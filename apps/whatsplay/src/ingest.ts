@@ -62,6 +62,7 @@ export function createIngest(deps: IngestDeps) {
         message_id: messageId,
         text: msg.text,
         author_name: msg.author_name ?? msg.chat_name,
+        is_group: msg.is_group,
         deliver: true,
         chat_id: msg.chat_id,
       },

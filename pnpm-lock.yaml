@@ -152,6 +152,9 @@ importers:
       '@luna/brain':
         specifier: workspace:*
         version: link:../../packages/brain
+      '@luna/channels':
+        specifier: workspace:*
+        version: link:../../packages/channels
       '@luna/database':
         specifier: workspace:*
         version: link:../../packages/database

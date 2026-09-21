@@ -74,6 +74,22 @@ async function main(): Promise<void> {
   });
   await telegramAdmin.start();
 
+  // F5 — escalação avançada: SLA timers (CRÍTICA 5min/ALTA 10min), follow-up
+  // de degrau e retomada de cascata (ADR-025). Tick direto (manutenção
+  // interna, como o reaper), a cada 60s.
+  const { runEscalationTick } = await import('./jobs/escalation-tick.js');
+  const escalationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
+  const escTick = async () => {
+    try {
+      await runEscalationTick({ pool, log, telegram: escalationTelegram });
+    } catch (err) {
+      log.error({ err }, 'escalation tick falhou');
+    }
+  };
+  await escTick();
+  const escTimer = setInterval(escTick, 60_000);
+  escTimer.unref();
+
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 

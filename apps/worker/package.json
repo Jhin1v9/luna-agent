@@ -14,7 +14,8 @@
     "@luna/database": "workspace:*",
     "@luna/agent": "workspace:*",
     "@luna/brain": "workspace:*",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "@luna/channels": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

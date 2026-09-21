@@ -39,6 +39,8 @@ interface HandlerPayload {
   text?: string;
   /** Quem falou (nome do membro no grupo / contato no privado). */
   author_name?: string | null;
+  /** true se a mensagem veio de grupo (detecção de humano na escalção). */
+  is_group?: boolean;
   /** true = mensagem de canal real (WhatsPlay entrega); false = simulação. */
   deliver?: boolean;
 }
@@ -88,8 +90,8 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     await transitionConversation(db, conversationId, 'NEEDS_HUMAN');
     await transitionConversation(db, conversationId, 'HUMAN_NOTIFIED');
     await db.query(
-      `INSERT INTO escalations (client_id, conversation_id, reason, priority, status, metadata)
-       VALUES ($1, $2, $3, $4, 'notified', $5)`,
+      `INSERT INTO escalations (client_id, conversation_id, reason, priority, status, notified_at, metadata)
+       VALUES ($1, $2, $3, $4, 'notified', now(), $5)`,
       [
         event.client_id,
         conversationId,
@@ -170,8 +172,63 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     }
 
     // ADR-026/§8: durante HUMAN_HANDLING a Luna não fala por cima do humano.
+    // ADR-025: humano respondendo = transição consciente; humano EXTRA = status,
+    // jamás re-escalação. Detecção: em GRUPO, autor != contato do cliente.
     const state = await getConversationState(db, conversationId);
     if (state === 'HUMAN_HANDLING' || state === 'NEEDS_HUMAN' || state === 'HUMAN_NOTIFIED') {
+      const contactName = await db
+        .query<{ name: string | null }>(
+          `SELECT ct.name FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1`,
+          [conversationId],
+        )
+        .then((r) => r.rows[0]?.name ?? null);
+      const author = payload.author_name ?? null;
+      const isGroup = payload.is_group === true;
+      const isHuman = isGroup && author !== null && author !== contactName;
+
+      if (isHuman && state !== 'NEEDS_HUMAN') {
+        const open = await db.query<{ id: string; handled_by: string | null }>(
+          `SELECT id, handled_by FROM escalations
+           WHERE conversation_id = $1 AND status IN ('notified','handling') ORDER BY created_at DESC LIMIT 1`,
+          [conversationId],
+        );
+        const esc = open.rows[0];
+        if (esc && (!esc.handled_by || esc.handled_by === author)) {
+          // Humano (o mesmo que atendeu) falando — atualiza atividade.
+          await db.query(
+            `UPDATE escalations SET status = 'handling', handled_by = $2, last_handled_at = now(), updated_at = now() WHERE id = $1`,
+            [esc.id, author],
+          );
+          if (state !== 'HUMAN_HANDLING') {
+            await transitionConversation(db, conversationId, 'HUMAN_HANDLING');
+            await recordAudit(db, {
+              actor: 'orchestrator', action: 'escalation.human.responded', tool: 'message_handler',
+              client_id: event.client_id, correlation_id: event.correlation_id, result: 'success',
+              metadata: { escalation_id: esc.id, handled_by: author },
+            });
+          }
+        } else if (esc && esc.handled_by && esc.handled_by !== author) {
+          // Humano EXTRA (ADR-025): status, nunca re-escalação.
+          await recordAudit(db, {
+            actor: 'orchestrator', action: 'escalation.coordination.status', tool: 'message_handler',
+            client_id: event.client_id, correlation_id: event.correlation_id, result: 'success',
+            metadata: { escalation_id: esc.id, handled_by: esc.handled_by, extra_human: author },
+          });
+          if (deps.telegram?.botToken && deps.telegram.teamChatId) {
+            try {
+              const { sendTeamMessage } = await import('@luna/channels');
+              await sendTeamMessage(
+                `🤝 Coordenação: ${author} entrou na conversa, mas ${esc.handled_by} já está cuidando do caso. ` +
+                  `Status: segue com ${esc.handled_by} (jamás re-escalação, ADR-025).`,
+                deps.telegram,
+              );
+            } catch (err) {
+              log.error({ err }, 'coordenação: status Telegram falhou');
+            }
+          }
+        }
+      }
+
       log.info({ state, conversation_id: conversationId }, 'HUMAN_HANDLING ativo — mensagem anexada à escalación, sem resposta automática');
       await recordAudit(db, {
         actor: 'orchestrator',
@@ -185,7 +242,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       await recordActivity(db, {
         client_id: event.client_id,
         kind: 'info',
-        summary: `Mensagem do cliente anexada à escalación em andamento (Luna silenciada, §8).`,
+        summary: `Mensagem anexada à escalación em andamento (Luna silenciada, §8).`,
         correlation_id: event.correlation_id,
       });
       return;
