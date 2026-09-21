@@ -48,10 +48,26 @@ cola = tabela `jobs` + worker.
 > sent + activity + audit num correlation_id só → RESOLVED. Achado do teste
 > vivo: grupo detectado como privado (heurística de nome) — violação §5,
 > corrigido com jid `@g.us`, daemon reiniciado. Ingest = watcher de badges
-> (ADR no watcher.ts; mutation-driven 100% fica pra F1.5). Gemini interino
-> mantido como opção (ADR-018; key anterior inválida). Testes: 77 verdes.
-> Daemons em produção local: orchestrator + whatsplay detached (ver relatório
-> da fase). Próxima: F1.5 Recovery/E2E.
+> (ADR no watcher.ts; sweep de allowlisted cobre msgs lidas/virtualizadas e o
+> self-test do owner). Gemini interino mantido como opção (ADR-018).
+>
+> **F1.5 Recovery/E2E ✅ — FASE F1 COMPLETA** — auto-reparo visual com VISÃO
+> REAL do k2.6 (probe no boot: `vision: true` — ADR-021): screenshot+DOM →
+> FAST analisa → retry com seletor sugerido → máx 3 → selector memory
+> automática (§13) + incident + Telegram (falha explícita se sem token).
+> Watchdog geral (§20, ADR-022) + self-test (boot + 6h) + heartbeats (migração
+> 005). Supervisão em duas camadas: **pm2 ressobe processos** (ecosystem,
+> node direto no tsx), **watchdog supervisiona saúde** e alerta.
+> `@luna/channels` real (Telegram). Acceptance E2E da §31 validado AO VIVO:
+> reboot no meio de job (sem perda) · duplicata não duplica · isolamento A/B ·
+> chrome morto → relaunch automático com sessão persistente (sem QR) · falha →
+> alerta explícito · correlation na cadeia · activity+audit. **112 testes
+> verdes.** Daemons: `pm2 list` (luna-orchestrator/whatsplay/worker/watchdog;
+> `pm2 save` feito; `pm2 startup` pendente — precisa admin). ADRs 015–022 em
+> `docs/adr/`. Próxima: F2 — notificações multicanal (push PWA, email,
+> WhatsApp por preferência) + usage ledger completo + Model Router.
+> Divergências: reboot de máquina simulado por restart de processos; Telegram
+> sem token (alertas explícitos em log).
 
 ## Quick start
 
