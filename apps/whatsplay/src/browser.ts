@@ -3,12 +3,14 @@ import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { SELECTORS } from './selectors.js';
 import { extractMention } from './rules.js';
+import { normalizeName } from './allowlist.js';
 import {
   STATE_PROBES_SCRIPT,
   COLLECT_UNREAD_CHATS_SCRIPT,
   READ_PANEL_MESSAGES_SCRIPT,
   READ_CONVERSATION_SCRIPT,
   MUTATION_OBSERVER_SCRIPT,
+  OPEN_CHAT_TITLE_SCRIPT,
   ARCHIVED_OPEN_SCRIPT,
   SIMPLIFIED_DOM_SCRIPT,
 } from './page-scripts.js';
@@ -191,7 +193,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   async readConversation(chatId: string, limit = 20): Promise<ConversationMessage[]> {
     const page = this.requirePage();
-    await this.openChat(chatId);
+    // NUNCA ler o painel sem conferir o chat: openChat verifica o título.
+    // Falhou → retorna vazio (o sweep tenta de novo no próximo ciclo).
+    if (!(await this.openChat(chatId))) return [];
     const messages = (await evalWithArg(page, READ_CONVERSATION_SCRIPT, {
       sel: SELECTORS,
       lim: limit,
@@ -201,7 +205,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   async sendMessage(chatId: string, text: string, opts?: { inputSelector?: string }): Promise<string> {
     const page = this.requirePage();
-    await this.openChat(chatId);
+    // Idem: sem verificação, o texto iria para o chat ERRADO (bug de
+    // roteamento 2026-09-21). Falha explícita > envio no destino errado.
+    if (!(await this.openChat(chatId))) {
+      throw new Error(`não consegui abrir o chat '${chatId}' — envio ABORTADO para não ir pro chat errado`);
+    }
     // Seletor do campo: override vem do auto-reparo (§14); default = SELECTORS.
     const inputSelector = opts?.inputSelector ?? SELECTORS.inputBox;
     await page.click(inputSelector);
@@ -237,27 +245,64 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
   }
 
-  /** Abre chat pelo nome (v0). F1.5: busca por jid/telefone com fallback visual. */
+  /** Título do chat aberto no painel agora (null se nenhum). */
+  private async currentOpenChatTitle(): Promise<string | null> {
+    const page = this.requirePage();
+    return (await page.evaluate(OPEN_CHAT_TITLE_SCRIPT).catch(() => null)) as string | null;
+  }
+
+  /**
+   * Abre chat pelo nome com VERIFICAÇÃO do painel — e fallback pela BUSCA.
+   *
+   * BUG GRAVE de roteamento (2026-09-21, owner): a lista é virtualizada; se a
+   * row do chat não está no DOM, o clique falhava em silêncio e
+   * readConversation lia o painel que estivesse ABERTO (outro chat!) — uma
+   * pergunta do GRUPO foi atribuída à conversa da namorada e respondida lá
+   * (evidência: evt_48805460). Regra nova: SÓ ler/enviar com o título do
+   * painel conferido (normalização bidi); se não abrir de verdade → falha
+   * explícita, nunca ação no chat errado.
+   */
   private async openChat(nameOrId: string): Promise<boolean> {
     const page = this.requirePage();
     const key = nameOrId.replace(/"/g, '\\"');
     await this.ensureMainChatList();
-    // Clique NATIVO do Playwright — el.click() sintético não abre o painel no
-    // WA Web (descoberto ao vivo pelo readcheck, painel ficava mainPresent=false).
-    // Atenção ao seletor com vírgula: `A, B:has(x)` aplica :has só em B —
-    // prefixar A com #pane-side resolve (bug achado ao vivo: clicava o 1º chat).
+
+    const matches = async (): Promise<boolean> => {
+      const title = await this.currentOpenChatTitle();
+      return title !== null && normalizeName(title) === normalizeName(nameOrId);
+    };
+
+    // 1) clique na row visível (caminho rápido)
     const row = page
       .locator(
         `#pane-side [role="row"]:has([title="${key}"]), #pane-side [data-testid="cell-frame-container"]:has([title="${key}"])`,
       )
       .first();
-    try {
-      await row.click({ timeout: 5_000 });
-    } catch {
-      return false;
+    const clicked = await row.click({ timeout: 4_000 }).then(() => true).catch(() => false);
+    if (clicked) {
+      await page.waitForTimeout(700);
+      if (await matches()) return true;
     }
-    await page.waitForSelector(SELECTORS.messagePanel, { timeout: 5_000 }).catch(() => null);
-    return true;
+
+    // 2) fallback: BUSCA (funciona mesmo com a chat fora da viewport)
+    const search = page
+      .locator('#side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]')
+      .first();
+    if ((await search.count()) > 0) {
+      await search.click({ timeout: 3_000 }).catch(() => {});
+      await page.keyboard.type(nameOrId, { delay: 40 });
+      await page.waitForTimeout(900);
+      const firstResult = page.locator('#pane-side [role="row"], #pane-side [data-testid="cell-frame-container"]').first();
+      await firstResult.click({ timeout: 4_000 }).catch(() => {});
+      await page.waitForTimeout(700);
+      if (await matches()) {
+        // limpa a busca pra não poluir a UI da sessão
+        await page.keyboard.press('Escape').catch(() => {});
+        return true;
+      }
+      await page.keyboard.press('Escape').catch(() => {});
+    }
+    return false;
   }
 
   /** Chat aberto no momento é grupo? (best-effort — marcadores do header). */

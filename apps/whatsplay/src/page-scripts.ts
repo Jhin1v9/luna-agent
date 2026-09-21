@@ -151,3 +151,13 @@ export const SIMPLIFIED_DOM_SCRIPT = `(() => {
   walk(document.body, 0);
   return lines.join('\\n');
 })()`;
+
+/** Título do chat aberto no painel (verificação pós-clique). */
+export const OPEN_CHAT_TITLE_SCRIPT = `(() => {
+  const el = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
+  if (!el) {
+    const t = document.querySelector('#main header [title]');
+    return t ? t.getAttribute('title') : null;
+  }
+  return (el.textContent || '').trim() || el.getAttribute('title');
+})()`;

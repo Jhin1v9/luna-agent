@@ -4,7 +4,7 @@ import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
-import { recordActivity, recordAudit, publishEvent, type Sql } from '@luna/database';
+import { recordActivity, recordAudit, publishEvent, enqueueJob, type Sql } from '@luna/database';
 import { buildClientConversationPack, renderConversationPrompt } from './context.js';
 import { transitionConversation, getConversationState } from './attention.js';
 import { runFastRoute, selectRoute } from './router/router.js';
@@ -293,6 +293,16 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       });
     } else {
       await transitionConversation(db, conversationId, 'RESOLVED');
+      // §27: classificação pós-conversa — job pro worker (cola, §7.12).
+      await enqueueJob(db, {
+        job_type: 'conversation.classify',
+        payload: {
+          conversation_id: conversationId,
+          client_id: event.client_id,
+          correlation_id: event.correlation_id,
+        },
+        idempotency_key: `classify:${event.event_id}`,
+      });
     }
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.

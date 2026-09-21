@@ -52,6 +52,16 @@ de menção §5 já existente; como privado no escopo, responde sempre). Ela nã
 é cobaia de teste: nenhuma mensagem de teste é enviada por iniciativa do
 sistema.
 
+## REMOVIDO (mesmo dia, terceiro decreto — revertendo o acréscimo)
+
+Após o **incidente de roteamento** (pergunta do owner no GRUPO respondida no
+privado dela — causa raiz: sweep atribuindo texto do painel aberto ao chat
+errado, corrigido com verificação de título + SEND-SAFETY), o owner removeu
+"Meu Amorzinho 💖🌻" das duas allowlists. Escopo voltou a: **Pai e
+🏆Production - 2026🙏🏻** apenas. As lições estruturais ficam: matcher com
+normalização bidi, verificação de chat aberto antes de ler/enviar, e o
+send-safety que bloqueia mismatch pergunta→resposta com alerta imediato.
+
 **Matcher endurecido com normalização**: nomes são comparados com marcas
 invisíveis de bidi (\u202A-\u202E, \u200E/\u200F) removidas dos DOIS lados —
 títulos do WhatsApp às vezes carregam essas marcas e um match exato cru

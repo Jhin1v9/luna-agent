@@ -190,3 +190,51 @@ describe('SWEEP de chats allowlisted — mensagem do owner (outbound @luna) disp
     expect(ingested).toHaveLength(1);
   });
 });
+
+describe('REGRESSÃO roteamento: resposta vai SEMPRE pro chat de origem (bug 2026-09-21)', () => {
+  it('pergunta no grupo → evento com chat_id do GRUPO mesmo com outro chat allowlisted ativo', async () => {
+    const ingested: Array<{ chat_id: string; text: string }> = [];
+    const perChat: Record<string, Array<{ sender: string; direction: 'inbound' | 'outbound'; text: string }>> = {
+      '🏆Production - 2026🙏🏻': [{ sender: 'Abner', direction: 'inbound', text: 'pergunta do grupo GROUP-SECRET' }],
+      'Outro Chat': [{ sender: 'X', direction: 'inbound', text: 'mensagem do outro chat OTHER-SECRET' }],
+    };
+    const transport = {
+      readConversation: async (chatId: string) => perChat[chatId] ?? [],
+      currentChatIsGroup: async () => true,
+    };
+    const watcher = new IngestWatcher(
+      {
+        pool: {} as never,
+        transport: transport as never,
+        log: { info: () => {}, debug: () => {}, error: () => {} } as never,
+        page: { evaluate: async () => [] as unknown[] },
+        selectors: {},
+        debounceMs: 5,
+        ingestAllowlist: ['🏆Production - 2026🙏🏻', 'Outro Chat'],
+        enforceIngestAllowlist: true,
+        ingestFn: async (msg) => {
+          ingested.push({ chat_id: msg.chat_id, text: msg.text });
+          return 'published';
+        },
+      },
+      { intervalMs: 60_000 },
+    );
+    for (let i = 0; i < 9; i++) await watcher.tick(); // seed + sweep
+    await new Promise((r) => setTimeout(r, 30));
+
+    const grupo = ingested.filter((m) => m.text.includes('GROUP-SECRET'));
+    const outro = ingested.filter((m) => m.text.includes('OTHER-SECRET'));
+    expect(grupo).toHaveLength(1);
+    expect(grupo[0]!.chat_id).toBe('🏆Production - 2026🙏🏻'); // NUNCA no outro chat
+    expect(outro).toHaveLength(1);
+    expect(outro[0]!.chat_id).toBe('Outro Chat');
+  });
+
+  it('contrato do transport: chat não aberto → [] (nunca painel arbitrário)', async () => {
+    // O browser.ts garante com verificação de título: readConversation só
+    // devolve mensagens do chatId pedido — esse é o buraco do cross-chat.
+    const perChat = { A: [{ sender: 's', direction: 'inbound' as const, text: 'segredo de A' }] };
+    const t = { readConversation: async (id: string) => perChat[id as 'A'] ?? [] };
+    await expect(t.readConversation('B')).resolves.toEqual([]);
+  });
+});

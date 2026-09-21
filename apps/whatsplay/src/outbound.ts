@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { KimiLiveAdapter } from '@luna/agent';
-import type { TelegramConfig } from '@luna/channels';
+import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
@@ -33,6 +33,7 @@ export interface OutboundDeps {
 interface OutboundMessageRow {
   id: string;
   body: string;
+  conversation_id: string;
   address: string | null;
   contact_name: string | null;
   correlation_id: string | null;
@@ -52,9 +53,80 @@ export function createOutboundListener(deps: OutboundDeps) {
       : `destinatário fora da allowlist de teste [${allowlist.join(', ')}]`;
   }
 
+  /**
+   * SEND-SAFETY (decreto owner, pós-incidente 2026-09-21): a resposta tem que
+   * ir SEMPRE pro mesmo chat de onde veio a pergunta. Antes de entregar,
+   * verifica se a conversa da mensagem outbound == conversa de origem do
+   * evento que a gerou (reply_to_event → events.payload.conversation_id).
+   *   mismatch PROVADO → bloqueio INCONDICIONAL + alerta imediato pro owner
+   *   no Telegram ("tentei responder no chat errado") + audit.
+   *   evento de origem ausente → segue com nota de auditoria (sem evidência
+   *   de mismatch não se bloqueia; com evidência, nunca se envia).
+   */
+  async function sendSafetyCheck(messageId: string, conversationId: string): Promise<void> {
+    const msg = await pool.query<{ reply_to_event: string | null }>(
+      `SELECT metadata->>'reply_to_event' AS reply_to_event FROM messages WHERE id = $1`,
+      [messageId],
+    );
+    const replyTo = msg.rows[0]?.reply_to_event;
+    if (!replyTo) {
+      await recordAudit(pool, {
+        actor: 'whatsplay', action: 'send_safety.skipped', tool: 'send_safety',
+        result: 'success', metadata: { message_id: messageId, motivo: 'sem reply_to_event (envio manual)' },
+      });
+      return;
+    }
+    const origin = await pool.query<{ origin_conv: string | null }>(
+      `SELECT payload->'payload'->>'conversation_id' AS origin_conv FROM events WHERE event_id = $1`,
+      [replyTo],
+    );
+    const originConv = origin.rows[0]?.origin_conv;
+    if (!originConv) {
+      await recordAudit(pool, {
+        actor: 'whatsplay', action: 'send_safety.skipped', tool: 'send_safety',
+        result: 'success', metadata: { message_id: messageId, motivo: 'evento de origem não encontrado' },
+      });
+      return;
+    }
+    if (originConv === conversationId) return; // vínculo íntegro
+
+    const alvo = await pool.query<{ address: string | null }>(
+      `SELECT ct.address FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1`,
+      [conversationId],
+    );
+    const origem = await pool.query<{ address: string | null }>(
+      `SELECT ct.address FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1`,
+      [originConv],
+    );
+    const destinoAlvo = alvo.rows[0]?.address ?? conversationId;
+    const destinoOrigem = origem.rows[0]?.address ?? originConv;
+
+    await mark(messageId, 'failed', `SEND-SAFETY: resposta ia para '${destinoAlvo}' mas a pergunta veio de '${destinoOrigem}' — bloqueado`);
+    await recordAudit(pool, {
+      actor: 'whatsplay', action: 'send_safety.blocked', tool: 'send_safety',
+      result: 'failed',
+      metadata: { message_id: messageId, ia_para: destinoAlvo, pergunta_veio_de: destinoOrigem, evento_origem: replyTo },
+    });
+    const alerta =
+      `🚨 SEND-SAFETY: bloqueei uma resposta no chat errado!\n` +
+      `Pergunta veio de: ${destinoOrigem}\nResposta ia para: ${destinoAlvo}\n` +
+      `Nada foi enviado. Confere o roteamento aí. — Luna`;
+    if (deps.telegram?.botToken && deps.telegram.teamChatId) {
+      try {
+        await sendTeamMessage(alerta, deps.telegram);
+      } catch (err) {
+        log.error({ err }, 'send-safety: alerta Telegram falhou');
+      }
+    } else {
+      log.error({ alerta }, 'send-safety: TELEGRAM não configurado — alerta NÃO enviado (falha explícita registrada)');
+    }
+    log.error({ message_id: messageId, ia_para: destinoAlvo, pergunta_veio_de: destinoOrigem }, 'SEND-SAFETY: entrega bloqueada (mismatch de conversa)');
+    throw new Error('send_safety_blocked');
+  }
+
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
-      `SELECT m.id, m.body, ct.address, ct.name AS contact_name,
+      `SELECT m.id, m.body, m.conversation_id, ct.address, ct.name AS contact_name,
               m.metadata->>'correlation_id' AS correlation_id
        FROM messages m
        JOIN conversations cv ON cv.id = m.conversation_id
@@ -68,6 +140,13 @@ export function createOutboundListener(deps: OutboundDeps) {
     if (!target) {
       await mark(messageId, 'failed', 'sem contato/alvo de entrega');
       return;
+    }
+    // SEND-SAFETY antes de tudo: vínculo pergunta→resposta íntegro.
+    try {
+      await sendSafetyCheck(messageId, row.conversation_id);
+    } catch (err) {
+      if (String(err).includes('send_safety_blocked')) return; // já auditado/alertado/bloqueado
+      throw err;
     }
     const refusal = refusedByAllowlist(target);
     if (refusal) {

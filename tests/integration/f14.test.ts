@@ -358,3 +358,62 @@ describe('GUARDRAIL outbound allowlist em Postgres real (decreto do owner)', () 
     expect(msg.rows[0]!.send_state).toBe('failed');
   });
 });
+
+// ─────────────────────────── SEND-SAFETY (decreto owner, pós-incidente 2026-09-21) ───────────────────────────
+
+describe('SEND-SAFETY: resposta vai SEMPRE pro chat da pergunta (mismatch = bloqueio incondicional)', () => {
+  async function setupOutboundWithOrigin(originConv: string, outboundConv: string): Promise<string> {
+    // evento de origem apontando pra conversation X
+    const ev = await pool.query<{ event_id: string }>(
+      `INSERT INTO events (event_id, event_type, version, correlation_id, priority, payload, occurred_at)
+       VALUES ('evt_safety_1', 'whatsapp.message.received', 1, 'corr_safety_1', 0,
+               $1::jsonb, now()) RETURNING event_id`,
+      [JSON.stringify({ payload: { conversation_id: originConv, text: 'pergunta' } })],
+    );
+    void ev;
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, direction, channel, sender, body, send_state, metadata)
+       VALUES ($1, 'outbound', 'whatsapp', 'luna', 'resposta', 'queued',
+               jsonb_build_object('reply_to_event', 'evt_safety_1', 'correlation_id', 'corr_safety_1'))
+       RETURNING id`,
+      [outboundConv],
+    );
+    return inserted.rows[0]!.id;
+  }
+
+  it('mismatch PROVADO: bloqueado, nada enviado, audit send_safety.blocked', async () => {
+    const a = await resolveIngressIdentity(pool, { client_name: 'Chat A', channel: 'whatsapp', address: 'Pai' });
+    const b = await resolveIngressIdentity(pool, { client_name: 'Chat B', channel: 'whatsapp', address: '🏆Production - 2026🙏🏻' });
+    const messageId = await setupOutboundWithOrigin(a.conversation_id, b.conversation_id);
+
+    const sent: string[] = [];
+    const { createOutboundListener } = await import('../../apps/whatsplay/src/outbound.js');
+    const listener = createOutboundListener({
+      pool, transport: fakeTransport(sent), log, humanDelayMs: 0,
+      allowlist: ['Pai', '🏆Production - 2026🙏🏻'], enforceAllowlist: true,
+    });
+    await listener.deliverOne(messageId);
+
+    expect(sent).toHaveLength(0); // NADA foi enviado
+    const msg = await pool.query<{ send_state: string }>('SELECT send_state FROM messages WHERE id = $1', [messageId]);
+    expect(msg.rows[0]!.send_state).toBe('failed');
+    expect((await pool.query("SELECT * FROM audit_log WHERE action = 'send_safety.blocked'")).rowCount).toBe(1);
+  });
+
+  it('vínculo íntegro (resposta na conversa da pergunta): entrega normal', async () => {
+    const a = await resolveIngressIdentity(pool, { client_name: 'Chat A2', channel: 'whatsapp', address: 'Pai' });
+    const messageId = await setupOutboundWithOrigin(a.conversation_id, a.conversation_id);
+
+    const sent: string[] = [];
+    const { createOutboundListener } = await import('../../apps/whatsplay/src/outbound.js');
+    const listener = createOutboundListener({
+      pool, transport: fakeTransport(sent), log, humanDelayMs: 0,
+      allowlist: ['Pai', '🏆Production - 2026🙏🏻'], enforceAllowlist: true,
+    });
+    await listener.deliverOne(messageId);
+
+    expect(sent).toHaveLength(1);
+    const msg = await pool.query<{ send_state: string }>('SELECT send_state FROM messages WHERE id = $1', [messageId]);
+    expect(msg.rows[0]!.send_state).toBe('sent');
+  });
+});

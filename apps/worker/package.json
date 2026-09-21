@@ -11,7 +11,10 @@
   "dependencies": {
     "@luna/shared": "workspace:*",
     "@luna/logging": "workspace:*",
-    "@luna/database": "workspace:*"
+    "@luna/database": "workspace:*",
+    "@luna/agent": "workspace:*",
+    "@luna/brain": "workspace:*",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

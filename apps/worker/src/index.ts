@@ -32,6 +32,19 @@ async function main(): Promise<void> {
     await ctx.recordActivity({ kind: 'info', summary: 'Worker respondeu um ping.' });
   });
 
+  // Classifier pós-conversa (§27): ao RESOLVED, o orchestrator enfileira
+  // 'conversation.classify' — o worker classifica com o FAST e alimenta o
+  // Brain (OPINIONES do cliente + sinapse + memory_index).
+  const { createAdapter } = await import('@luna/agent');
+  const { createClassifyHandler } = await import('./jobs/classify.js');
+  const classifyAdapter = createAdapter({
+    mode: 'kimi-api',
+    apiKey: config.LLM_API_KEY,
+    apiBaseUrl: config.LLM_BASE_URL,
+    apiModel: config.LLM_MODEL,
+  });
+  runner.register('conversation.classify', createClassifyHandler({ pool, adapter: classifyAdapter, log }));
+
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 

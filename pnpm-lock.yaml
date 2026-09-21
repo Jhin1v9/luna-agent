@@ -146,6 +146,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@luna/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@luna/brain':
+        specifier: workspace:*
+        version: link:../../packages/brain
       '@luna/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -155,6 +161,9 @@ importers:
       '@luna/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -186,6 +195,9 @@ importers:
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@24.13.6)(tsx@4.23.15)
 
   packages/channels:
     dependencies:
