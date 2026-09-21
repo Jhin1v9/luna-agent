@@ -49,4 +49,6 @@ export interface WhatsAppTransport {
   sendMessage(chatId: string, text: string): Promise<string>;
   /** Mídia fica para F1.5 (áudio/print); a interface já reserva o lugar. */
   sendMedia?(chatId: string, mediaPath: string, caption?: string): Promise<string>;
+  /** Chat aberto no momento é grupo? (best-effort, v0 — sweep de teste). */
+  currentChatIsGroup?(): Promise<boolean>;
 }

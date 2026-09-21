@@ -82,13 +82,13 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
     return { watcher, readCalls, ingested };
   }
 
-  it('chat FORA do escopo: NÃO abre o chat (zero mark-as-read), NÃO ingere, NÃO gasta tokens', async () => {
+  it('escopo em dev: badge-path ignora TODOS os chats allowlisted (sweep é o dono) e fora do escopo nem abre', async () => {
     const { watcher, readCalls, ingested } = makeWatcher(['Pai'], true);
     await watcher.tick(); // seed
     await watcher.tick(); // diff
     await new Promise((r) => setTimeout(r, 30)); // debounce flush
-    expect(readCalls).toEqual(['c1']); // só o Pai foi aberto
-    expect(ingested).toEqual(['c1']); // fora do escopo ignorado
+    expect(readCalls).toEqual([]); // badge-path não abre nada em dev (sweep cuida)
+    expect(ingested).toEqual([]);
   });
 
   it('lista VAZIA em dev: NADA é processado (fail-closed)', async () => {
@@ -100,28 +100,93 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
     expect(ingested).toEqual([]);
   });
 
-  it('grupo permitido por nome (decreto owner): entra no escopo', async () => {
-    const { watcher, readCalls, ingested } = makeWatcher(['🏆Production - 2026🙏🏻'], true);
-    // reconfigura amostra: c1 vira o grupo permitido
-    (watcher as unknown as { deps: { page: { evaluate: () => Promise<unknown> } } }).deps.page.evaluate = (async () =>
-      [{ chat_id: 'g1', chat_name: '🏆Production - 2026🙏🏻', unread: 1, preview: '@luna oi', is_group: true }]) as never;
-    await watcher.tick(); // seed
-    await watcher.tick(); // mesmo preview → sem diff
-    expect(ingested).toEqual([]);
-    (watcher as unknown as { deps: { page: { evaluate: () => Promise<unknown> } } }).deps.page.evaluate = (async () =>
-      [{ chat_id: 'g1', chat_name: '🏆Production - 2026🙏🏻', unread: 2, preview: '@luna oi tudo', is_group: true }]) as never;
-    await watcher.tick();
-    await new Promise((r) => setTimeout(r, 30));
-    expect(readCalls).toEqual(['g1']);
-    expect(ingested).toEqual(['g1']);
-  });
-
-  it('produção (enforce=false): tudo processado normalmente', async () => {
+  it('produção (enforce=false): badge-path processa tudo normalmente', async () => {
     const { watcher, readCalls, ingested } = makeWatcher(['Pai'], false);
     await watcher.tick();
     await watcher.tick();
     await new Promise((r) => setTimeout(r, 30));
     expect(readCalls).toContain('c2');
     expect(ingested).toContain('c2');
+  });
+});
+
+describe('SWEEP de chats allowlisted — mensagem do owner (outbound @luna) dispara em dev', () => {
+  function makeSweepWatcher(script: Array<Array<{ sender: string; direction: 'inbound' | 'outbound'; text: string }>>, isGroup = false) {
+    const ingested: Array<{ chat_id: string; text: string }> = [];
+    let sample = 0;
+    const page = { evaluate: async () => [] as unknown[] };
+    const transport = {
+      readConversation: async () => script[Math.min(sample, script.length - 1)]!,
+      currentChatIsGroup: async () => isGroup,
+    };
+    const watcher = new IngestWatcher(
+      {
+        pool: {} as never,
+        transport: transport as never,
+        log: { info: () => {}, debug: () => {}, error: () => {} } as never,
+        page,
+        selectors: {},
+        debounceMs: 5,
+        ingestAllowlist: ['Pai'],
+        enforceIngestAllowlist: true,
+        ingestFn: async (msg) => {
+          ingested.push({ chat_id: msg.chat_id, text: msg.text });
+          return 'published';
+        },
+      },
+      { intervalMs: 60_000 },
+    );
+    // sweep roda quando sweepCount % 8 === 0; o 1º tick é seed (retorna antes
+    // do sweep), então 9 ticks garantem uma janela de sweep por chamada.
+    const tickWithSweep = async () => {
+      for (let i = 0; i < 9; i++) await watcher.tick();
+      sample++;
+      await new Promise((r) => setTimeout(r, 30));
+    };
+    return { watcher, ingested, tickWithSweep };
+  }
+
+  it('mensagem OUTBOUND do owner com @luna → dispara (self-test trigger)', async () => {
+    const { ingested, tickWithSweep } = makeSweepWatcher([
+      [], // seed: sem mensagens
+      [{ sender: 'Tú', direction: 'outbound', text: '@luna oi' }],
+    ]);
+    await tickWithSweep(); // seed + sweep vazio
+    expect(ingested).toEqual([]);
+    await tickWithSweep(); // sweep vê "@luna oi" do owner
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]!.text).toBe('oi'); // menção @luna removida
+  });
+
+  it('resposta da própria Luna (outbound SEM @luna) → ignorada', async () => {
+    const { ingested, tickWithSweep } = makeSweepWatcher([
+      [],
+      [{ sender: 'Tú', direction: 'outbound', text: 'Oi! Tudo bem por aí?' }],
+    ]);
+    await tickWithSweep();
+    await tickWithSweep();
+    expect(ingested).toEqual([]);
+  });
+
+  it('mensagem INBOUND de cliente → dispara normalmente', async () => {
+    const { ingested, tickWithSweep } = makeSweepWatcher([
+      [],
+      [{ sender: 'Pai', direction: 'inbound', text: 'boa tarde' }],
+    ]);
+    await tickWithSweep();
+    await tickWithSweep();
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]!.text).toBe('boa tarde');
+  });
+
+  it('mesma mensagem em varreduras seguidas → não repete', async () => {
+    const { ingested, tickWithSweep } = makeSweepWatcher(
+      [[{ sender: 'Pai', direction: 'inbound', text: 'oi de novo' }]],
+    );
+    await tickWithSweep(); // primeira vista: dispara (acionável)
+    expect(ingested).toHaveLength(1);
+    await tickWithSweep(); // mesma mensagem → não repete
+    await tickWithSweep();
+    expect(ingested).toHaveLength(1);
   });
 });

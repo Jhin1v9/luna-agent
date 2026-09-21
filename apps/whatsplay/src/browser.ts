@@ -257,6 +257,21 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return true;
   }
 
+  /** Chat aberto no momento é grupo? (best-effort — marcadores do header). */
+  async currentChatIsGroup(): Promise<boolean> {
+    const page = this.requirePage();
+    return page
+      .evaluate(`(() => {
+        const header = document.querySelector('[data-testid="conversation-info-header"]');
+        if (!header) return false;
+        if (header.querySelector('[data-testid*="group"]')) return true;
+        const text = header.textContent || '';
+        return /\\bgrupo\\b|\\bgroup\\b|participantes|members/i.test(text);
+      })()`)
+      .then((r) => r === true)
+      .catch(() => false);
+  }
+
   /** Evidência para auto-reparo (§14/F1.5): screenshot + DOM simplificado. */
   async captureEvidence(prefix: string): Promise<EvidencePaths> {
     const page = this.page;

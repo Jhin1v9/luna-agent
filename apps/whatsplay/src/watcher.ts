@@ -110,6 +110,10 @@ export class IngestWatcher {
   private readonly intervalMs: number;
   private readonly ingestAllowlist: string[];
   private readonly enforceIngest: boolean;
+  private sweepCount = 0;
+  /** Roda o sweep a cada N ticks (4s × 8 ≈ 32s). */
+  private readonly sweepEvery = 8;
+  private lastSeenMsg = new Map<string, string>();
 
   constructor(
     private readonly deps: WatcherDeps,
@@ -140,6 +144,13 @@ export class IngestWatcher {
       this.deps.log.info({ chats: badges.length, withUnread: badges.filter((b) => b.unread > 0).length }, 'watcher: baseline armado (nada antigo dispara)');
       return { seeded: true, fresh: 0 };
     }
+    this.sweepCount++;
+    if (this.enforceIngest && this.ingestAllowlist.length > 0 && this.sweepCount % this.sweepEvery === 0) {
+      // Sweep periódico dos chats allowlisted: cobre mensagem JÁ LIDA,
+      // chat virtualizado fora do DOM e (fora de produção) o gatilho de
+      // teste do owner — mensagem dele é OUTBOUND na sessão com @luna.
+      await this.sweepAllowlisted().catch((err) => this.deps.log.error({ err }, 'watcher: sweep falhou'));
+    }
     const fresh = diffBadges(this.baseline, badges);
     for (const b of fresh) {
       this.baseline.set(b.chat_id, b.preview);
@@ -149,12 +160,67 @@ export class IngestWatcher {
         this.deps.log.debug({ chat: b.chat_name }, 'watcher: fora do escopo de ingestão — ignorado (zero tokens)');
         continue;
       }
+      if (this.enforceIngest) {
+        // chats allowlisted são responsabilidade do sweep — evita corrida
+        // badge-path × sweep-path (dupla resposta no mesmo chat).
+        this.deps.log.debug({ chat: b.chat_name }, 'watcher: chat no escopo (sweep processa) — badge-path ignora');
+        continue;
+      }
       this.deps.log.info({ chat: b.chat_name, unread: b.unread }, 'watcher: mensagem nova detectada');
       void this.extractAndIngest(b).catch((err) =>
         this.deps.log.error({ err, chat: b.chat_name }, 'watcher: ingest falhou'),
       );
     }
     return { seeded: false, fresh: fresh.length };
+  }
+
+  /**
+   * Sweep dos chats allowlisted: abre cada um (título visível ou busca),
+   * lê as últimas mensagens e dispara ingest quando a última mensagem MUDA.
+   * - inbound → mensagem de cliente (normal);
+   * - outbound + @luna → gatilho de TESTE do owner: na sessão do WhatsApp
+   *   Web, a mensagem DELE é outbound — fora de produção ela dispara a Luna
+   *   (descoberto ao vivo: owner testava com mensagens próprias e nada
+   *   acontecia). Outras mensagens outbound (respostas da própria Luna) são
+   *   ignoradas.
+   */
+  private async sweepAllowlisted(): Promise<void> {
+    for (const entry of this.ingestAllowlist) {
+      if (entry.includes('@')) continue; // sweep por nome; jid pula
+      try {
+        const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
+        const last = msgs[msgs.length - 1];
+        if (!last) continue;
+        const key = `${last.direction}:${last.text}`;
+        const prev = this.lastSeenMsg.get(entry);
+        this.lastSeenMsg.set(entry, key);
+        const isSelfTest = last.direction === 'outbound' && /@luna\b/i.test(last.text);
+        if (last.direction === 'outbound' && !isSelfTest) continue; // resposta da própria Luna
+        if (prev === key) continue; // mesma mensagem da última varredura
+        // Primeira vista (prev undefined): dispara SE acionável (inbound ou
+        // self-test do owner); dedupe fino de repetição fica no unique
+        // (channel, external_id) de messages.
+        const text = last.text.replace(/@luna\b/gi, '').trim() || last.text;
+        const msg: UnreadMessage = {
+          chat_id: entry,
+          chat_name: entry,
+          is_group: (await this.deps.transport.currentChatIsGroup?.().catch(() => false)) ?? false,
+          text,
+          external_id: `wa:${entry}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
+          mentioned_luna: /@luna\b/i.test(last.text),
+          quoted_from_luna: false,
+          received_at: new Date().toISOString(),
+        };
+        this.deps.log.info({ chat: entry, self_test: isSelfTest }, 'watcher(sweep): mensagem nova');
+        this.debouncer.push(`sweep:${entry}`, msg.text, (combined) => {
+          void this.ingest({ ...msg, text: combined }).catch((err) =>
+            this.deps.log.error({ err }, 'watcher: ingest falhou'),
+          );
+        });
+      } catch {
+        // chat não abriu agora (virtualizado?), tenta no próximo ciclo
+      }
+    }
   }
 
   /** Abre só o chat novidade, extrai mensagens inbound recentes, ingere. */
