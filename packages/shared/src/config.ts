@@ -15,15 +15,19 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
-  // KimiAdapter (§7.3, ADR-010/015): mock = dev/testes determinístico;
-  // kimi-web = servidor local em 127.0.0.1 (sendTurn ainda não mapeado — ADR-015).
-  // kimi-api = fast brain REAL (§7.2, ADR-016) — único modo permitido em produção.
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api']).default('mock'),
+  // KimiAdapter (§7.3, ADR-010/015/016/018): mock = dev/testes determinístico
+  // (proibido em produção — ADR-016); kimi-web = servidor local 127.0.0.1
+  // (sendTurn via WS ainda não mapeado — ADR-015); kimi-api = fast brain
+  // oficial (§7.2, ADR-016); gemini = fast brain INTERINO para teste (ADR-018).
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini']).default('mock'),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
   KIMI_WEB_TOKEN: z.string().optional(),
   KIMI_API_KEY: z.string().optional(),
   KIMI_API_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
   KIMI_API_MODEL: z.string().default('kimi-k2-0905-preview'),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_BASE_URL: z.string().url().default('https://generativelanguage.googleapis.com/v1beta/openai/'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   // WhatsPlay (§13): Chrome DEDICADO com user-data-dir próprio — nunca o
   // perfil do Chrome do usuário.
   WHATSAPP_CHROME_PATH: z
@@ -58,10 +62,25 @@ export function resetConfigCache(): void {
 /**
  * Carrega um arquivo .env simples (KEY=VALUE por linha) para process.env,
  * sem sobrescrever variáveis já definidas. Não expande variáveis.
+ * Procura do cwd para cima (apps/<app> acham o .env da raiz do monorepo).
  */
-export function loadDotEnv(path = resolve(process.cwd(), '.env')): void {
-  if (!existsSync(path)) return;
-  const content = readFileSync(path, 'utf8');
+export function loadDotEnv(path?: string): void {
+  let envPath = path;
+  if (!envPath) {
+    let dir = process.cwd();
+    for (;;) {
+      const candidate = resolve(dir, '.env');
+      if (existsSync(candidate)) {
+        envPath = candidate;
+        break;
+      }
+      const parent = resolve(dir, '..');
+      if (parent === dir) return; // nenhum .env achado — defaults assumem o volante
+      dir = parent;
+    }
+  }
+  if (!existsSync(envPath)) return;
+  const content = readFileSync(envPath, 'utf8');
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;

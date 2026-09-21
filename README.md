@@ -36,21 +36,22 @@ cola = tabela `jobs` + worker.
 > RESOLVED → evidência com correlation). Migração 003: não precisou.
 > Testes: 18 unitários + 21 de integração, verdes.
 >
-> **F1.4 WhatsPlay + Brain Real ✅ (critério PARCIAL — falta a KIMI_API_KEY e o
-> pareamento do QR)** — KimiApiAdapter (fast brain real, §7.2; decreto do owner:
-> resposta de cliente NUNCA sai do mock — guarda de boot em produção, sem
-> fallback silencioso — ADR-016; key pendente, adapter testado com fetch
-> injetado). WhatsPlay real: Chrome dedicado (perfil próprio, nunca o do
-> usuário), captura por MUTAÇÃO de DOM (zero polling), WhatsAppTransport
-> isolado (zero seletor no orchestrator), watchdog 5 estados com evidência
-> (screenshot+DOM), regras de grupo §5 (privado sempre, grupo só @luna/reply),
-> debounce §19, client lock (advisory lock), fila de saída por LISTEN/NOTIFY,
-> Telegram fallback §15, selector memory `.brain/luna/selectors/whatsapp.md`
-> (append-only). Migração `003_messages_send_tracking` aplicada (29 tabelas).
-> Descoberta ao vivo: sessão dedicada está `QR_PENDING` — owner pareia uma vez
-> com `pnpm --filter whatsplay login` (ADR-017). Testes: 28 unitários + 26 de
-> integração, verdes; daemon WhatsPlay validado ao vivo (boot, watchdog,
-> LISTEN, shutdown limpo). Próxima: F1.5 Recovery/E2E.
+> **F1.4 WhatsPlay + Brain Real ✅ (critério PARCIAL — falta key de brain válida
+> e confirmação do owner p/ envio)** — KimiApiAdapter (fast brain oficial,
+> §7.2; anti-mock por decreto — ADR-016) e **GeminiAdapter (fast brain
+> INTERINO p/ teste, ADR-018)** sobre OpenAiCompatAdapter compartilhado.
+> WhatsPlay real: Chrome dedicado, captura por mutação de DOM, transport
+> isolado, watchdog 5 estados, grupo §5, debounce §19, client lock, fila de
+> saída NOTIFY, Telegram §15, selector memory. **Falso negativo de detecção
+> corrigido** (ADR-017 corrigido: a sessão ESTAVA pareada; heurística pura em
+> `state.ts` + polling; leitura real validada — badges, abertura de painel,
+> extração de mensagens). Bug de robustez do dispatcher corrigido (payload
+> inválido → DLQ `invalid_envelope`, nunca 'running' preso). Chamada real à
+> Gemini: **key rejeitada pelo endpoint (400 Invalid Auth key)** — key não tem
+> formato Google (`AIza…`); pendente do owner reemitir (ver ADR-018). Ciclo
+> vivo completo até o envio validado: publish real → dispatch → brain → falha
+> EXPLÍCITA auditada (5 tentativas → DLQ), zero resposta fake. Testes:
+> 46 unitários + 26 de integração, verdes. Próxima: F1.5 Recovery/E2E.
 
 ## Quick start
 

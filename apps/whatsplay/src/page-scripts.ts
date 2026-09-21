@@ -7,11 +7,34 @@
  * Os seletores continuam vindo como argumento (SELECTORS — única fonte).
  */
 
-export const DETECT_STATE_SCRIPT = `(sel) => {
-  if (document.querySelector(sel.qrCanvas)) return 'QR_PENDING';
-  if (document.querySelector(sel.chatList)) return 'LOGGED_IN';
-  return 'LOADING';
-}`;
+/** Probes estruturais para a heurística pura de estado (state.ts). Sem canvas solto. */
+export const STATE_PROBES_SCRIPT = `(() => ({
+  paneSide: document.querySelectorAll('#pane-side').length,
+  chatListTestId: document.querySelectorAll('[data-testid="chat-list"]').length,
+  chatListRoleGrid: document.querySelectorAll('#pane-side [role="grid"], [role="grid"]').length,
+  landingWrapper: document.querySelectorAll('.landing-wrapper').length,
+  landingMain: document.querySelectorAll('.landing-main').length,
+  qrTestId: document.querySelectorAll('[data-testid="qrcode"]').length,
+  qrRef: document.querySelectorAll('[data-ref]').length,
+  canvasInLanding: document.querySelectorAll('.landing-wrapper canvas, .landing-main canvas').length,
+}))()`;
+
+/**
+ * A pasta "Archivados/Arquivados/Archived" pode estar aberta (a sessão restaura
+ * o último estado da UI). Detecta pelo HEADING — cuidado: no menu principal a
+ * entrada da pasta também tem esse texto, mas dentro de cell-frame-title.
+ */
+export const ARCHIVED_OPEN_SCRIPT = `(() => {
+  const els = document.querySelectorAll('span, div, h1, h2, h3');
+  for (const e of els) {
+    if (e.children.length > 0) continue;
+    const t = (e.textContent || '').trim();
+    if (!/^(archivados?|arquivados?|archived)$/i.test(t)) continue;
+    if (e.closest('[data-testid="cell-frame-title"]')) continue; // entrada do menu, não o header
+    return true;
+  }
+  return false;
+})()`;
 
 export const COLLECT_UNREAD_CHATS_SCRIPT = `(sel) => {
   const out = [];
@@ -27,12 +50,20 @@ export const COLLECT_UNREAD_CHATS_SCRIPT = `(sel) => {
 
 export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
   const rows = Array.from(document.querySelectorAll(sel.messageRow)).slice(-30);
+  const SELF = /^(tú|você|voce|you|tu)$/i;
   return rows.map((row) => {
-    const inbound = row.className.includes('message-in') || !!row.closest('.message-in');
     const textEl = row.querySelector(sel.messageText);
+    let sender = '';
+    let isSelf = false;
+    for (const el of row.querySelectorAll('[aria-label]')) {
+      const aria = el.getAttribute('aria-label') || '';
+      const m = aria.match(/^(.*?)\\s*:\\s*$/);
+      if (m) { sender = m[1].trim(); isSelf = SELF.test(sender); break; }
+    }
     const quotedEl = row.querySelector('[data-pre-plain-text]');
     return {
-      direction: inbound ? 'inbound' : 'outbound',
+      direction: isSelf ? 'outbound' : 'inbound',
+      sender,
       text: textEl ? (textEl.textContent || '').trim() : '',
       quoted: quotedEl ? (quotedEl.textContent || '').trim() : null,
     };
@@ -41,31 +72,24 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
 
 export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
   const rows = Array.from(document.querySelectorAll(sel.messageRow)).slice(-lim);
+  const SELF = /^(tú|você|voce|you|tu)$/i;
   return rows.map((row) => {
-    const inbound = row.className.includes('message-in');
     const textEl = row.querySelector(sel.messageText);
-    const senderEl = row.querySelector('[data-pre-plain-text]');
+    let sender = '';
+    let isSelf = false;
+    for (const el of row.querySelectorAll('[aria-label]')) {
+      const aria = el.getAttribute('aria-label') || '';
+      const m = aria.match(/^(.*?)\\s*:\\s*$/);
+      if (m) { sender = m[1].trim(); isSelf = SELF.test(sender); break; }
+    }
     return {
-      sender: senderEl ? (senderEl.textContent || '').split(':')[0].trim() : '',
-      direction: inbound ? 'inbound' : 'outbound',
+      sender,
+      direction: isSelf ? 'outbound' : 'inbound',
       text: textEl ? (textEl.textContent || '').trim() : '',
     };
   });
 }`;
 
-export const OPEN_CHAT_SCRIPT = `({ sel, key }) => {
-  const items = document.querySelectorAll(sel.chatItem);
-  for (const item of items) {
-    const titleEl = item.querySelector('[title]');
-    const title = titleEl ? titleEl.getAttribute('title') : '';
-    const dataId = item.getAttribute('data-id') || '';
-    if (title === key || dataId === key) {
-      item.click();
-      return true;
-    }
-  }
-  return false;
-}`;
 
 export const MUTATION_OBSERVER_SCRIPT = `(sel) => {
   const collect = () => {

@@ -39,7 +39,7 @@ describe('KimiApiAdapter (fast brain real, §7.2)', () => {
     expect((seen!.init?.headers as Record<string, string>).authorization).toBe('Bearer test-key');
 
     expect(r.reply_text).toContain('site já está no ar');
-    expect(r.session_id).toBe('kimiapi:conv-1');
+    expect(r.session_id).toBe('kimi-api:conv-1');
     expect(r.usage).toEqual({ input_tokens: 120, output_tokens: 18 });
   });
 
@@ -64,7 +64,7 @@ describe('KimiApiAdapter (fast brain real, §7.2)', () => {
     const a = new KimiApiAdapter(CONFIG, async () => jsonResponse({ choices: [{ message: { content: 'x' } }] }));
     const s1 = await a.ensureSession('conv-9');
     const s2 = await a.ensureSession('conv-9');
-    expect(s1.session_id).toBe('kimiapi:conv-9');
+    expect(s1.session_id).toBe('kimi-api:conv-9');
     expect(s2.session_id).toBe(s1.session_id);
   });
 });

@@ -7,6 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "discover": "tsx src/discover.ts",
+    "probe": "tsx src/probe.ts",
+    "readcheck": "tsx src/readcheck.ts",
     "login": "tsx src/discover.ts --login",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

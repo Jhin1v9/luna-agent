@@ -15,11 +15,14 @@ const config = loadConfig();
 assertProductionAdapter(config.KIMI_ADAPTER_MODE, config.NODE_ENV);
 const log = createLogger({ name: 'orchestrator' });
 
-// Adapter do cérebro vivo (§7.3, ADR-010/015). Nunca expor à internet.
+// Adapter do cérebro vivo (§7.3, ADR-010/015/016/018). Nunca expor à internet.
 const adapter = createAdapter({
   mode: config.KIMI_ADAPTER_MODE,
   webUrl: config.KIMI_WEB_URL,
   webToken: config.KIMI_WEB_TOKEN,
+  apiKey: config.KIMI_ADAPTER_MODE === 'gemini' ? config.GEMINI_API_KEY : config.KIMI_API_KEY,
+  apiBaseUrl: config.KIMI_ADAPTER_MODE === 'gemini' ? config.GEMINI_BASE_URL : config.KIMI_API_BASE_URL,
+  apiModel: config.KIMI_ADAPTER_MODE === 'gemini' ? config.GEMINI_MODEL : config.KIMI_API_MODEL,
 });
 // Handler de simulação (só montado fora de produção; precisa do pool/bus do main).
 let simulateHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;

@@ -3,14 +3,15 @@ import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { SELECTORS } from './selectors.js';
 import {
-  DETECT_STATE_SCRIPT,
+  STATE_PROBES_SCRIPT,
   COLLECT_UNREAD_CHATS_SCRIPT,
   READ_PANEL_MESSAGES_SCRIPT,
   READ_CONVERSATION_SCRIPT,
-  OPEN_CHAT_SCRIPT,
   MUTATION_OBSERVER_SCRIPT,
+  ARCHIVED_OPEN_SCRIPT,
   SIMPLIFIED_DOM_SCRIPT,
 } from './page-scripts.js';
+import { detectStateFromProbes, type StateProbes } from './state.js';
 import type {
   ConversationMessage,
   SessionState,
@@ -47,6 +48,16 @@ export interface EvidencePaths {
 
 const WA_URL = 'https://web.whatsapp.com';
 
+/**
+ * page.evaluate com string NÃO invoca função nem passa argumento — avalia a
+ * expressão e devolve seu valor (uma arrow string vira função não chamada,
+ * serializada como undefined). Por isso: compomos um IIFE com o argumento
+ * embutido como JSON. (Bug achado pelo readcheck ao vivo.)
+ */
+async function evalWithArg(page: Page, script: string, arg: unknown): Promise<unknown> {
+  return page.evaluate(`(${script})(${JSON.stringify(arg)})`);
+}
+
 export class WhatsAppWebTransport implements WhatsAppTransport {
   private ctx: BrowserContext | null = null;
   private page: Page | null = null;
@@ -72,11 +83,24 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return this.page;
   }
 
-  async detectSessionState(): Promise<SessionState> {
+  /**
+   * Estado da sessão com heurística pura (state.ts) + polling até estabilizar.
+   * A F1.4 ensinou que espera fixa gera falso negativo: a splash/intro do WA
+   * Web pode durar mais que 15s; aqui amostramos a cada 2s até sair de
+   * LOADING (máx. 30s) antes de concluir.
+   */
+  async detectSessionState(pollTimeoutMs = 30_000): Promise<SessionState> {
     const page = this.requirePage();
+    const deadline = Date.now() + pollTimeoutMs;
+    let last: SessionState = 'LOADING';
     try {
-      const state = (await page.evaluate(DETECT_STATE_SCRIPT, SELECTORS)) as SessionState;
-      return state;
+      while (Date.now() <= deadline) {
+        const probes = (await page.evaluate(STATE_PROBES_SCRIPT)) as Partial<StateProbes>;
+        last = detectStateFromProbes(probes);
+        if (last !== 'LOADING') return last;
+        await page.waitForTimeout(2_000);
+      }
+      return last;
     } catch {
       return 'UNKNOWN';
     }
@@ -110,7 +134,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       this.lastHeartbeatAt = new Date();
       onUnread(payload as UnreadMessage[]);
     });
-    await page.evaluate(MUTATION_OBSERVER_SCRIPT, SELECTORS);
+    await evalWithArg(page, MUTATION_OBSERVER_SCRIPT, SELECTORS);
   }
 
   /**
@@ -121,7 +145,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     const page = this.requirePage();
     if ((await this.detectSessionState()) !== 'LOGGED_IN') return [];
 
-    const chats = (await page.evaluate(COLLECT_UNREAD_CHATS_SCRIPT, SELECTORS)) as Array<{
+    const chats = (await evalWithArg(page, COLLECT_UNREAD_CHATS_SCRIPT, SELECTORS)) as Array<{
       chat_id: string;
       chat_name: string;
     }>;
@@ -131,7 +155,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       try {
         if (!(await this.openChat(chat.chat_name))) continue;
         await page.waitForSelector(SELECTORS.messagePanel, { timeout: 3_000 }).catch(() => null);
-        const messages = (await page.evaluate(READ_PANEL_MESSAGES_SCRIPT, SELECTORS)) as Array<{
+        const messages = (await evalWithArg(page, READ_PANEL_MESSAGES_SCRIPT, SELECTORS)) as Array<{
           direction: string;
           text: string;
           quoted: string | null;
@@ -167,7 +191,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   async readConversation(chatId: string, limit = 20): Promise<ConversationMessage[]> {
     const page = this.requirePage();
     await this.openChat(chatId);
-    const messages = (await page.evaluate(READ_CONVERSATION_SCRIPT, {
+    const messages = (await evalWithArg(page, READ_CONVERSATION_SCRIPT, {
       sel: SELECTORS,
       lim: limit,
     })) as ConversationMessage[];
@@ -186,13 +210,49 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return `sent:${chatId}:${Date.now()}`;
   }
 
+  /**
+   * Sai da pasta "Archivados/Archived/Arquivados" se ela estiver aberta.
+   * A sessão restaura o último estado da UI — se a pasta estiver aberta, os
+   * chats da lista principal não existem no DOM e o clique falha (descoberto
+   * ao vivo pelo readcheck). O ← do header NÃO tem aria-label nem data-icon
+   * nesta build: detectamos o heading e clicamos o primeiro [role="button"]
+   * do primeiro filho de #side (o header da view atual); se não sair, reload.
+   */
+  async ensureMainChatList(): Promise<void> {
+    const page = this.requirePage();
+    const isOpen = async () =>
+      (await page.evaluate(ARCHIVED_OPEN_SCRIPT).catch(() => false)) as boolean;
+    if (!(await isOpen())) return;
+    const back = page.locator('#side > div:first-child [role="button"]').first();
+    await back.click({ timeout: 3_000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    if (await isOpen()) {
+      // fallback: recarrega — a view default é a lista principal
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page.waitForSelector('#pane-side', { timeout: 45_000 }).catch(() => null);
+      await page.waitForTimeout(1_000);
+    }
+  }
+
   /** Abre chat pelo nome (v0). F1.5: busca por jid/telefone com fallback visual. */
   private async openChat(nameOrId: string): Promise<boolean> {
     const page = this.requirePage();
-    const clicked = await page
-      .evaluate(OPEN_CHAT_SCRIPT, { sel: SELECTORS, key: nameOrId })
-      .catch(() => false);
-    if (!clicked) return false;
+    const key = nameOrId.replace(/"/g, '\\"');
+    await this.ensureMainChatList();
+    // Clique NATIVO do Playwright — el.click() sintético não abre o painel no
+    // WA Web (descoberto ao vivo pelo readcheck, painel ficava mainPresent=false).
+    // Atenção ao seletor com vírgula: `A, B:has(x)` aplica :has só em B —
+    // prefixar A com #pane-side resolve (bug achado ao vivo: clicava o 1º chat).
+    const row = page
+      .locator(
+        `#pane-side [role="row"]:has([title="${key}"]), #pane-side [data-testid="cell-frame-container"]:has([title="${key}"])`,
+      )
+      .first();
+    try {
+      await row.click({ timeout: 5_000 });
+    } catch {
+      return false;
+    }
     await page.waitForSelector(SELECTORS.messagePanel, { timeout: 5_000 }).catch(() => null);
     return true;
   }

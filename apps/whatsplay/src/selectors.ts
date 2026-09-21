@@ -12,8 +12,8 @@
 export const SELECTORS = {
   /** Indica sessão logada: a lista de conversas visível. Se ausente + QR visível → deslogado. */
   chatList: '[data-testid="chat-list"], [aria-label="Chat list"]',
-  /** QR code de pareamento visível na tela de intro. */
-  qrCanvas: '[data-testid="qrcode"], [data-ref="intro-md-beta-logo-dark"], canvas',
+  /** QR code de pareamento — NUNCA usar `canvas` solto (falso positivo em tela logada, F1.4). */
+  qrCanvas: '[data-testid="qrcode"], [data-ref="intro-md-beta-logo-dark"]',
   /** Item de conversa na lista (tem badge de não-lidas quando há novas mensagens). */
   chatItem: '[data-testid="cell-frame-container"], [role="row"]',
   /** Badge de mensagens não lidas dentro do item de conversa. */
@@ -21,7 +21,7 @@ export const SELECTORS = {
   /** Painel de mensagens aberto (conversa selecionada). */
   messagePanel: '[data-testid="conversation-panel-wrapper"], #main',
   /** Mensagens no painel. */
-  messageRow: '[data-testid="msg-container"], div.message-in, div.message-out',
+  messageRow: '[data-testid="msg-container"]',
   /** Texto dentro de uma mensagem. */
   messageText: '.selectable-text, span[dir="ltr"]',
   /** Campo de digitação. */

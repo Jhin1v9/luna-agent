@@ -131,8 +131,34 @@ export class EventBus {
     );
 
     for (const row of claimed.rows) {
-      const event = validateEvent(row.payload);
       const startedAt = Date.now();
+      let event: EventEnvelope;
+      try {
+        event = validateEvent(row.payload);
+      } catch (err) {
+        // Payload inválido (evento não-envelope): mata na hora, vai pra DLQ —
+        // nunca fica 'running' preso esperando o reaper.
+        const { message, stack } = errorStack(err);
+        await this.pool.query(
+          `UPDATE outbox SET status = 'dead', locked_at = NULL WHERE id = $1`,
+          [row.id],
+        );
+        await this.pool.query(
+          `INSERT INTO dead_letter_events
+             (event_id, event_type, source, payload, reason, last_error, attempts, stack)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [row.event_id, row.event_type, this.dispatcherId, row.payload, 'invalid_envelope', message, row.attempts, stack],
+        );
+        await recordAudit(this.pool, {
+          actor: this.dispatcherId,
+          action: 'event.dispatched',
+          tool: 'event_bus',
+          result: 'failed',
+          duration_ms: Date.now() - startedAt,
+          metadata: { event_id: row.event_id, error: message, reason: 'invalid_envelope' },
+        });
+        continue;
+      }
       try {
         await this.runHandlers(event);
         await this.pool.query(
