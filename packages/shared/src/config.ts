@@ -15,6 +15,13 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  // KimiAdapter (§7.3, ADR-010/015): mock = dev/testes determinístico;
+  // kimi-web = servidor local em 127.0.0.1 (sendTurn ainda não mapeado — ADR-015).
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web']).default('mock'),
+  KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
+  KIMI_WEB_TOKEN: z.string().optional(),
+  // Reaper: locks 'running' travados há mais que isso voltam para a fila.
+  LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

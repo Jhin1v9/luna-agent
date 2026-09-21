@@ -104,7 +104,8 @@ export class JobRunner {
           actor: this.workerId,
           action: 'job.completed',
           tool: job.job_type,
-          correlation_id: typeof job.idempotency_key === 'string' ? job.idempotency_key : null,
+          correlation_id:
+            (job.payload as { correlation_id?: string }).correlation_id ?? null,
           duration_ms: Date.now() - startedAt,
           result: 'success',
           metadata: { job_id: job.id },
@@ -116,6 +117,8 @@ export class JobRunner {
           actor: this.workerId,
           action: 'job.failed',
           tool: job.job_type,
+          correlation_id:
+            (job.payload as { correlation_id?: string }).correlation_id ?? null,
           duration_ms: Date.now() - startedAt,
           result: 'failed',
           metadata: { job_id: job.id, error: message, attempts },

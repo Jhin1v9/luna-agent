@@ -1,6 +1,6 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection } from '@luna/database';
+import { getPool, closePool, checkConnection, reapStaleLocks } from '@luna/database';
 import { JobRunner } from './jobs/poller.js';
 
 // F1.2 — worker real: polla a tabela `jobs` (FOR UPDATE SKIP LOCKED) e executa
@@ -35,11 +35,28 @@ async function main(): Promise<void> {
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 
+  // Reaper: locks 'running' travados por crash voltam para a fila.
+  const reap = async () => {
+    try {
+      const r = await reapStaleLocks(pool, config.LOCK_REAPER_TIMEOUT_MS);
+      if (r.outbox_requeued || r.jobs_requeued) {
+        log.warn(r, 'locks travados reenfileirados pelo reaper');
+      }
+    } catch (err) {
+      log.error({ err }, 'reaper falhou');
+    }
+  };
+  await reap();
+  const reaperTimer = setInterval(reap, 30_000);
+  reaperTimer.unref();
+  log.info({ timeout_ms: config.LOCK_REAPER_TIMEOUT_MS }, 'lock reaper armed');
+
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info({ signal }, 'shutting down');
     runner.stop();
+    clearInterval(reaperTimer);
     closePool()
       .catch(() => {})
       .finally(() => process.exit(0));

@@ -3,11 +3,23 @@ import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
 import { getPool, closePool, checkConnection, recordActivity } from '@luna/database';
 import { migrate } from '@luna/database/migrate';
+import { createAdapter } from '@luna/agent';
 import { EventBus } from './events/bus.js';
+import { createMessageHandler } from './agent/handler.js';
+import { createSimulateHandler } from './test/simulate.js';
 
 loadDotEnv();
 const config = loadConfig();
 const log = createLogger({ name: 'orchestrator' });
+
+// Adapter do cérebro vivo (§7.3, ADR-010/015). Nunca expor à internet.
+const adapter = createAdapter({
+  mode: config.KIMI_ADAPTER_MODE,
+  webUrl: config.KIMI_WEB_URL,
+  webToken: config.KIMI_WEB_TOKEN,
+});
+// Handler de simulação (só montado fora de produção; precisa do pool/bus do main).
+let simulateHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
 
 const startedAt = Date.now();
 let ready = false;
@@ -74,6 +86,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         respond(200, renderMetrics(), 'text/plain');
         break;
 
+      case '/test/simulate-message': {
+        // Simulação de ingress de cliente (dev/teste). WhatsPlay real = F1.4.
+        if (!simulateHandler) {
+          respond(404, { error: 'not_found' });
+          break;
+        }
+        if (req.method !== 'POST') {
+          respond(405, { error: 'method_not_allowed' });
+          break;
+        }
+        await simulateHandler(req, res);
+        break;
+      }
+
       default:
         respond(404, { error: 'not_found' });
     }
@@ -101,10 +127,17 @@ async function main(): Promise<void> {
     log.info({ count: applied.length }, 'migrations checked/applied');
   }
 
-  // 3. Event bus (outbox dispatcher — §7.8)
+  // 3. Event bus (outbox dispatcher — §7.8) + handler do cérebro vivo (§7.1 agent/)
   const bus = new EventBus(pool, { dispatcherId: 'orchestrator' });
+  bus.on('client.message.received', createMessageHandler({ pool, adapter, log }));
   bus.start();
-  log.info({ interval_ms: 200 }, 'event bus dispatcher started');
+  log.info({ interval_ms: 200, adapter: adapter.mode }, 'event bus dispatcher started');
+
+  // Simulação de ingress (só fora de produção)
+  if (config.NODE_ENV !== 'production') {
+    simulateHandler = createSimulateHandler({ pool, bus, log });
+    log.info('POST /test/simulate-message disponível (simulação de cliente)');
+  }
   await recordActivity(pool, {
     kind: 'info',
     summary: 'Orchestrator iniciou — event bus, outbox e health endpoints no ar.',

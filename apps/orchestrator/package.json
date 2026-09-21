@@ -13,6 +13,8 @@
     "@luna/logging": "workspace:*",
     "@luna/database": "workspace:*",
     "@luna/events": "workspace:*",
+    "@luna/agent": "workspace:*",
+    "pino": "^9.5.0",
     "pino-pretty": "^11.0.0"
   },
   "devDependencies": {

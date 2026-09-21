@@ -62,9 +62,11 @@ respondendo em `/health` e `/ready`, e testes passando.
 ## Estrutura (§32)
 
 ```
-apps/     orchestrator (HTTP + event bus/outbox) · worker (poll de jobs) · whatsplay/admin (placeholders)
-packages/ events · database (pool, migrator, audit/activity, enqueueJob) · logging · shared (reais) · brain · agent · channels (placeholders)
+apps/     orchestrator (HTTP + event bus/outbox + módulo agent/ com Context Builder e handler)
+          · worker (poll de jobs + reaper de locks) · whatsplay/admin (placeholders)
+packages/ agent (KimiAdapter: interface estável + mock + kimi-web REST) · events · database
+          (pool, migrator, audit/activity, enqueueJob, reaper) · logging · shared · brain · channels
 scripts/  start-postgres.sh
-docs/     adr/ (decisões)
+docs/     adr/ (inclui ADR-015: kimi web REST verificada, sendTurn WS experimental → modo mock)
 tests/    integration/ (vitest contra Postgres real — banco luna_test)
 ```

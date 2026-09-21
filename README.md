@@ -21,7 +21,20 @@ cola = tabela `jobs` + worker.
 > worker pollando `jobs` com `FOR UPDATE SKIP LOCKED`, audit log (máquina) e
 > activity log (humano) — §20. Migração `002_events_outbox_dlq_audit` aplicada
 > (27 tabelas; a 001 intacta). Testes: 8 unitários + 13 de integração contra
-> Postgres real, todos verdes. Próxima: F1.3 Kimi Live.
+> Postgres real, todos verdes.
+>
+> **F1.3 Kimi Live ✅** — KimiAdapter (`@luna/agent`, interface estável +
+> modo mock determinístico; REST do `kimi web` local verificada ao vivo,
+> sendTurn via WS experimental — ver docs/adr/ADR-015-kimi-adapter-mock.md),
+> identidade completa em `.kimi-code/agents/luna.md` (§3/§4/§5, sem templates),
+> Context Builder mínimo (pack CLIENT_CONVERSATION, §7.9), state machine de
+> atenção (NEW→AI_HANDLING→RESOLVED persistido, §7.11), handler real de
+> `client.message.received` com activity + audit **sempre com correlation_id**,
+> endpoint de teste `POST /test/simulate-message` (só fora de produção,
+> WhatsPlay real é F1.4), reaper de locks travados no worker, e **primeiro
+> evento end-to-end validado ao vivo** (curl → evento → resposta persistida →
+> RESOLVED → evidência com correlation). Migração 003: não precisou.
+> Testes: 18 unitários + 21 de integração, verdes. Próxima: F1.4 WhatsPlay.
 
 ## Quick start
 

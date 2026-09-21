@@ -39,3 +39,5 @@ export { recordAudit, recordActivity } from './audit.js';
 export type { AuditEntry, AuditResult, ActivityEntry, ActivityKind, Sql } from './audit.js';
 export { enqueueJob } from './jobs.js';
 export type { EnqueueJobInput, EnqueueJobResult } from './jobs.js';
+export { reapStaleLocks } from './reaper.js';
+export type { ReapResult } from './reaper.js';
