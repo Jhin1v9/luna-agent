@@ -187,7 +187,6 @@ async function main(): Promise<void> {
 
   // Workspace ingress (F2) — sempre montado; 503 sem WORKSPACE_SERVICE_TOKEN.
   workspaceHandler = createWorkspaceIngress({
-    pool,
     bus,
     log,
     serviceToken: config.WORKSPACE_SERVICE_TOKEN,

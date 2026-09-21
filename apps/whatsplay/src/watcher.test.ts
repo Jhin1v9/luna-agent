@@ -155,7 +155,7 @@ describe('SWEEP de chats allowlisted — mensagem do owner (outbound @luna) disp
     expect(ingested).toEqual([]);
     await tickWithSweep(); // sweep vê "@luna oi" do owner
     expect(ingested).toHaveLength(1);
-    expect(ingested[0]!.text).toBe('oi'); // menção @luna removida
+    expect(ingested[0]!.text).toBe('Tú: @luna oi'); // transcrição com autor
   });
 
   it('resposta da própria Luna (outbound SEM @luna) → ignorada', async () => {
@@ -176,7 +176,7 @@ describe('SWEEP de chats allowlisted — mensagem do owner (outbound @luna) disp
     await tickWithSweep();
     await tickWithSweep();
     expect(ingested).toHaveLength(1);
-    expect(ingested[0]!.text).toBe('boa tarde');
+    expect(ingested[0]!.text).toBe('Pai: boa tarde');
   });
 
   it('mesma mensagem em varreduras seguidas → não repete', async () => {

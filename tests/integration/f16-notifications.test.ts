@@ -163,7 +163,7 @@ describe('notifications engine (§22) — fan-out por preferência + dedupe', ()
 
 describe('workspace ingress (BLOCO 5) — auth por token de serviço', () => {
   it('sem token configurado: 503 fail-closed explícito', async () => {
-    const ingress = createWorkspaceIngress({ pool, bus: null as unknown as EventBus, log, serviceToken: undefined });
+    const ingress = createWorkspaceIngress({ bus: null as unknown as EventBus, log, serviceToken: undefined });
     const { req, res } = fakeReqRes('POST', { event_type: 'x', payload: {} });
     await ingress(req as IncomingMessage, res as ServerResponse);
     expect(res.statusCode).toBe(503);
@@ -172,7 +172,7 @@ describe('workspace ingress (BLOCO 5) — auth por token de serviço', () => {
 
   it('token errado: 401; token certo: publica e devolve event_id', async () => {
     const bus = new EventBus(pool, { dispatcherId: 'ws-test' });
-    const ingress = createWorkspaceIngress({ pool, bus, log, serviceToken: 'segredo' });
+    const ingress = createWorkspaceIngress({ bus, log, serviceToken: "segredo" });
 
     const bad = fakeReqRes('POST', { event_type: 'task.completed', payload: {} }, 'Bearer errado');
     await ingress(bad.req as IncomingMessage, bad.res as ServerResponse);

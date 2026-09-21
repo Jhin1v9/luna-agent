@@ -207,7 +207,12 @@ export class IngestWatcher {
           chat_id: entry,
           chat_name: entry,
           is_group: (await this.deps.transport.currentChatIsGroup?.().catch(() => false)) ?? false,
-          text,
+          // transcrição com AUTOR (quem falou o quê) — prompt rico pra Luna
+          text:
+            msgs
+              .slice(-3)
+              .map((m) => `${(m as { author?: string | null }).author ?? m.sender ?? 'contato'}: ${m.text}`)
+              .join('\n') || text,
           external_id: `wa:${entry}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,

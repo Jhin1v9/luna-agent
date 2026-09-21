@@ -214,15 +214,30 @@ export function createOutboundListener(deps: OutboundDeps) {
       });
       log.info({ message_id: messageId, target }, 'resposta entregue no WhatsApp');
     } catch (err) {
-      await mark(messageId, 'failed', err instanceof Error ? err.message : String(err));
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      await mark(messageId, 'failed', errorMsg);
       await recordAudit(pool, {
         actor: 'whatsplay',
         action: 'whatsapp.message.send_failed',
         tool: 'whatsplay_transport',
         correlation_id: row.correlation_id,
         result: 'failed',
-        metadata: { message_id: messageId, target, error: String(err) },
+        metadata: { message_id: messageId, target, error: errorMsg },
       });
+      // Paridade com o caminho de recusa: delivery de notificação (§22)
+      // reflete o resultado real.
+      const notifId = await pool
+        .query<{ id: string }>(
+          `SELECT id FROM notifications WHERE id = (SELECT (metadata->>'notification_delivery')::text FROM messages WHERE id = $1)`,
+          [messageId],
+        )
+        .catch(() => ({ rows: [] as Array<{ id: string }> }));
+      if (notifId.rows[0]) {
+        await pool.query(
+          `UPDATE notifications SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`,
+          [notifId.rows[0].id, `entrega falhou: ${errorMsg}`],
+        );
+      }
       log.error({ err, message_id: messageId }, 'falha ao entregar resposta');
     }
   }

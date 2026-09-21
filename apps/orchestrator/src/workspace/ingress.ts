@@ -1,4 +1,3 @@
-import type { Pool } from 'pg';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from 'pino';
 import type { EventBus } from '../events/bus.js';
@@ -18,7 +17,6 @@ import type { EventBus } from '../events/bus.js';
  */
 
 export interface WorkspaceIngressDeps {
-  pool: Pool;
   bus: EventBus;
   log: Logger;
   serviceToken?: string;
