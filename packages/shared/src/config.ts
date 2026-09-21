@@ -43,8 +43,22 @@ const envSchema = z.object({
   WHATSAPP_HEADLESS: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   WHATSAPP_DEBOUNCE_MS: z.coerce.number().int().positive().default(3000),
   // Telegram fallback vivo (§15): sessão WhatsApp caiu → msg ao time.
+  // TELEGRAM_CHAT_ID (novo nome) ou TELEGRAM_TEAM_CHAT_ID (legado).
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_TEAM_CHAT_ID: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
+
+  // ── F2 — Canais de notificação (§22). Fail-closed: sem credencial o
+  // canal falha EXPLICITAMENTE na delivery; o boot loga a capability.
+  SMTP_URL: z.string().optional(),           // smtp://user:pass@host:587
+  SMTP_FROM: z.string().default('Luna <luna@nexo-digital.local>'),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:luna@nexo-digital.local'),
+
+  // ── F2 — Endpoint do workspace (BLOCO 5): token de serviço (Bearer).
+  // Sem token configurado o endpoint fica 503 (fail-closed explícito).
+  WORKSPACE_SERVICE_TOKEN: z.string().optional(),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   // Anti-ban (ADR-004): espera humana antes de entregar a resposta no

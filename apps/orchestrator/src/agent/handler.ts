@@ -1,33 +1,30 @@
+import { readFileSync } from 'node:fs';
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
 import type { KimiLiveAdapter } from '@luna/agent';
-import { recordActivity, recordAudit, type Sql } from '@luna/database';
+import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
+import { recordActivity, recordAudit, publishEvent, type Sql } from '@luna/database';
 import { buildClientConversationPack, renderConversationPrompt } from './context.js';
-import { transitionConversation } from './attention.js';
+import { transitionConversation, getConversationState } from './attention.js';
+import { runFastRoute, selectRoute } from './router/router.js';
 
 /**
- * Handler de mensagens de cliente (client.message.received do simulador e
- * whatsapp.message.received do WhatsPlay) — o ciclo vivo (§7.1 módulo agent/):
+ * Handler de mensagens de cliente — o ciclo vivo com MODEL ROUTER
+ * (contrato v1.1): evento → route determinística (§10) → client lock (§19)
+ * → estado AI_HANDLING (§7.11) → FAST estruturado (§5, guardas §5.1) →
+ * entrega / handoff (§6, ADR-023) / escalación (§8) → usage ledger (§23/§28)
+ * → agent_runs + activity (humano) + audit (máquina, correlation_id).
  *
- *   evento → client lock (advisory lock por conversa, §19)
- *          → estado AI_HANDLING (persistido, §7.11)
- *          → Context Builder (pack CLIENT_CONVERSATION, §7.9)
- *          → brain REAL via adapter (kimi-api na produção — mock só dev/teste, ADR-016)
- *          → resposta em messages (outbound, send_state queued → WhatsPlay entrega)
- *          → usage_entries quando o backend informa tokens (§23)
- *          → agent_runs + activity (humano) + audit (máquina, com correlation_id)
- *          → estado RESOLVED
- *
- * Idempotência dupla: publish deduplica por idempotency_key (§7.6) e a resposta
- * gravada leva metadata.reply_to_event — reprocessamento do mesmo evento é
- * detectado e ignorado (retry nunca gera segunda resposta ao cliente).
+ * ADR-026/§8: durante HUMAN_HANDLING a Luna NÃO responde o cliente — a
+ * mensagem é anexada ao contexto da escalación.
  */
 
 export interface MessageHandlerDeps {
   pool: Pool;
   adapter: KimiLiveAdapter;
   log: Logger;
+  telegram?: TelegramConfig;
 }
 
 interface HandlerPayload {
@@ -39,8 +36,102 @@ interface HandlerPayload {
   deliver?: boolean;
 }
 
+// ── Usage ledger (§23/§28): preços versionados em config/prices.json ──
+interface PricesFile {
+  currency: string;
+  models: Record<string, { input_per_1M: number; output_per_1M: number }>;
+  billable: { multiplier: number };
+}
+
+let pricesCache: PricesFile | null = null;
+function loadPrices(): PricesFile {
+  if (pricesCache) return pricesCache;
+  pricesCache = JSON.parse(
+    readFileSync('C:/Users/Abner/Documents/Luna cto/luna-agent/config/prices.json', 'utf8'),
+  ) as PricesFile;
+  return pricesCache;
+}
+
+export function estimateCost(
+  model: string,
+  usage: { input_tokens: number; output_tokens: number },
+): { estimated_cost: number; billable_units: number } | null {
+  const prices = loadPrices();
+  const p = prices.models[model];
+  if (!p) return null;
+  const estimated_cost =
+    (usage.input_tokens / 1_000_000) * p.input_per_1M +
+    (usage.output_tokens / 1_000_000) * p.output_per_1M;
+  return {
+    estimated_cost: Number(estimated_cost.toFixed(6)),
+    billable_units: Math.max(1, Math.ceil(estimated_cost * prices.billable.multiplier)),
+  };
+}
+
 export function createMessageHandler(deps: MessageHandlerDeps) {
   const { pool, adapter, log } = deps;
+  const eventPool = pool; // publishEvent precisa de Pool (client dedicado do lock é PoolClient)
+
+  async function escalate(
+    db: Sql,
+    event: EventEnvelope,
+    conversationId: string,
+    input: { reason: string; priority: string; summary: string; trigger: string },
+  ): Promise<void> {
+    await transitionConversation(db, conversationId, 'NEEDS_HUMAN');
+    await transitionConversation(db, conversationId, 'HUMAN_NOTIFIED');
+    await db.query(
+      `INSERT INTO escalations (client_id, conversation_id, reason, priority, status, metadata)
+       VALUES ($1, $2, $3, $4, 'notified', $5)`,
+      [
+        event.client_id,
+        conversationId,
+        input.reason,
+        input.priority,
+        { summary: input.summary, trigger: input.trigger, correlation_id: event.correlation_id },
+      ],
+    );
+    await publishRouterEvent(db, event, 'router.escalate.human', {
+      trigger: input.trigger,
+      priority: input.priority,
+    });
+    // §8 cascata: ligação (F6, pendente) → mensagem viva ao grupo do time.
+    if (deps.telegram?.botToken && deps.telegram.teamChatId) {
+      try {
+        await sendTeamMessage(
+          `🙋 Escalación ${input.priority}: ${input.reason}. Resumo: ${input.summary || '(ver escalations)'} — quem puder atende 🙏`,
+          deps.telegram,
+        );
+      } catch (err) {
+        log.error({ err }, 'escalación: alerta Telegram falhou');
+      }
+    } else {
+      log.error('escalación: TELEGRAM não configurado — alerta NÃO enviado (falha explícita registrada)');
+    }
+    await recordActivity(db, {
+      client_id: event.client_id,
+      kind: 'incident',
+      summary: `Escalonei para humano (${input.priority}): ${input.reason}. Time notificado.`,
+      correlation_id: event.correlation_id,
+    });
+  }
+
+  async function publishRouterEvent(
+    db: Sql,
+    event: EventEnvelope,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    await publishEvent(eventPool, {
+      event_type: eventType,
+      source: 'model_router',
+      client_id: event.client_id,
+      conversation_id: event.conversation_id,
+      correlation_id: event.correlation_id,
+      causation_id: event.event_id,
+      payload,
+    });
+  }
 
   async function processLocked(
     db: Sql & Pick<PoolClient, 'query'>,
@@ -71,15 +162,40 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       return;
     }
 
+    // ADR-026/§8: durante HUMAN_HANDLING a Luna não fala por cima do humano.
+    const state = await getConversationState(db, conversationId);
+    if (state === 'HUMAN_HANDLING' || state === 'NEEDS_HUMAN' || state === 'HUMAN_NOTIFIED') {
+      log.info({ state, conversation_id: conversationId }, 'HUMAN_HANDLING ativo — mensagem anexada à escalación, sem resposta automática');
+      await recordAudit(db, {
+        actor: 'orchestrator',
+        action: 'escalation.client_message_appended',
+        tool: 'message_handler',
+        client_id: event.client_id,
+        correlation_id: event.correlation_id,
+        result: 'success',
+        metadata: { conversation_id: conversationId, state, text: text.slice(0, 120) },
+      });
+      await recordActivity(db, {
+        client_id: event.client_id,
+        kind: 'info',
+        summary: `Mensagem do cliente anexada à escalación em andamento (Luna silenciada, §8).`,
+        correlation_id: event.correlation_id,
+      });
+      return;
+    }
+
     const runStartedAt = new Date();
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
     const pack = await buildClientConversationPack(db, conversationId);
     const prompt = renderConversationPrompt(pack, text, payload.author_name);
 
-    // Brain real. Se falhar: erro sobe pro dispatcher (retry → DLQ), nunca
-    // fallback silencioso pro mock (ADR-016).
-    const turn = await adapter.sendTurn({ session_key: conversationId, prompt });
+    // §10: route determinística + FAST estruturado com guardas (§5.1).
+    const route = await selectRoute({ pool: eventPool, adapter, log }, event);
+    const decision = await runFastRoute(
+      { pool: eventPool, adapter, log },
+      { event, prompt, sessionKey: conversationId, allowLiveHandoff: route.allowLiveHandoff },
+    );
 
     // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
     const deliver = payload.deliver !== false;
@@ -90,30 +206,37 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       [
         conversationId,
         pack.channel,
-        turn.reply_text,
-        { reply_to_event: event.event_id, correlation_id: event.correlation_id, adapter: adapter.mode },
+        decision.answerText,
+        {
+          reply_to_event: event.event_id,
+          correlation_id: event.correlation_id,
+          adapter: adapter.mode,
+          router_output: decision.output.type,
+          tool_rounds: decision.toolRounds,
+        },
         deliver ? 'queued' : 'simulated',
       ],
     );
     const replyMessageId = inserted.rows[0]!.id;
-
-    // Avisa o WhatsPlay (LISTEN/NOTIFY) sem poluir o log binário da fila.
     if (deliver) {
       await db.query('SELECT pg_notify($1, $2)', ['luna_outbound', replyMessageId]);
     }
 
-    // Usage ledger (§23): entrada real por resposta gerada.
-    if (turn.usage) {
+    // Usage ledger (§23/§28): provider/modelo reais + estimated_cost (BLOCO 4).
+    if (decision.turn.usage) {
+      const cost = estimateCost(decision.turn.model ?? 'unknown', decision.turn.usage);
       await db.query(
-        `INSERT INTO usage_entries (client_id, event_id, provider, model, input_tokens, output_tokens)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO usage_entries (client_id, event_id, provider, model, input_tokens, output_tokens, estimated_cost, billable_units)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           event.client_id,
           event.event_id,
-          adapter.mode === 'kimi-api' ? 'kimi-api' : adapter.mode,
-          adapter.mode === 'kimi-api' ? 'kimi-k2' : adapter.mode,
-          turn.usage.input_tokens,
-          turn.usage.output_tokens,
+          adapter.mode,
+          decision.turn.model ?? adapter.mode,
+          decision.turn.usage.input_tokens,
+          decision.turn.usage.output_tokens,
+          cost?.estimated_cost ?? 0,
+          cost?.billable_units ?? 0,
         ],
       );
     }
@@ -126,46 +249,84 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         event.event_id,
         event.client_id,
         adapter.mode,
-        { prompt_lines: prompt.split('\n').length, pack: { client: pack.client_name, channel: pack.channel } },
-        { reply_text: turn.reply_text, session_id: turn.session_id, reply_message_id: replyMessageId },
+        {
+          prompt_lines: prompt.split('\n').length,
+          pack: { client: pack.client_name, channel: pack.channel },
+          route: route.destination,
+          router_output: decision.output.type,
+          tool_rounds: decision.toolRounds,
+        },
+        {
+          reply_text: decision.answerText,
+          session_id: decision.turn.session_id,
+          reply_message_id: replyMessageId,
+          handoff: decision.handoff,
+          escalate: decision.escalate,
+        },
         runStartedAt,
         finishedAt,
       ],
     );
 
-    await transitionConversation(db, conversationId, 'RESOLVED');
+    // Destino final da conversa (§7.11 + §8).
+    if (decision.escalate && decision.output.type === 'ESCALATE_HUMAN') {
+      const esc = decision.output;
+      await escalate(db, event, conversationId, {
+        reason: esc.reason,
+        priority: esc.priority,
+        summary: esc.summary,
+        trigger: esc.reason.includes('explícito') ? 'explicit_human_request' : 'guardrail_or_loop',
+      });
+    } else if (decision.handoff) {
+      // ADR-023: handoff registrado; investigação ao vivo espera o live brain.
+      await transitionConversation(db, conversationId, 'RESOLVED');
+      await publishRouterEvent(db, event, 'router.investigation.pending_live', {
+        objective: decision.output.type === 'HANDOFF_LIVE' ? decision.output.objective : '',
+        budget: 3,
+        timeout_ms: 600_000,
+      });
+      await recordActivity(db, {
+        client_id: event.client_id,
+        kind: 'info',
+        summary: `Handoff registrado (investigação pendente do live brain, ADR-023): ${decision.output.type === 'HANDOFF_LIVE' ? decision.output.objective : ''}`.slice(0, 180),
+        correlation_id: event.correlation_id,
+      });
+    } else {
+      await transitionConversation(db, conversationId, 'RESOLVED');
+    }
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.
-    // Activity cita o AUTOR da mensagem quando conhecido (decreto owner:
-    // "registrar quem falou o quê") — no grupo fica "Respondi Abner (grupo)".
     const snippet = text.length > 60 ? `${text.slice(0, 60)}…` : text;
     const author = payload.author_name ?? pack.contact_name ?? pack.client_name;
     await recordActivity(db, {
       client_id: event.client_id,
-      kind: 'action',
-      summary: `Respondi ${author} (${pack.client_name}): "${snippet}"`,
+      kind: decision.escalate ? 'incident' : 'action',
+      summary: decision.escalate
+        ? `Escalonei ${author} (${pack.client_name}) para humano: "${snippet}"`
+        : `Respondi ${author} (${pack.client_name}): "${snippet}"`,
       correlation_id: event.correlation_id,
     });
     await recordAudit(db, {
       actor: 'orchestrator',
       action: 'agent.run.completed',
-      tool: 'kimi_adapter',
+      tool: 'model_router',
       client_id: event.client_id,
       correlation_id: event.correlation_id,
-      duration_ms: turn.duration_ms,
+      duration_ms: decision.turn.duration_ms,
       result: 'success',
       metadata: {
         event_id: event.event_id,
         conversation_id: conversationId,
         adapter: adapter.mode,
-        reply_chars: turn.reply_text.length,
+        router_output: decision.output.type,
+        tool_rounds: decision.toolRounds,
         deliver,
       },
     });
 
     log.info(
-      { event_id: event.event_id, correlation_id: event.correlation_id, conversation_id: conversationId, adapter: adapter.mode },
-      'cliente respondido',
+      { event_id: event.event_id, correlation_id: event.correlation_id, conversation_id: conversationId, router_output: decision.output.type, tool_rounds: decision.toolRounds },
+      'cliente respondido (router)',
     );
   }
 
@@ -176,8 +337,8 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       throw new Error(`${event.event_type} sem conversation_id no payload`);
     }
 
-    // Client lock (§19): mensagens da mesma conversa se processam em série;
-    // clientes diferentes, em paralelo. Lock transacional Postgres.
+    // Client lock (§19): mensagens da mesma conversa em série; clientes
+    // diferentes em paralelo. Lock transacional Postgres.
     const client = await pool.connect();
     try {
       await client.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [

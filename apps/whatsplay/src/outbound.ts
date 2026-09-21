@@ -81,6 +81,20 @@ export function createOutboundListener(deps: OutboundDeps) {
         result: 'failed',
         metadata: { message_id: messageId, target, reason: 'outbound_allowlist', detail: refusal },
       });
+      // Se a mensagem era uma delivery de notificação (§22), reflete o
+      // resultado real na notifications — 'sent' da fila ≠ entregue.
+      const notifId = await pool
+        .query<{ id: string }>(
+          `SELECT id FROM notifications WHERE id = (SELECT (metadata->>'notification_delivery')::text FROM messages WHERE id = $1)`,
+          [messageId],
+        )
+        .catch(() => ({ rows: [] as Array<{ id: string }> }));
+      if (notifId.rows[0]) {
+        await pool.query(
+          `UPDATE notifications SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`,
+          [notifId.rows[0].id, `entrega recusada: ${refusal}`],
+        );
+      }
       log.error({ message_id: messageId, target, refusal }, 'GUARDRAIL: envio recusado pela allowlist');
       return;
     }

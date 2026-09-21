@@ -159,6 +159,7 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
       reply_text: content,
       session_id: `${this.provider}:${request.session_key}`,
       duration_ms: Date.now() - started,
+      model: this.model,
       usage: data.usage
         ? {
             input_tokens: data.usage.prompt_tokens ?? 0,

@@ -48,6 +48,8 @@ export interface TurnResult {
   duration_ms: number;
   /** Uso de tokens quando o backend informa (Kimi API). Vira usage_entries (§23). */
   usage?: { input_tokens: number; output_tokens: number };
+  /** Modelo real que respondeu (usage_entries.model — §9 do contrato). */
+  model?: string;
 }
 
 export interface SessionInfo {

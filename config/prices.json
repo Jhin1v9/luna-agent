@@ -1,0 +1,10 @@
+{
+  "$comment": "Preços internos por modelo (§23/§27 — custo real, não cobrança). USD por 1M tokens. Versionado no repo: mudar preço = commit. NUNCA 2.7/K3 (decreto owner, ADR-019).",
+  "currency": "USD",
+  "models": {
+    "kimi-k2.6": { "input_per_1M": 0.95, "output_per_1M": 4.0 },
+    "kimi-k2-0905-preview": { "input_per_1M": 0.95, "output_per_1M": 4.0 },
+    "gemini-2.5-flash": { "input_per_1M": 0.30, "output_per_1M": 2.50 }
+  },
+  "billable": { "$comment": "billable_units = ceil(estimated_cost * multiplier) — separa custo interno de cobrança (§28).", "multiplier": 100 }
+}

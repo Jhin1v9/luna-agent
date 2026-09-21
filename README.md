@@ -51,6 +51,26 @@ cola = tabela `jobs` + worker.
 > (ADR no watcher.ts; sweep de allowlisted cobre msgs lidas/virtualizadas e o
 > self-test do owner). Gemini interino mantido como opção (ADR-018).
 >
+> **F2 Notificações multicanal + cérebro estruturado ✅** — Model Router
+> (contrato v1.1): routes em config versionada (`config/routes.json`, mudar =
+> commit sem tocar código), saídas estruturadas ANSWER/TOOL_CALL/HANDOFF_LIVE/
+> ESCALATE_HUMAN com guardas (TOOL_CALL tope 5, HANDOFF 1 por evento + espera
+> ao cliente, pedido explícito de humano = zero IA, HUMAN_HANDLING silencia a
+> Luna), tools de leitura, eventos router.* (§11), investigation budget
+> registrado (handoff executa como espera+registro — live brain pendente,
+> ADR-023). Notifications engine (§22): fan-out por preferência do cliente,
+> deliveries pending/sent/failed, dedupe por idempotency_key (migração 006),
+> whatsapp (fila existente + guardrails) / email SMTP (nodemailer) / push PWA
+> (web-push+VAPID) — fail-closed com capability logada no boot (ADR-025).
+> Usage ledger (§23/§28): provider/modelo reais + estimated_cost com preços
+> versionados (`config/prices.json`), custo interno ≠ billable_units
+> (ADR-024). Endpoint do workspace: `POST /v1/events` com Bearer
+> WORKSPACE_SERVICE_TOKEN (503 fail-closed sem token, exemplo no .env.example
+> e no código). **136 testes verdes.** Telegram @lunanexobot: token pendente
+> do owner — quando entrar no .env, todos os alertas funcionam sem mudança
+> de código (`pm2 restart all`). ADRs 015–025. Próxima: F3 — memória/contexto
+> completo (Brain, Context Builder full, memory index, promotion, summaries).
+>
 > **F1.5 Recovery/E2E ✅ — FASE F1 COMPLETA** — auto-reparo visual com VISÃO
 > REAL do k2.6 (probe no boot: `vision: true` — ADR-021): screenshot+DOM →
 > FAST analisa → retry com seletor sugerido → máx 3 → selector memory

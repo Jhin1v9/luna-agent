@@ -4,9 +4,15 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "vapid": "node -e \"import('./src/push.js').then(m=>console.log(JSON.stringify(m.generateVapidKeys(),null,2)))\"" },
+  "dependencies": {
+    "nodemailer": "^6.9.16",
+    "web-push": "^3.6.7"
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/web-push": "^3.6.4",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   }

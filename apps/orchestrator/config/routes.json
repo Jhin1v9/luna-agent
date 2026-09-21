@@ -1,0 +1,48 @@
+{
+  "$comment": "Routes do Model Router (contrato v1.1 §4) — CONFIG VERSIONADA, não hardcode. Mudar routing = mudar este arquivo + commit, sem tocar código. Timeout em ms. investigation_budget = rondas (§6).",
+  "routes": {
+    "client.message.received": {
+      "destination": "fast",
+      "context_pack": "CLIENT_CONVERSATION",
+      "requirements": ["text", "structured"],
+      "allow_live_handoff": true,
+      "timeout_ms": 15000,
+      "investigation_budget": 3,
+      "investigation_timeout_ms": 600000
+    },
+    "whatsapp.message.received": {
+      "destination": "fast",
+      "context_pack": "CLIENT_CONVERSATION",
+      "requirements": ["text", "structured"],
+      "allow_live_handoff": true,
+      "timeout_ms": 15000,
+      "investigation_budget": 3,
+      "investigation_timeout_ms": 600000
+    },
+    "notification.requested": {
+      "destination": "fast",
+      "context_pack": "CLIENT_BASIC",
+      "requirements": ["text"]
+    },
+    "conversation.classify": {
+      "destination": "fast",
+      "context_pack": "CLIENT_CONVERSATION",
+      "requirements": ["text", "structured"]
+    },
+    "screenshot.analyze": {
+      "destination": "fast",
+      "context_pack": "SYSTEM_DIAGNOSTIC",
+      "requirements": ["vision", "structured"]
+    },
+    "admin.message.received": {
+      "destination": "live",
+      "context_pack": "ADMIN_FULL"
+    },
+    "system.incident.requires_investigation": {
+      "destination": "live",
+      "context_pack": ["SYSTEM_DIAGNOSTIC", "CODEBASE"],
+      "investigation_budget": 3,
+      "investigation_timeout_ms": 600000
+    }
+  }
+}

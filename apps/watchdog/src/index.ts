@@ -25,7 +25,7 @@ const RESTART_COOLDOWN_MS = 120_000;
 
 const telegram: TelegramConfig = {
   botToken: config.TELEGRAM_BOT_TOKEN,
-  teamChatId: config.TELEGRAM_TEAM_CHAT_ID,
+  teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID,
 };
 
 const lastRestart = new Map<string, number>();

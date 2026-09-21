@@ -7,6 +7,8 @@ import { createAdapter, assertProductionAdapter, probeVisionSupport } from '@lun
 import { EventBus } from './events/bus.js';
 import { createMessageHandler } from './agent/handler.js';
 import { createSimulateHandler } from './test/simulate.js';
+import { createWorkspaceIngress } from './workspace/ingress.js';
+import { createNotificationHandler, logChannelCapabilities } from './notifications/engine.js';
 
 loadDotEnv();
 const config = loadConfig();
@@ -32,6 +34,7 @@ const adapter = createAdapter({
 });
 // Handler de simulação (só montado fora de produção; precisa do pool/bus do main).
 let simulateHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
+let workspaceHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
 
 const startedAt = Date.now();
 let ready = false;
@@ -98,6 +101,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         respond(200, renderMetrics(), 'text/plain');
         break;
 
+      case '/v1/events': {
+        // Ingress do workspace (F2): autenticado por token de serviço.
+        if (!workspaceHandler) {
+          respond(503, { error: 'workspace_ingress_disabled' });
+          break;
+        }
+        if (req.method !== 'POST') {
+          respond(405, { error: 'method_not_allowed' });
+          break;
+        }
+        await workspaceHandler(req, res);
+        break;
+      }
+
       case '/test/simulate-message': {
         // Simulação de ingress de cliente (dev/teste). WhatsPlay real = F1.4.
         if (!simulateHandler) {
@@ -151,7 +168,12 @@ async function main(): Promise<void> {
 
   // 3. Event bus (outbox dispatcher — §7.8) + handler do cérebro vivo (§7.1 agent/)
   const bus = new EventBus(pool, { dispatcherId: 'orchestrator' });
-  const messageHandler = createMessageHandler({ pool, adapter, log });
+  const messageHandler = createMessageHandler({
+    pool,
+    adapter,
+    log,
+    telegram: { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID },
+  });
   bus.on('client.message.received', messageHandler);
   bus.on('whatsapp.message.received', messageHandler);
   bus.start();
@@ -162,6 +184,27 @@ async function main(): Promise<void> {
     simulateHandler = createSimulateHandler({ pool, bus, log });
     log.info('POST /test/simulate-message disponível (simulação de cliente)');
   }
+
+  // Workspace ingress (F2) — sempre montado; 503 sem WORKSPACE_SERVICE_TOKEN.
+  workspaceHandler = createWorkspaceIngress({
+    pool,
+    bus,
+    log,
+    serviceToken: config.WORKSPACE_SERVICE_TOKEN,
+  });
+
+  // Notifications engine (§22) + capability logada no boot.
+  bus.on('notification.requested', createNotificationHandler({
+    pool,
+    log,
+    email: { smtpUrl: config.SMTP_URL, from: config.SMTP_FROM },
+    push: { publicKey: config.VAPID_PUBLIC_KEY, privateKey: config.VAPID_PRIVATE_KEY, subject: config.VAPID_SUBJECT },
+  }));
+  logChannelCapabilities(
+    log,
+    { smtpUrl: config.SMTP_URL, from: config.SMTP_FROM },
+    { publicKey: config.VAPID_PUBLIC_KEY, privateKey: config.VAPID_PRIVATE_KEY, subject: config.VAPID_SUBJECT },
+  );
   await recordActivity(pool, {
     kind: 'info',
     summary: 'Orchestrator iniciou — event bus, outbox e health endpoints no ar.',

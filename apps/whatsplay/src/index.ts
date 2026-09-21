@@ -98,7 +98,7 @@ async function main(): Promise<void> {
   log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
 
   // Telegram fallback (§15) — configurado antes da fila de saída (auto-reparo alerta por ele).
-  const telegramConfig = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID };
+  const telegramConfig = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
 
   // Fila de saída (respostas da Luna).
   const outbound = createOutboundListener({

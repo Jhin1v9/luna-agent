@@ -1,0 +1,187 @@
+import type { Pool } from 'pg';
+import type { Logger } from 'pino';
+import type { EventEnvelope } from '@luna/events';
+import type { KimiLiveAdapter, TurnResult } from '@luna/agent';
+import { publishEvent, type Sql } from '@luna/database';
+import { loadRouterConfig, routeFor, type RouterConfig } from './config.js';
+import {
+  STRUCTURED_INSTRUCTIONS,
+  parseStructured,
+  isExplicitHumanRequest,
+  type StructuredOutput,
+} from './structured.js';
+import { runTool, toolNames, type ToolContext } from './tools.js';
+
+/**
+ * Model Router (contrato v1.1) — enrutamento DETERMINÍSTICO por event_type
+ * (zero IA no roteamento, §10.4). Este módulo executa o destination=fast com
+ * saídas estruturadas (§5) e guardas de bucle (§5.1); destination=live e a
+ * investigação em si ficam registrados como handoff estruturado (ADR-023 —
+ * kimi-web WS ainda opaco).
+ */
+
+export const TOOL_CALL_MAX_ITERATIONS = 5; // §5.1
+export const HANDOFF_MAX_PER_EVENT = 1; // §5.1 — via de sentido único
+
+export interface RouterDecision {
+  /** O que o handler deve entregar ao cliente (ANSWER de espera em handoff). */
+  answerText: string;
+  /** Uso real do turno vencedor (usage ledger). */
+  turn: TurnResult;
+  /** Saída estruturada final. */
+  output: StructuredOutput;
+  /** Rondas de tool executadas (evidência das guardas). */
+  toolRounds: number;
+  handoff: boolean;
+  escalate: boolean;
+}
+
+export interface RouterDeps {
+  pool: Pool;
+  adapter: KimiLiveAdapter;
+  log: Logger;
+  config?: RouterConfig;
+}
+
+interface TurnTrace {
+  output: StructuredOutput;
+  turn: TurnResult;
+  toolRounds: number;
+}
+
+async function structuredTurn(
+  deps: RouterDeps,
+  prompt: string,
+  sessionKey: string,
+  toolRounds: number,
+): Promise<TurnTrace> {
+  const toolBlock =
+    toolRounds < TOOL_CALL_MAX_ITERATIONS
+      ? `\nTools disponíveis (somente leitura): ${toolNames().join(', ')}.`
+      : '\nVocê JÁ atingiu o tope de chamadas de tool neste evento — responda ANSWER, HANDOFF_LIVE ou ESCALATE_HUMAN.';
+  const turn = await deps.adapter.sendTurn({
+    session_key: sessionKey,
+    prompt: `${STRUCTURED_INSTRUCTIONS}\n${toolBlock}\n\n---\n${prompt}`,
+  });
+  const { output } = parseStructured(turn.reply_text);
+  return { output, turn, toolRounds };
+}
+
+/**
+ * §10 algoritmo para destination=fast. Retorna a decisão final; o handler
+ * faz a entrega. Pedido explícito de humano (§8.1) sai antes de qualquer IA.
+ */
+export async function runFastRoute(deps: RouterDeps, input: {
+  event: EventEnvelope;
+  prompt: string;
+  sessionKey: string;
+  allowLiveHandoff: boolean;
+}): Promise<RouterDecision> {
+  const { event, prompt, sessionKey, allowLiveHandoff } = input;
+  const clientText = (event.payload as { text?: string }).text ?? '';
+
+  // §8.1 — pedido explícito de humano: escalación imediata, ZERO tentativas de IA.
+  if (isExplicitHumanRequest(clientText)) {
+    deps.log.info({ event_id: event.event_id }, 'router: pedido explícito de humano — escalación imediata (§8.1)');
+    return {
+      answerText:
+        'Claro! Já chamei o time — quem puder te atende agora. Enquanto isso, se quiser deixar mais detalhes, eu anoto tudo pra eles.',
+      turn: { reply_text: '', session_id: 'router:no-ai', duration_ms: 0 },
+      output: { type: 'ESCALATE_HUMAN', reason: 'pedido explícito de humano no texto do cliente', priority: 'ALTA', summary: clientText.slice(0, 200) },
+      toolRounds: 0,
+      handoff: false,
+      escalate: true,
+    };
+  }
+
+  const ctx: ToolContext = { conversationId: sessionKey, clientId: event.client_id };
+  let trace = await structuredTurn(deps, prompt, sessionKey, 0);
+
+  // §10.2/§5.1 — loop FAST↔tool, tope de 5 iterações.
+  while (trace.output.type === 'TOOL_CALL' && trace.toolRounds < TOOL_CALL_MAX_ITERATIONS) {
+    const call = trace.output;
+    deps.log.info({ tool: call.tool, event_id: event.event_id }, 'router: TOOL_CALL — executando tool');
+    const result = await runTool(deps.pool, ctx, call.tool, call.args);
+    const backToFast = [
+      prompt,
+      '',
+      `Resultado da tool "${call.tool}" (rodada ${trace.toolRounds + 1}):`,
+      JSON.stringify(result).slice(0, 1500),
+      '',
+      'Com esse dado, responda com o JSON final (ANSWER / HANDOFF_LIVE / ESCALATE_HUMAN).',
+    ].join('\n');
+    trace = await structuredTurn(deps, backToFast, sessionKey, trace.toolRounds + 1);
+  }
+
+  const output = trace.output;
+
+  // §5.1 — HANDOFF_LIVE: máx 1 por evento. Como é a 1ª e única via, ok.
+  if (output.type === 'HANDOFF_LIVE' && allowLiveHandoff && HANDOFF_MAX_PER_EVENT === 1) {
+    await publishEvent(deps.pool, {
+      event_type: 'router.handoff.live',
+      source: 'model_router',
+      client_id: event.client_id,
+      conversation_id: event.conversation_id,
+      correlation_id: event.correlation_id,
+      causation_id: event.event_id,
+      payload: {
+        objective: output.objective,
+        budget: 3,
+        timeout_ms: 600_000,
+        context_summary: output.context_summary,
+      },
+    });
+    // ADR-023: sem live brain mapeado, o handoff vira: resposta de espera ao
+    // cliente (§6 cortesia) + registro estruturado pro admin (chat admin = F4).
+    return {
+      answerText: 'Deixa eu verificar isso direitinho — já te falo aqui mesmo, tá?',
+      turn: trace.turn,
+      output,
+      toolRounds: trace.toolRounds,
+      handoff: true,
+      escalate: false,
+    };
+  }
+
+  if (output.type === 'ESCALATE_HUMAN') {
+    return {
+      answerText: 'Claro! Já chamei o time — quem puder te atende agora.',
+      turn: trace.turn,
+      output,
+      toolRounds: trace.toolRounds,
+      handoff: false,
+      escalate: true,
+    };
+  }
+
+  // ANSWER (ou degradação de parse → ANSWER com o texto cru).
+  const text = output.type === 'ANSWER' ? output.text : trace.turn.reply_text;
+  return {
+    answerText: text,
+    turn: trace.turn,
+    output: output.type === 'ANSWER' ? output : { type: 'ANSWER', text },
+    toolRounds: trace.toolRounds,
+    handoff: false,
+    escalate: false,
+  };
+}
+
+/** Seleção de route + evento router.route.selected / router.default.used (§11). */
+export async function selectRoute(deps: RouterDeps, event: EventEnvelope): Promise<{
+  destination: 'fast' | 'live';
+  allowLiveHandoff: boolean;
+  timeoutMs: number;
+}> {
+  const config = deps.config ?? loadRouterConfig();
+  const { route, defaulted } = routeFor(config, event.event_type);
+  await publishEvent(deps.pool, {
+    event_type: defaulted ? 'router.default.used' : 'router.route.selected',
+    source: 'model_router',
+    client_id: event.client_id,
+    conversation_id: event.conversation_id,
+    correlation_id: event.correlation_id,
+    causation_id: event.event_id,
+    payload: { event_type: event.event_type, destination: route.destination, route: event.event_type in config.routes ? event.event_type : null },
+  }).catch(() => {});
+  return { destination: route.destination, allowLiveHandoff: route.allow_live_handoff, timeoutMs: route.timeout_ms };
+}
