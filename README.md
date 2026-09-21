@@ -69,6 +69,18 @@ cola = tabela `jobs` + worker.
 > polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
 > id); alertas seguem fail-closed em log até lá.
 >
+> **Tools da VPS Nexo ligadas ✅** — catálogo oficial em
+> `docs/tools/nexo-api-catalog.md` (mapeado ao vivo do bundle do dashboard
+> pro: base `/dashboard/api/`, Bearer via login). **12 tools de LEITURA** no
+> TOOL_CALL do Model Router (finanças, clientes, leads, tarefas, caixa,
+> orçamentos, notificações, relatórios, sistema) — a Luna consulta dados
+> REAIS da VPS e responde no WhatsApp com eles. ~20 endpoints RESTRITOS
+> catalogados sem implementação (pagamentos, escrita, system/control, VNC,
+> namespace /api/luna/* quebrado do kernel legado). Business guard no prompt:
+> consulta livre, ação comercial NUNCA (§4). Credenciais via env; chamada
+> real validada (7 clientes reais + finanças EUR). Pendência: usuário de
+> serviço próprio pra Luna (owner).
+>
 > **Pós-F2 — decretos + F3 adiantado + F4 mínimo ✅** — (1) NUNCA deixar
 > chat aberto: closeCurrentChat após ler/responder + sweep só abre com
 > trabalho novo; LIMITAÇÃO HONESTA (ADR-027): a plataforma não restaura o
