@@ -1,0 +1,41 @@
+import pg from 'pg';
+
+let pool: pg.Pool | null = null;
+
+export function getPool(databaseUrl?: string): pg.Pool {
+  if (pool) return pool;
+  pool = new pg.Pool({
+    connectionString: databaseUrl ?? process.env.DATABASE_URL,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+  pool.on('error', (err) => {
+    // Erros de cliente idle não devem derrubar o processo.
+    console.error('[db] idle client error', err.message);
+  });
+  return pool;
+}
+
+export async function closePool(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
+}
+
+/** SELECT 1 — checagem mínima de conectividade. */
+export async function checkConnection(p?: pg.Pool): Promise<boolean> {
+  const db = p ?? getPool();
+  try {
+    await db.query('SELECT 1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export { recordAudit, recordActivity } from './audit.js';
+export type { AuditEntry, AuditResult, ActivityEntry, ActivityKind, Sql } from './audit.js';
+export { enqueueJob } from './jobs.js';
+export type { EnqueueJobInput, EnqueueJobResult } from './jobs.js';

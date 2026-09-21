@@ -1,0 +1,8 @@
+{
+  "name": "whatsplay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "echo \"whatsplay: placeholder (F1.1) — implementado em fases futuras\"" },
+  "devDependencies": { "typescript": "^5.6.0" }
+}

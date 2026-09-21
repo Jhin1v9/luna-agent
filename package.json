@@ -1,0 +1,28 @@
+{
+  "name": "luna-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Luna — CTO virtual da Nexo Digital. Infraestrutura do agente (orchestrator, worker, whatsplay, admin).",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:orchestrator": "pnpm --filter orchestrator dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "migrate": "pnpm --filter @luna/database migrate",
+    "test": "pnpm -r run test && pnpm run test:integration",
+    "test:unit": "pnpm -r run test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.0",
+    "pg": "^8.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
