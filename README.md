@@ -51,6 +51,24 @@ cola = tabela `jobs` + worker.
 > (ADR no watcher.ts; sweep de allowlisted cobre msgs lidas/virtualizadas e o
 > self-test do owner). Gemini interino mantido como opção (ADR-018).
 >
+> **Pós-F2 (hotfixes decretados pelo owner) ✅** — **BUG DE ROTEAMENTO
+> GRAVO corrigido**: pergunta no grupo que foi respondida no privado errado —
+> causa raiz com evidência (sweep atribuindo texto do painel aberto ao chat
+> errado quando a row estava fora da lista virtualizada). Fix: openChat
+> VERIFICA o título do painel + fallback pela busca; readConversation retorna
+> [] sem o chat certo; sendMessage falha em vez de digitar no painel errado.
+> **SEND-SAFETY incondicional** no whatsplay: mismatch pergunta→resposta =
+> bloqueio + alerta imediato ao owner no Telegram + audit. Regressões
+> cobertas (2 testes). Escopo revertido pelo owner: allowlists voltaram a
+> Pai + 🏆Production-2026 (ADR-020 atualizado). **Classifier pós-conversa
+> (§27, ADR-026)**: taxonomia pequena travada, pipeline RESOLVED→job→worker
+> → DB + Brain (OPINIONES + sinapses `.brain/luna/synapses/YYYY-MM.md`
+> assinadas) + memory_index; `@luna/brain` real; seed dev (Jess/onadance,
+> NEXO Internal). Migração 007. **144 testes verdes.**
+> Telegram: token OK (@lunanexobot), chat_id pendente (getUpdates em
+> polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
+> id); alertas seguem fail-closed em log até lá.
+>
 > **F2 Notificações multicanal + cérebro estruturado ✅** — Model Router
 > (contrato v1.1): routes em config versionada (`config/routes.json`, mudar =
 > commit sem tocar código), saídas estruturadas ANSWER/TOOL_CALL/HANDOFF_LIVE/
