@@ -45,6 +45,7 @@ export function createIngest(deps: IngestDeps) {
       channel: 'whatsapp',
       text: msg.text,
       external_id: msg.external_id,
+      author_name: msg.author_name ?? msg.chat_name,
     });
     if (!messageId) {
       log.info({ external_id: msg.external_id }, 'mensagem duplicada — ignorada (§7.6)');
@@ -60,6 +61,7 @@ export function createIngest(deps: IngestDeps) {
         conversation_id: identity.conversation_id,
         message_id: messageId,
         text: msg.text,
+        author_name: msg.author_name ?? msg.chat_name,
         deliver: true,
         chat_id: msg.chat_id,
       },

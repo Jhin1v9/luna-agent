@@ -92,14 +92,16 @@ export async function insertInboundMessage(
     text: string;
     external_id: string;
     sender?: string;
+    /** Quem falou (nome do membro/contato). NULL = autor desconhecido. */
+    author_name?: string | null;
   },
 ): Promise<string | null> {
   const inserted = await pool.query<{ id: string }>(
-    `INSERT INTO messages (conversation_id, direction, channel, sender, body, external_id)
-     VALUES ($1, 'inbound', $2, $3, $4, $5)
+    `INSERT INTO messages (conversation_id, direction, channel, sender, body, external_id, author_name)
+     VALUES ($1, 'inbound', $2, $3, $4, $5, $6)
      ON CONFLICT (channel, external_id) WHERE external_id IS NOT NULL DO NOTHING
      RETURNING id`,
-    [input.conversation_id, input.channel, input.sender ?? 'contact', input.text, input.external_id],
+    [input.conversation_id, input.channel, input.sender ?? 'contact', input.text, input.external_id, input.author_name ?? null],
   );
   return inserted.rowCount ? inserted.rows[0]!.id : null;
 }

@@ -81,6 +81,7 @@ describe('migrator (integração)', () => {
         '001_foundation.sql',
         '002_events_outbox_dlq_audit.sql',
         '003_messages_send_tracking.sql',
+        '004_messages_author.sql',
       ]);
 
       const c = new pg.Client({ connectionString: scratchUrl });

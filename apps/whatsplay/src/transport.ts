@@ -29,6 +29,8 @@ export interface UnreadMessage {
   quoted_from_luna?: boolean;
   /** @luna mencionado no texto. */
   mentioned_luna: boolean;
+  /** Quem falou (nome do membro no grupo / contato no privado). */
+  author_name?: string | null;
   received_at: string;
 }
 
@@ -36,6 +38,8 @@ export interface ConversationMessage {
   sender: string;
   direction: 'inbound' | 'outbound';
   text: string;
+  /** Quem falou (nome do membro no grupo; 'Tú'/null no outbound). */
+  author?: string | null;
 }
 
 export interface WhatsAppTransport {

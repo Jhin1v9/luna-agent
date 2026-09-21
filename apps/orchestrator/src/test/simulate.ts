@@ -54,6 +54,7 @@ export async function simulateMessage(
     channel,
     text: input.text,
     external_id: externalId,
+    author_name: input.contact_name ?? input.client_name,
   });
   if (!messageId) {
     return {
@@ -70,7 +71,7 @@ export async function simulateMessage(
     source: 'test-simulate',
     client_id: identity.client_id,
     conversation_id: identity.conversation_id,
-    payload: { conversation_id: identity.conversation_id, message_id: messageId, text: input.text, deliver: false },
+    payload: { conversation_id: identity.conversation_id, message_id: messageId, text: input.text, author_name: input.contact_name ?? input.client_name, deliver: false },
     idempotency_key: `simmsg:${channel}:${externalId}`,
   });
 

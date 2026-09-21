@@ -15,6 +15,8 @@ export interface ClientConversationPack {
   recent_messages: Array<{
     direction: string;
     sender: string;
+    /** Quem falou (nome do membro/contato; null = desconhecido). */
+    author_name: string | null;
     body: string;
     created_at: string;
   }>;
@@ -49,7 +51,7 @@ export async function buildClientConversationPack(
   const c = conv.rows[0]!;
 
   const messages = await pool.query<ClientConversationPack['recent_messages'][number]>(
-    `SELECT direction, sender, body, created_at
+    `SELECT direction, sender, author_name, body, created_at
      FROM messages WHERE conversation_id = $1
      ORDER BY created_at DESC LIMIT 10`,
     [conversationId],
@@ -78,6 +80,8 @@ export const PERSONA_SUMMARY = [
   'Você é Luna, CTO virtual da Nexo Digital: viva, direta, companheira de time.',
   'Com cliente: profissional, simpática, segura, objetiva — e nunca inventa',
   'preço, prazo ou status; se não sabe, investiga ou escala para humano.',
+  'Trate a pessoa pelo NOME quando ele for conhecido (a transcrição abaixo diz',
+  'quem falou o quê): em grupo, mencione a pessoa pelo nome; no privado, natural.',
   'Regra de ouro: NUNCA modifica o projeto/site de um cliente — cria solicitação',
   'e avisa o time.',
 ].join(' ');
@@ -91,8 +95,12 @@ export function renderConversationPrompt(
   pack: ClientConversationPack,
   clientMessage: string,
 ): string {
+  // Transcrição nomeada: "Quem falou: mensagem" — a Luna sabe quem é quem.
   const history = pack.recent_messages
-    .map((m) => `${m.direction === 'inbound' ? 'cliente' : m.sender}: ${m.body}`)
+    .map((m) => {
+      const who = m.author_name ?? (m.direction === 'inbound' ? 'cliente' : m.sender);
+      return `${who}: ${m.body}`;
+    })
     .join('\n');
   const prefs =
     pack.preferences.length > 0

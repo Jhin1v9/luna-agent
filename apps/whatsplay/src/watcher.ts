@@ -210,6 +210,7 @@ export class IngestWatcher {
           external_id: `wa:${entry}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
+          author_name: (last as { author?: string | null }).author ?? null,
           received_at: new Date().toISOString(),
         };
         this.deps.log.info({ chat: entry, self_test: isSelfTest }, 'watcher(sweep): mensagem nova');
@@ -244,6 +245,7 @@ export class IngestWatcher {
       external_id: `wa:${badge.chat_id}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
       mentioned_luna: extractMention(last.text),
       quoted_from_luna: false,
+      author_name: (last as { author?: string | null }).author ?? badge.chat_name,
       received_at: new Date().toISOString(),
     };
     this.debouncer.push(badge.chat_id, msg.text, (combined) => {

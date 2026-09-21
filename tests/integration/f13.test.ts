@@ -127,7 +127,7 @@ describe('Context Builder — pack CLIENT_CONVERSATION (§7.9)', () => {
     expect(prompt).toContain('Luna');
     expect(prompt).toContain('Jess');
     expect(prompt).toContain('e o prazo?');
-    expect(prompt).toContain('cliente: oi, o site já ficou pronto?');
+    expect(prompt).toContain('Jessica: oi, o site já ficou pronto?'); // transcrição nomeada pelo autor
   });
 });
 
@@ -284,5 +284,60 @@ describe('reaper de locks travados (F1.3)', () => {
     );
     const r = await reapStaleLocks(pool, 300_000);
     expect(r.jobs_requeued).toBe(0);
+  });
+});
+
+// ─────────────────────────── autor por mensagem (decreto owner) ───────────────────────────
+
+describe('autor por mensagem — persistência + transcrição nomeada (decreto owner)', () => {
+  it('messages.author_name gravado no inbound e na resposta; Context Builder nomeia quem falou', async () => {
+    const bus = await makeBus();
+    const r = await simulateMessage(pool, bus, {
+      client_name: 'Grupo Teste',
+      contact_name: 'Nonoke', // autor extraído do [data-testid="author"] no grupo
+      text: '@luna alguém pegou o relatório?',
+      external_id: 'wamid-author-1',
+    });
+    await bus.dispatchOnce();
+
+    // inbound persistido com autor
+    const inbound = await pool.query<{ author_name: string | null }>(
+      "SELECT author_name FROM messages WHERE direction='inbound' AND conversation_id=$1",
+      [r.conversation_id],
+    );
+    expect(inbound.rows[0]!.author_name).toBe('Nonoke');
+
+    // resposta da Luna persistida como autora
+    const outbound = await pool.query<{ author_name: string | null }>(
+      "SELECT author_name FROM messages WHERE direction='outbound' AND conversation_id=$1",
+      [r.conversation_id],
+    );
+    expect(outbound.rows[0]!.author_name).toBe('Luna');
+
+    // pack nomeia quem falou o quê
+    const pack = await buildClientConversationPack(pool, r.conversation_id);
+    const nonoke = pack.recent_messages.find((m) => m.direction === 'inbound');
+    expect(nonoke!.author_name).toBe('Nonoke');
+    const prompt = renderConversationPrompt(pack, 'e o relatório?');
+    expect(prompt).toContain('Nonoke: @luna alguém pegou o relatório?');
+    expect(prompt).toContain('Luna: ');
+    // persona instrui tratar pela pessoa pelo nome
+    expect(prompt).toContain('pelo NOME');
+  });
+
+  it('activity cita o autor real (não só o nome do chat)', async () => {
+    const bus = await makeBus();
+    await simulateMessage(pool, bus, {
+      client_name: 'Grupo Teste 2',
+      contact_name: 'Abner',
+      text: '@luna teste de autor',
+      external_id: 'wamid-author-2',
+    });
+    await bus.dispatchOnce();
+    const act = await pool.query<{ summary: string }>(
+      "SELECT summary FROM activity_log WHERE summary LIKE '%Abner%' ORDER BY id DESC LIMIT 1",
+    );
+    expect(act.rowCount).toBe(1);
+    expect(act.rows[0]!.summary).toContain('Respondi Abner');
   });
 });

@@ -33,6 +33,8 @@ export interface MessageHandlerDeps {
 interface HandlerPayload {
   conversation_id?: string;
   text?: string;
+  /** Quem falou (nome do membro no grupo / contato no privado). */
+  author_name?: string | null;
   /** true = mensagem de canal real (WhatsPlay entrega); false = simulação. */
   deliver?: boolean;
 }
@@ -82,8 +84,8 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
     const deliver = payload.deliver !== false;
     const inserted = await db.query<{ id: string }>(
-      `INSERT INTO messages (conversation_id, direction, channel, sender, body, metadata, send_state)
-       VALUES ($1, 'outbound', $2, 'luna', $3, $4, $5)
+      `INSERT INTO messages (conversation_id, direction, channel, sender, body, author_name, metadata, send_state)
+       VALUES ($1, 'outbound', $2, 'luna', $3, 'Luna', $4, $5)
        RETURNING id`,
       [
         conversationId,
@@ -134,11 +136,14 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     await transitionConversation(db, conversationId, 'RESOLVED');
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.
+    // Activity cita o AUTOR da mensagem quando conhecido (decreto owner:
+    // "registrar quem falou o quê") — no grupo fica "Respondi Abner (grupo)".
     const snippet = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+    const author = payload.author_name ?? pack.contact_name ?? pack.client_name;
     await recordActivity(db, {
       client_id: event.client_id,
       kind: 'action',
-      summary: `Respondi ${pack.contact_name ?? pack.client_name} (${pack.client_name}): "${snippet}"`,
+      summary: `Respondi ${author} (${pack.client_name}): "${snippet}"`,
       correlation_id: event.correlation_id,
     });
     await recordAudit(db, {

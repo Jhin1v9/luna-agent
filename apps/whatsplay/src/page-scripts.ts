@@ -53,20 +53,24 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
   const SELF = /^(tú|você|voce|you|tu)$/i;
   return rows.map((row) => {
     const textEl = row.querySelector(sel.messageText);
+    // Direção: marcador estrutural tail-in/tail-out (validado ao vivo 2026-09-21);
+    // fallback: padrão aria "Remetente:" (Self = Tú/Você/You).
+    let direction = row.querySelector('[data-testid="tail-in"]') ? 'inbound'
+      : row.querySelector('[data-testid="tail-out"]') ? 'outbound' : null;
     let sender = '';
-    let isSelf = false;
-    for (const el of row.querySelectorAll('[aria-label]')) {
-      const aria = el.getAttribute('aria-label') || '';
-      const m = aria.match(/^(.*?)\\s*:\\s*$/);
-      if (m) { sender = m[1].trim(); isSelf = SELF.test(sender); break; }
+    if (!direction) {
+      for (const el of row.querySelectorAll('[aria-label]')) {
+        const aria = el.getAttribute('aria-label') || '';
+        const m = aria.match(/^(.*?)\\s*:\\s*$/);
+        if (m) { sender = m[1].trim(); direction = SELF.test(sender) ? 'outbound' : 'inbound'; break; }
+      }
     }
+    if (!direction) direction = 'inbound'; // fallback explícito: sem marcadores, assume inbound
+    // Autor: seletor semântico [data-testid="author"] (grupo); outbound = "Tú".
+    const authorEl = row.querySelector('[data-testid="author"]');
+    const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
     const quotedEl = row.querySelector('[data-pre-plain-text]');
-    return {
-      direction: isSelf ? 'outbound' : 'inbound',
-      sender,
-      text: textEl ? (textEl.textContent || '').trim() : '',
-      quoted: quotedEl ? (quotedEl.textContent || '').trim() : null,
-    };
+    return { direction, sender, author, text: textEl ? (textEl.textContent || '').trim() : '', quoted: quotedEl ? (quotedEl.textContent || '').trim() : null };
   });
 }`;
 
@@ -75,18 +79,20 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
   const SELF = /^(tú|você|voce|you|tu)$/i;
   return rows.map((row) => {
     const textEl = row.querySelector(sel.messageText);
+    let direction = row.querySelector('[data-testid="tail-in"]') ? 'inbound'
+      : row.querySelector('[data-testid="tail-out"]') ? 'outbound' : null;
     let sender = '';
-    let isSelf = false;
-    for (const el of row.querySelectorAll('[aria-label]')) {
-      const aria = el.getAttribute('aria-label') || '';
-      const m = aria.match(/^(.*?)\\s*:\\s*$/);
-      if (m) { sender = m[1].trim(); isSelf = SELF.test(sender); break; }
+    if (!direction) {
+      for (const el of row.querySelectorAll('[aria-label]')) {
+        const aria = el.getAttribute('aria-label') || '';
+        const m = aria.match(/^(.*?)\\s*:\\s*$/);
+        if (m) { sender = m[1].trim(); direction = SELF.test(sender) ? 'outbound' : 'inbound'; break; }
+      }
     }
-    return {
-      sender,
-      direction: isSelf ? 'outbound' : 'inbound',
-      text: textEl ? (textEl.textContent || '').trim() : '',
-    };
+    if (!direction) direction = 'inbound';
+    const authorEl = row.querySelector('[data-testid="author"]');
+    const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
+    return { sender, author, direction, text: textEl ? (textEl.textContent || '').trim() : '' };
   });
 }`;
 
