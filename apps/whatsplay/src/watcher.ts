@@ -4,6 +4,7 @@ import type { UnreadMessage, WhatsAppTransport } from './transport.js';
 import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
+import { extractMention } from './rules.js';
 
 /**
  * Watcher de ingress (modo F1.4 — registrado em ADR).
@@ -194,20 +195,20 @@ export class IngestWatcher {
         const key = `${last.direction}:${last.text}`;
         const prev = this.lastSeenMsg.get(entry);
         this.lastSeenMsg.set(entry, key);
-        const isSelfTest = last.direction === 'outbound' && /@luna\b/i.test(last.text);
+        const isSelfTest = last.direction === 'outbound' && extractMention(last.text);
         if (last.direction === 'outbound' && !isSelfTest) continue; // resposta da própria Luna
         if (prev === key) continue; // mesma mensagem da última varredura
         // Primeira vista (prev undefined): dispara SE acionável (inbound ou
         // self-test do owner); dedupe fino de repetição fica no unique
         // (channel, external_id) de messages.
-        const text = last.text.replace(/@luna\b/gi, '').trim() || last.text;
+        const text = last.text.replace(/@luna/gi, '').trim() || last.text;
         const msg: UnreadMessage = {
           chat_id: entry,
           chat_name: entry,
           is_group: (await this.deps.transport.currentChatIsGroup?.().catch(() => false)) ?? false,
           text,
           external_id: `wa:${entry}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
-          mentioned_luna: /@luna\b/i.test(last.text),
+          mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
           received_at: new Date().toISOString(),
         };
@@ -241,7 +242,7 @@ export class IngestWatcher {
         .map((m) => m.text)
         .join(' '),
       external_id: `wa:${badge.chat_id}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
-      mentioned_luna: /@luna\b/i.test(last.text),
+      mentioned_luna: extractMention(last.text),
       quoted_from_luna: false,
       received_at: new Date().toISOString(),
     };

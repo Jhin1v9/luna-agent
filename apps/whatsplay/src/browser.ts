@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { SELECTORS } from './selectors.js';
+import { extractMention } from './rules.js';
 import {
   STATE_PROBES_SCRIPT,
   COLLECT_UNREAD_CHATS_SCRIPT,
@@ -178,7 +179,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           external_id: `wa:${chat.chat_id}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
           quoted_text: last.quoted,
           quoted_from_luna: false,
-          mentioned_luna: /@luna\b/i.test(last.text),
+          mentioned_luna: extractMention(last.text),
           received_at: new Date().toISOString(),
         });
       } catch {
