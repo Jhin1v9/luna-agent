@@ -187,7 +187,8 @@ export class IngestWatcher {
    */
   private async sweepAllowlisted(): Promise<void> {
     for (const entry of this.ingestAllowlist) {
-      if (entry.includes('@')) continue; // sweep por nome; jid pula
+      // jid (decreto: número do owner, ex. 34685093192@s.whatsapp.net):
+      // o browser busca pelo número — sweep suporta; nome segue igual.
       try {
         const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
         const last = msgs[msgs.length - 1];

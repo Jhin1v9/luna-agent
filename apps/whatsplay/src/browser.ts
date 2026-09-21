@@ -200,6 +200,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       sel: SELECTORS,
       lim: limit,
     })) as ConversationMessage[];
+    await this.closeCurrentChat(); // decreto: não deixar chat aberto
     return messages.filter((m) => m.text);
   }
 
@@ -218,6 +219,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
     await page.keyboard.press('Enter');
     this.lastHeartbeatAt = new Date();
+    await this.closeCurrentChat(); // decreto: não deixar chat aberto
     return `sent:${chatId}:${Date.now()}`;
   }
 
@@ -252,6 +254,31 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   }
 
   /**
+   * Decreto owner (ADR-027): NÃO deixar chat aberto. Abrir marca como lida e
+   * o owner perde a notificação. Após ler/responder, fechamos o painel
+   * (Escape; WA Web não tem API estável de "close"). LIMITAÇÃO HONESTA: a
+   * plataforma NÃO restaura o badge de não-lida após fechar — a mitigação
+   * real é só abrir quando há trabalho (sweep por diff) e nunca reabrir o
+   * já processado. Chip dedicado (§36 pendente do owner) remove a
+   * necessidade.
+   */
+  async closeCurrentChat(): Promise<void> {
+    const page = this.requirePage();
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(400);
+    if ((await this.currentOpenChatTitle()) !== null) {
+      // fallback: clicar no wordmark/header da lista (deseleta o painel)
+      await page
+        .evaluate(`(() => {
+          const el = document.querySelector('#side [data-testid="wa-wordmark"]') || document.querySelector('#side header');
+          if (el) el.click();
+        })()`)
+        .catch(() => {});
+      await page.waitForTimeout(400);
+    }
+  }
+
+  /**
    * Abre chat pelo nome com VERIFICAÇÃO do painel — e fallback pela BUSCA.
    *
    * BUG GRAVE de roteamento (2026-09-21, owner): a lista é virtualizada; se a
@@ -264,24 +291,32 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
    */
   private async openChat(nameOrId: string): Promise<boolean> {
     const page = this.requirePage();
+    // jid/número (decreto: identificar o contato PELO NÚMERO): a busca é o
+    // caminho — título do chat não casa com número, e número é único.
+    const isJid = nameOrId.includes('@');
+    const searchKey = isJid ? nameOrId.split('@')[0] : nameOrId;
     const key = nameOrId.replace(/"/g, '\\"');
     await this.ensureMainChatList();
 
     const matches = async (): Promise<boolean> => {
       const title = await this.currentOpenChatTitle();
-      return title !== null && normalizeName(title) === normalizeName(nameOrId);
+      if (title === null) return false;
+      if (isJid) return true; // busca por número é unicamente identificável
+      return normalizeName(title) === normalizeName(nameOrId);
     };
 
-    // 1) clique na row visível (caminho rápido)
-    const row = page
-      .locator(
-        `#pane-side [role="row"]:has([title="${key}"]), #pane-side [data-testid="cell-frame-container"]:has([title="${key}"])`,
-      )
-      .first();
-    const clicked = await row.click({ timeout: 4_000 }).then(() => true).catch(() => false);
-    if (clicked) {
-      await page.waitForTimeout(700);
-      if (await matches()) return true;
+    // 1) clique na row visível (caminho rápido; jid vai direto pra busca)
+    if (!isJid) {
+      const row = page
+        .locator(
+          `#pane-side [role="row"]:has([title="${key}"]), #pane-side [data-testid="cell-frame-container"]:has([title="${key}"])`,
+        )
+        .first();
+      const clicked = await row.click({ timeout: 4_000 }).then(() => true).catch(() => false);
+      if (clicked) {
+        await page.waitForTimeout(700);
+        if (await matches()) return true;
+      }
     }
 
     // 2) fallback: BUSCA (funciona mesmo com a chat fora da viewport)
@@ -290,7 +325,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       .first();
     if ((await search.count()) > 0) {
       await search.click({ timeout: 3_000 }).catch(() => {});
-      await page.keyboard.type(nameOrId, { delay: 40 });
+      await page.keyboard.type(searchKey, { delay: 40 });
       await page.waitForTimeout(900);
       const firstResult = page.locator('#pane-side [role="row"], #pane-side [data-testid="cell-frame-container"]').first();
       await firstResult.click({ timeout: 4_000 }).catch(() => {});
