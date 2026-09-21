@@ -20,8 +20,7 @@ export interface ToolResult {
 export type FastTool = (db: Sql, ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>;
 
 export const FAST_TOOLS: Record<string, FastTool> = {
-  /** Últimas mensagens da conversa (além do que o context pack já trouxe). */
-  'conversation.recent': async (db, ctx) => {
+  /** Últimas mensagens da conversa (além do que o context pack já trouxe). */  'conversation.recent': async (db, ctx) => {
     const res = await db.query(
       `SELECT direction, author_name, body, created_at FROM messages
        WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 10`,
@@ -69,5 +68,12 @@ export async function runTool(
     return await tool(db, ctx, args);
   } catch (err) {
     return { ok: false, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Registra tools extras no catálogo do FAST (ex.: tools Nexo da VPS). */
+export function registerFastTools(extra: Record<string, FastTool>): void {
+  for (const [name, fn] of Object.entries(extra)) {
+    if (!(name in FAST_TOOLS)) FAST_TOOLS[name] = fn;
   }
 }

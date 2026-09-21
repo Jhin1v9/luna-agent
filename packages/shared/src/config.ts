@@ -59,6 +59,13 @@ const envSchema = z.object({
   // ── F2 — Endpoint do workspace (BLOCO 5): token de serviço (Bearer).
   // Sem token configurado o endpoint fica 503 (fail-closed explícito).
   WORKSPACE_SERVICE_TOKEN: z.string().optional(),
+
+  // ── Tools da VPS Nexo (docs/tools/nexo-api-catalog.md) — LEITURA apenas.
+  // Credenciais SÓ via env (nunca commit; pino mascara). Sem credencial a
+  // tool falha explicitamente (fail-closed).
+  NEXO_API_BASE_URL: z.string().url().default('https://vps.nexo-digital.app'),
+  NEXO_API_USERNAME: z.string().optional(),
+  NEXO_API_PASSWORD: z.string().optional(),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   // Anti-ban (ADR-004): espera humana antes de entregar a resposta no

@@ -174,6 +174,20 @@ async function main(): Promise<void> {
     log,
     telegram: { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID },
   });
+  // Tools da VPS Nexo (leitura, catálogo docs/tools/nexo-api-catalog.md) —
+  // ligadas "igual um neurônio" no TOOL_CALL do Model Router. Sem
+  // credencial: tool falha explicitamente (fail-closed), sem derrubar nada.
+  const { registerFastTools } = await import('./agent/router/tools.js');
+  const { createNexoTools } = await import('./agent/router/tools-nexo.js');
+  registerFastTools(
+    createNexoTools({
+      baseUrl: config.NEXO_API_BASE_URL,
+      username: config.NEXO_API_USERNAME,
+      password: config.NEXO_API_PASSWORD,
+    }),
+  );
+  log.info('tools Nexo registradas no FAST (leitura; ações = restritas)');
+
   bus.on('client.message.received', messageHandler);
   bus.on('whatsapp.message.received', messageHandler);
   bus.start();

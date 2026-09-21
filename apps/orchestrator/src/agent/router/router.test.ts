@@ -154,3 +154,48 @@ describe('usage ledger (§23/§28) — custo por modelo', () => {
     expect(estimateCost('modelo-desconhecido', { input_tokens: 1, output_tokens: 1 })).toBeNull();
   });
 });
+
+describe('tools Nexo (leitura da VPS)', () => {
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  }
+
+  it('login → Bearer em todas as chamadas; dados reais retornam', async () => {
+    const { createNexoTools } = await import('./tools-nexo.js');
+    const seen: Array<{ url: string; auth?: string }> = [];
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      seen.push({ url, auth: (init?.headers as Record<string, string>)?.authorization });
+      if (url.endsWith('/dashboard/api/auth/login')) {
+        return jsonResponse({ success: true, token: 'tok-123', user: { id: 'luna' } });
+      }
+      return jsonResponse({ totalExpected: 100, activeClients: 2 });
+    };
+    const tools = createNexoTools({ baseUrl: 'https://vps.test', username: 'luna', password: 'x' }, fetchImpl);
+    const r = await tools['nexo.finance.summary']!({} as never, { conversationId: 'c', clientId: null }, {});
+    expect(r.ok).toBe(true);
+    expect((r.data as { activeClients: number }).activeClients).toBe(2);
+    // login chamado uma vez; chamada de dados com Bearer
+    expect(seen[0]!.url).toContain('/dashboard/api/auth/login');
+    expect(seen[1]!.auth).toBe('Bearer tok-123');
+  });
+
+  it('sem credencial: falha explícita por tool (fail-closed)', async () => {
+    const { createNexoTools } = await import('./tools-nexo.js');
+    const tools = createNexoTools({ baseUrl: 'https://vps.test' });
+    const r = await tools['nexo.clients.list']!({} as never, { conversationId: 'c', clientId: null }, {});
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('NEXO_API_USERNAME');
+  });
+
+  it('erro HTTP da VPS vira ToolResult ok=false (nunca exceção pro loop)', async () => {
+    const { createNexoTools } = await import('./tools-nexo.js');
+    const fetchImpl = async (url: string) =>
+      url.endsWith('/login')
+        ? jsonResponse({ success: true, token: 't' })
+        : jsonResponse({ error: 'boom' }, 500);
+    const tools = createNexoTools({ baseUrl: 'https://vps.test', username: 'u', password: 'p' }, fetchImpl);
+    const r = await tools['nexo.tasks.list']!({} as never, { conversationId: 'c', clientId: null }, {});
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('500');
+  });
+});
