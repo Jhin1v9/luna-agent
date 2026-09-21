@@ -41,15 +41,16 @@ const envSchema = z.object({
     .default('C:/Program Files/Google/Chrome/Application/chrome.exe'),
   WHATSAPP_USER_DATA_DIR: z.string().default(''),
   WHATSAPP_HEADLESS: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
-  WHATSAPP_DEBOUNCE_MS: z.coerce.number().int().positive().default(4000),
+  WHATSAPP_DEBOUNCE_MS: z.coerce.number().int().positive().default(3000),
   // Telegram fallback vivo (§15): sessão WhatsApp caiu → msg ao time.
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_TEAM_CHAT_ID: z.string().optional(),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   // Anti-ban (ADR-004): espera humana antes de entregar a resposta no
-  // WhatsApp — "responde como gente", não em 300ms.
-  HUMAN_RESPONSE_DELAY_MS: z.coerce.number().int().min(0).default(6_000),
+  // WhatsApp — "responde como gente". Decreto owner: 3-4s (era 6-9s) +
+  // typing delay curto no sendMessage.
+  HUMAN_RESPONSE_DELAY_MS: z.coerce.number().int().min(0).default(3500),
   // GUARDRAIL DE CÓDIGO (decreto do owner): fora de produção, SÓ estes
   // contatos (nome ou jid, separados por vírgula) podem receber mensagem da
   // Luna. Lista VAZIA em dev = recusa TUDO (fail-closed). Em produção a

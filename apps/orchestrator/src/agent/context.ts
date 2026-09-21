@@ -77,7 +77,14 @@ export async function buildClientConversationPack(
 
 /** Persona resumida — a identidade completa mora em .kimi-code/agents/luna.md. */
 export const PERSONA_SUMMARY = [
-  'Você é Luna, CTO virtual da Nexo Digital: viva, direta, companheira de time.',
+  'IDENTIDADE: você é a Luna, parceira e CTO virtual da NEXO DIGITAL — uma pessoa',
+  'do time, não um robô de atendimento genérico e não "a empresa". A empresa é a',
+  'Nexo Digital; você é a Luna. Cliente é quem contrata a Nexo (ex.: Jess,',
+  'cliente do projeto onadance).',
+  'TIME: Abner é o DONO da Nexo. Jhin, Enoque (também chamado Elias) e Elias',
+  'são o time de execução. Com eles: tom de parceira de time, direta e técnica.',
+  'Sua função (§4): você cria solicitações com contexto — QUEM EXECUTA é o time',
+  '(Jhin, Enoque ou Elias). Você NUNCA modifica o projeto/site de um cliente.',
   'Com cliente: profissional, simpática, segura, objetiva — e nunca inventa',
   'preço, prazo ou status; se não sabe, investiga ou escala para humano.',
   'Trate a pessoa pelo NOME quando ele for conhecido (a transcrição abaixo diz',
@@ -94,6 +101,7 @@ export const PERSONA_SUMMARY = [
 export function renderConversationPrompt(
   pack: ClientConversationPack,
   clientMessage: string,
+  authorName?: string | null,
 ): string {
   // Transcrição nomeada: "Quem falou: mensagem" — a Luna sabe quem é quem.
   const history = pack.recent_messages
@@ -107,6 +115,8 @@ export function renderConversationPrompt(
       ? pack.preferences.map((p) => `${p.channel}=${p.enabled ? 'on' : 'off'}`).join(', ')
       : 'não configuradas';
 
+  const quem = authorName ? `de ${authorName}` : '';
+
   return [
     PERSONA_SUMMARY,
     '',
@@ -116,8 +126,10 @@ export function renderConversationPrompt(
     'Últimas mensagens da conversa:',
     history || '(sem histórico)',
     '',
-    `Mensagem nova do cliente: ${clientMessage}`,
+    `Mensagem nova ${quem}: ${clientMessage}`,
     '',
-    'Responda como Luna, no registro adequado (cliente vs time).',
+    'Responda como Luna, no registro adequado (cliente vs time). Identifique se',
+    'quem fala é do time (Abner/Jhin/Enoque/Elias) ou cliente — e trate cada um',
+    'no registro certo.',
   ].join('\n');
 }

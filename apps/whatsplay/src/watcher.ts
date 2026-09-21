@@ -112,8 +112,8 @@ export class IngestWatcher {
   private readonly ingestAllowlist: string[];
   private readonly enforceIngest: boolean;
   private sweepCount = 0;
-  /** Roda o sweep a cada N ticks (4s × 8 ≈ 32s). */
-  private readonly sweepEvery = 8;
+  /** Roda o sweep a cada N ticks (4s × 3 = 12s — decreto owner: latência). */
+  private readonly sweepEvery = 3;
   private lastSeenMsg = new Map<string, string>();
 
   constructor(

@@ -341,3 +341,28 @@ describe('autor por mensagem — persistência + transcrição nomeada (decreto 
     expect(act.rows[0]!.summary).toContain('Respondi Abner');
   });
 });
+
+describe('identidade/time no system prompt (feedback owner: confusão com quem é quem)', () => {
+  it('prompt deixa explícito: Luna é parceira da NEXO, Abner é o dono, time executa', async () => {
+    await pool.query("INSERT INTO organizations (name, slug) VALUES ('NEXO', 'nexo-id') ON CONFLICT DO NOTHING");
+    const client = await pool.query<{ id: string }>(
+      "INSERT INTO clients (organization_id, name, code) SELECT id, 'Teste', 'teste-id' FROM organizations WHERE slug='nexo-id' RETURNING id",
+    );
+    const pack = await buildClientConversationPack(
+      pool,
+      (
+        await pool.query<{ id: string }>(
+          "INSERT INTO conversations (client_id, channel, state) VALUES ($1, 'whatsapp', 'NEW') RETURNING id",
+          [client.rows[0]!.id],
+        )
+      ).rows[0]!.id,
+    );
+    const prompt = renderConversationPrompt(pack, '@luna status do projeto?', 'Abner');
+    expect(prompt).toContain('parceira e CTO virtual da NEXO DIGITAL');
+    expect(prompt).toContain('não um robô de atendimento genérico');
+    expect(prompt).toContain('Abner é o DONO');
+    expect(prompt).toContain('Enoque');
+    expect(prompt).toContain('Mensagem nova de Abner');
+    expect(prompt).toContain('Jhin');
+  });
+});

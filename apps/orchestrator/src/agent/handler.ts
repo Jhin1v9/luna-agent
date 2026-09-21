@@ -75,7 +75,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
     const pack = await buildClientConversationPack(db, conversationId);
-    const prompt = renderConversationPrompt(pack, text);
+    const prompt = renderConversationPrompt(pack, text, payload.author_name);
 
     // Brain real. Se falhar: erro sobe pro dispatcher (retry → DLQ), nunca
     // fallback silencioso pro mock (ADR-016).
