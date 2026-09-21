@@ -55,6 +55,11 @@ const envSchema = z.object({
   // Luna. Lista VAZIA em dev = recusa TUDO (fail-closed). Em produção a
   // allowlist de teste não se aplica (ADR-020).
   WHATSAPP_OUTBOUND_ALLOWLIST: z.string().default(''),
+  // ESCOPO DE INGESTÃO (decreto do owner, ADR-020): o watcher SÓ processa
+  // conversas desta lista — fora do escopo é ignorado SEM abrir o chat e SEM
+  // gastar tokens (nem Context Builder, nem LLM). Vazia em dev = nada
+  // processado (fail-closed).
+  WHATSAPP_INGEST_ALLOWLIST: z.string().default(''),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

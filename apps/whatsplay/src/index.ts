@@ -3,6 +3,7 @@ import { createLogger } from '@luna/logging';
 import { getPool, closePool, checkConnection } from '@luna/database';
 import { WhatsAppWebTransport } from './browser.js';
 import { SELECTORS } from './selectors.js';
+import { parseAllowlist } from './allowlist.js';
 import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { createOutboundListener } from './outbound.js';
@@ -73,6 +74,10 @@ async function main(): Promise<void> {
       page,
       selectors: SELECTORS,
       debounceMs: config.WHATSAPP_DEBOUNCE_MS,
+      // ESCOPO DE INGESTÃO (decreto do owner, ADR-020): só estas conversas
+      // gastam tokens. Fora da lista = ignorado sem abrir chat, sem LLM.
+      ingestAllowlist: parseAllowlist(config.WHATSAPP_INGEST_ALLOWLIST),
+      enforceIngestAllowlist: config.NODE_ENV !== 'production',
     },
     { intervalMs: 4_000 },
   );

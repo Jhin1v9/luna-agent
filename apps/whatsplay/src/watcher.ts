@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import type { UnreadMessage, WhatsAppTransport } from './transport.js';
 import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
+import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 
 /**
  * Watcher de ingress (modo F1.4 — registrado em ADR).
@@ -80,28 +81,45 @@ const BADGES_PREVIEW_SCRIPT = `(sel) => {
   return out;
 }`;
 
+export interface WatcherDeps {
+  pool: Pool;
+  transport: WhatsAppTransport;
+  log: Logger;
+  page: { evaluate(script: string, arg?: unknown): Promise<unknown> };
+  selectors: unknown;
+  debounceMs: number;
+  /**
+   * ESCOPO DE INGESTÃO (decreto do owner, ADR-020): fora de produção, o
+   * watcher SÓ processa conversas nesta lista — mensagem de fora do escopo
+   * é ignorada SEM abrir o chat (não marca como lida), SEM Context Builder
+   * e SEM chamar LLM (zero tokens). Lista vazia com enforce = nada
+   * processado (fail-closed).
+   */
+  ingestAllowlist?: string[];
+  enforceIngestAllowlist?: boolean;
+  /** Injetável para testes (default: createIngest real). */
+  ingestFn?: (msg: UnreadMessage) => Promise<'published' | 'skipped'>;
+}
+
 export class IngestWatcher {
   private baseline = new Map<string, string>();
   private seeded = false;
   private timer: NodeJS.Timeout | null = null;
   private readonly debouncer: Debouncer;
-  private readonly ingest;
+  private readonly ingest: (msg: UnreadMessage) => Promise<'published' | 'skipped'>;
   private readonly intervalMs: number;
+  private readonly ingestAllowlist: string[];
+  private readonly enforceIngest: boolean;
 
   constructor(
-    private readonly deps: {
-      pool: Pool;
-      transport: WhatsAppTransport;
-      log: Logger;
-      page: { evaluate(script: string, arg?: unknown): Promise<unknown> };
-      selectors: unknown;
-      debounceMs: number;
-    },
+    private readonly deps: WatcherDeps,
     opts: WatcherOptions = {},
   ) {
     this.intervalMs = opts.intervalMs ?? 4_000;
     this.debouncer = new Debouncer({ flushMs: deps.debounceMs });
-    this.ingest = createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log });
+    this.ingest = deps.ingestFn ?? createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log }).ingestOne;
+    this.ingestAllowlist = parseAllowlist(deps.ingestAllowlist?.join(','));
+    this.enforceIngest = deps.enforceIngestAllowlist ?? false;
   }
 
   private async collect(): Promise<ChatBadge[]> {
@@ -125,6 +143,12 @@ export class IngestWatcher {
     const fresh = diffBadges(this.baseline, badges);
     for (const b of fresh) {
       this.baseline.set(b.chat_id, b.preview);
+      // ESCOPO DE INGESTÃO: fora da lista → ignora SEM abrir o chat (não
+      // marca como lida), SEM Context Builder, SEM LLM — zero tokens.
+      if (this.enforceIngest && !matchesAllowlist(this.ingestAllowlist, b.chat_name) && !matchesAllowlist(this.ingestAllowlist, b.chat_id)) {
+        this.deps.log.debug({ chat: b.chat_name }, 'watcher: fora do escopo de ingestão — ignorado (zero tokens)');
+        continue;
+      }
       this.deps.log.info({ chat: b.chat_name, unread: b.unread }, 'watcher: mensagem nova detectada');
       void this.extractAndIngest(b).catch((err) =>
         this.deps.log.error({ err, chat: b.chat_name }, 'watcher: ingest falhou'),
@@ -156,7 +180,7 @@ export class IngestWatcher {
       received_at: new Date().toISOString(),
     };
     this.debouncer.push(badge.chat_id, msg.text, (combined) => {
-      void this.ingest.ingestOne({ ...msg, text: combined }).catch((err) =>
+      void this.ingest({ ...msg, text: combined }).catch((err) =>
         this.deps.log.error({ err }, 'watcher: ingest falhou'),
       );
     });

@@ -25,6 +25,25 @@
    Postgres respondem) é do owner quando chegar a vez; até lá, este guardrail
    é a fronteira.
 
+## Escopo de ingestão (acréscimo do mesmo decreto, 2026-09-21)
+
+O owner também liberou o grupo **"🏆Production - 2026🙏🏻"** para testes (além
+do "Pai" — só esses dois destinos, ninguém mais). E fechou o problema
+operacional que tinha me obrigado a parar o daemon: `WHATSAPP_INGEST_ALLOWLIST`.
+
+- O watcher **só processa conversas da lista**: mensagem fora do escopo é
+  ignorada **sem abrir o chat** (não marca como lida), **sem Context Builder e
+  sem chamar LLM — zero tokens** (no máximo um log debug). Fail-closed: lista
+  vazia em dev = nada processado.
+- Matcher compartilhado (`allowlist.ts`): exato por nome, ou jid por sufixo
+  (entrada com `@`). Substring não vale.
+- Identificador do grupo: o sistema usa o **nome do chat** como address (o
+  `data-id` do DOM não vem para grupos nesta build) — por isso a entrada é o
+  nome exato com emojis. Se a build passar a expor o jid `@g.us`, preferir
+  adicioná-lo à lista (mais estável que nome).
+- Validado ao religar: log "fora do escopo de ingestão — ignorado (zero
+  tokens)" disparando em runtime real na primeira janela.
+
 ## Validação (2026-09-21)
 
 - 6 testes unitários + 3 de integração (Postgres real): na lista envia, fora

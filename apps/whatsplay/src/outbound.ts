@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
+import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 
 /**
  * Fila de saída (zero polling): o handler da Luna grava a resposta com
@@ -15,12 +16,10 @@ export interface OutboundDeps {
   log: Logger;
   /** Anti-ban (ADR-004): espera humana (com jitter) antes de enviar. Default 6s. */
   humanDelayMs?: number;
-  /**
-   * GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção, só
+  /** GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção, só
    * estes destinatários (nome ou jid) podem receber mensagem da Luna.
    * Lista vazia com enforce=true = recusa TUDO (fail-closed). Nunca
-   * silencioso: recusa gera audit explícito + send_state='failed'.
-   */
+   * silencioso: recusa gera audit explícito + send_state='failed'. */
   allowlist?: string[];
   enforceAllowlist?: boolean;
 }
@@ -35,19 +34,13 @@ interface OutboundMessageRow {
 
 export function createOutboundListener(deps: OutboundDeps) {
   const { pool, transport, log } = deps;
-  const allowlist = (deps.allowlist ?? []).map((s) => s.trim()).filter(Boolean);
+  const allowlist = parseAllowlist(deps.allowlist?.join(','));
   const enforce = deps.enforceAllowlist ?? false;
 
-  /** GUARDRAIL: fora de produção, destino precisa estar na allowlist.
-   *  Match estrito (fail-closed): exato, ou jid (entrada com @ casa por
-   *  sufixo). Substring solto NÃO vale — falso-positivo de allow é o pior
-   *  cenário deste guardrail. */
+  /** GUARDRAIL: fora de produção, destino precisa estar na allowlist. */
   function refusedByAllowlist(target: string): string | null {
     if (!enforce) return null;
-    const hit = allowlist.some((entry) =>
-      entry.includes('@') ? target.endsWith(entry) : entry === target,
-    );
-    if (hit) return null;
+    if (matchesAllowlist(allowlist, target)) return null;
     return allowlist.length === 0
       ? 'allowlist vazia em modo teste/dev — envio recusado (fail-closed, decreto do owner)'
       : `destinatário fora da allowlist de teste [${allowlist.join(', ')}]`;
