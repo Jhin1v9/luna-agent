@@ -50,6 +50,11 @@ const envSchema = z.object({
   // Anti-ban (ADR-004): espera humana antes de entregar a resposta no
   // WhatsApp — "responde como gente", não em 300ms.
   HUMAN_RESPONSE_DELAY_MS: z.coerce.number().int().min(0).default(6_000),
+  // GUARDRAIL DE CÓDIGO (decreto do owner): fora de produção, SÓ estes
+  // contatos (nome ou jid, separados por vírgula) podem receber mensagem da
+  // Luna. Lista VAZIA em dev = recusa TUDO (fail-closed). Em produção a
+  // allowlist de teste não se aplica (ADR-020).
+  WHATSAPP_OUTBOUND_ALLOWLIST: z.string().default(''),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

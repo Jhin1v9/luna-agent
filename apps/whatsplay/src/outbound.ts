@@ -15,6 +15,14 @@ export interface OutboundDeps {
   log: Logger;
   /** Anti-ban (ADR-004): espera humana (com jitter) antes de enviar. Default 6s. */
   humanDelayMs?: number;
+  /**
+   * GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção, só
+   * estes destinatários (nome ou jid) podem receber mensagem da Luna.
+   * Lista vazia com enforce=true = recusa TUDO (fail-closed). Nunca
+   * silencioso: recusa gera audit explícito + send_state='failed'.
+   */
+  allowlist?: string[];
+  enforceAllowlist?: boolean;
 }
 
 interface OutboundMessageRow {
@@ -27,6 +35,23 @@ interface OutboundMessageRow {
 
 export function createOutboundListener(deps: OutboundDeps) {
   const { pool, transport, log } = deps;
+  const allowlist = (deps.allowlist ?? []).map((s) => s.trim()).filter(Boolean);
+  const enforce = deps.enforceAllowlist ?? false;
+
+  /** GUARDRAIL: fora de produção, destino precisa estar na allowlist.
+   *  Match estrito (fail-closed): exato, ou jid (entrada com @ casa por
+   *  sufixo). Substring solto NÃO vale — falso-positivo de allow é o pior
+   *  cenário deste guardrail. */
+  function refusedByAllowlist(target: string): string | null {
+    if (!enforce) return null;
+    const hit = allowlist.some((entry) =>
+      entry.includes('@') ? target.endsWith(entry) : entry === target,
+    );
+    if (hit) return null;
+    return allowlist.length === 0
+      ? 'allowlist vazia em modo teste/dev — envio recusado (fail-closed, decreto do owner)'
+      : `destinatário fora da allowlist de teste [${allowlist.join(', ')}]`;
+  }
 
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
@@ -43,6 +68,21 @@ export function createOutboundListener(deps: OutboundDeps) {
     const target = row.address ?? row.contact_name;
     if (!target) {
       await mark(messageId, 'failed', 'sem contato/alvo de entrega');
+      return;
+    }
+    const refusal = refusedByAllowlist(target);
+    if (refusal) {
+      // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.
+      await mark(messageId, 'failed', refusal);
+      await recordAudit(pool, {
+        actor: 'whatsplay',
+        action: 'whatsapp.message.send_refused',
+        tool: 'whatsplay_transport',
+        correlation_id: row.correlation_id,
+        result: 'failed',
+        metadata: { message_id: messageId, target, reason: 'outbound_allowlist', detail: refusal },
+      });
+      log.error({ message_id: messageId, target, refusal }, 'GUARDRAIL: envio recusado pela allowlist');
       return;
     }
     try {

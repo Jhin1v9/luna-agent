@@ -82,7 +82,16 @@ async function main(): Promise<void> {
   log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
 
   // Fila de saída (respostas da Luna).
-  const outbound = createOutboundListener({ pool, transport, log, humanDelayMs: config.HUMAN_RESPONSE_DELAY_MS });
+  const outbound = createOutboundListener({
+    pool,
+    transport,
+    log,
+    humanDelayMs: config.HUMAN_RESPONSE_DELAY_MS,
+    // GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção,
+    // só a allowlist recebe mensagem. Lista vazia em dev = recusa tudo.
+    allowlist: config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim()),
+    enforceAllowlist: config.NODE_ENV !== 'production',
+  });
   const listenClient = await outbound.start();
 
   // Fallback Telegram (§15).

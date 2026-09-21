@@ -277,3 +277,84 @@ describe('resposta de cliente NUNCA vem do mock em produção (ADR-016)', () => 
     expect(audit.rows[0]!.result).toBe('failed');
   });
 });
+
+// ─────────────────────────── GUARDRAIL outbound allowlist (ADR-020) ───────────────────────────
+
+describe('GUARDRAIL outbound allowlist em Postgres real (decreto do owner)', () => {
+  async function setupConversation(address: string): Promise<{ conversationId: string; messageId: string }> {
+    const identity = await resolveIngressIdentity(pool, {
+      client_name: `Teste ${address}`,
+      contact_name: address,
+      channel: 'whatsapp',
+      address,
+    });
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, direction, channel, sender, body, send_state, metadata)
+       VALUES ($1, 'outbound', 'whatsapp', 'luna', 'resposta de teste', 'queued', $2) RETURNING id`,
+      [identity.conversation_id, JSON.stringify({ correlation_id: 'corr_guardrail' })],
+    );
+    return { conversationId: identity.conversation_id, messageId: inserted.rows[0]!.id };
+  }
+
+  it('destino fora da allowlist → recusado: failed + audit send_refused, zero envio', async () => {
+    const { messageId } = await setupConversation('Contato Proibido');
+    const sent: string[] = [];
+    const { createOutboundListener } = await import('../../apps/whatsplay/src/outbound.js');
+    const listener = createOutboundListener({
+      pool,
+      transport: fakeTransport(sent),
+      log,
+      humanDelayMs: 0,
+      allowlist: ['Pai'],
+      enforceAllowlist: true,
+    });
+    await listener.deliverOne(messageId);
+
+    expect(sent).toHaveLength(0);
+    const msg = await pool.query<{ send_state: string }>('SELECT send_state FROM messages WHERE id = $1', [messageId]);
+    expect(msg.rows[0]!.send_state).toBe('failed');
+    const audit = await pool.query<{ action: string; metadata: { reason: string } }>(
+      "SELECT action, metadata FROM audit_log WHERE action = 'whatsapp.message.send_refused'",
+    );
+    expect(audit.rowCount).toBe(1);
+    expect(audit.rows[0]!.metadata.reason).toBe('outbound_allowlist');
+  });
+
+  it('destino na allowlist → enviado normalmente', async () => {
+    const { messageId } = await setupConversation('Pai');
+    const sent: string[] = [];
+    const { createOutboundListener } = await import('../../apps/whatsplay/src/outbound.js');
+    const listener = createOutboundListener({
+      pool,
+      transport: fakeTransport(sent),
+      log,
+      humanDelayMs: 0,
+      allowlist: ['Pai'],
+      enforceAllowlist: true,
+    });
+    await listener.deliverOne(messageId);
+
+    expect(sent).toHaveLength(1);
+    const msg = await pool.query<{ send_state: string }>('SELECT send_state FROM messages WHERE id = $1', [messageId]);
+    expect(msg.rows[0]!.send_state).toBe('sent');
+  });
+
+  it('lista vazia em dev → recusa tudo (fail-closed)', async () => {
+    const { messageId } = await setupConversation('Pai');
+    const sent: string[] = [];
+    const { createOutboundListener } = await import('../../apps/whatsplay/src/outbound.js');
+    const listener = createOutboundListener({
+      pool,
+      transport: fakeTransport(sent),
+      log,
+      humanDelayMs: 0,
+      allowlist: [],
+      enforceAllowlist: true,
+    });
+    await listener.deliverOne(messageId);
+
+    expect(sent).toHaveLength(0);
+    const msg = await pool.query<{ send_state: string }>('SELECT send_state FROM messages WHERE id = $1', [messageId]);
+    expect(msg.rows[0]!.send_state).toBe('failed');
+  });
+});
