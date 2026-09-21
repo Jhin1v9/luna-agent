@@ -69,6 +69,22 @@ cola = tabela `jobs` + worker.
 > polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
 > id); alertas seguem fail-closed em log até lá.
 >
+> **Pós-F2 — decretos + F3 adiantado + F4 mínimo ✅** — (1) NUNCA deixar
+> chat aberto: closeCurrentChat após ler/responder + sweep só abre com
+> trabalho novo; LIMITAÇÃO HONESTA (ADR-027): a plataforma não restaura o
+> badge de não-lida — ler é irreversível; chip dedicado resolve. (2) Testes
+> SÓ pro número do owner (jid 34685093192@s.whatsapp.net, match por número).
+> FASE A (revisão): dep pool não usado no ingress, paridade de notificação
+> no catch de entrega, sweep com autoria na transcrição. FASE B (F3):
+> Context packs CLIENT_PROJECT e ADMIN_FULL selecionados PELA ROUTE,
+> promotion protocol (§10/§11), summaries mensais no worker (memory_index +
+> MEMORY.md + profile + sinapse — RODANDO ao vivo), estrutura do Brain
+> garantida. FASE C (F4 mínimo): chat admin via Telegram (§25) — responde
+> só o chat autorizado com dados REAIS; IDLE sem TELEGRAM_CHAT_ID.
+> **147 testes verdes.** 4 serviços pm2 no ar. Pendências: chat_id Telegram
+> (poll autocontido grava no .env quando o owner mandar msg pro bot),
+> pm2 startup no boot (admin), chip dedicado, volume real p/ circuit breaker.
+>
 > **F2 Notificações multicanal + cérebro estruturado ✅** — Model Router
 > (contrato v1.1): routes em config versionada (`config/routes.json`, mudar =
 > commit sem tocar código), saídas estruturadas ANSWER/TOOL_CALL/HANDOFF_LIVE/
