@@ -4,7 +4,7 @@ import { closePool } from '@luna/database';
 
 /**
  * Seed dev (idempotente): clientes/projetos de exemplo mapeados às conversas
- * reais do escopo. Roda: pnpm exec tsx scripts/seed-dev.ts
+ * reais do escopo. Roda: pnpm --filter worker exec tsx src/tools-seed-dev.ts
  * - Jess (onadance) + projeto "Site Onadance" (link cliente↔projeto via FK).
  * - Grupo interno Production - 2026 como "cliente" interno (contexto do time).
  */
