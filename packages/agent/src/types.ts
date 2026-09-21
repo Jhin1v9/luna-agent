@@ -14,7 +14,7 @@
  *   · Modo 'mock' (default dev/test): determinístico, sem rede.
  */
 
-export type KimiAdapterMode = 'mock' | 'kimi-web';
+export type KimiAdapterMode = 'mock' | 'kimi-web' | 'kimi-api';
 
 export interface KimiAdapterConfig {
   mode: KimiAdapterMode;
@@ -24,6 +24,11 @@ export interface KimiAdapterConfig {
   webToken?: string;
   /** Diretório de trabalho das sessões criadas no kimi web. */
   cwd?: string;
+  /** Kimi API (fast brain, §7.2): key só via env/KIMI_API_KEY — nunca commite. */
+  apiKey?: string;
+  apiBaseUrl?: string;
+  apiModel?: string;
+  apiTimeoutMs?: number;
 }
 
 /** Um turno de conversa: prompt montado (persona + contexto) + mensagem do cliente. */
@@ -38,6 +43,8 @@ export interface TurnResult {
   reply_text: string;
   session_id: string;
   duration_ms: number;
+  /** Uso de tokens quando o backend informa (Kimi API). Vira usage_entries (§23). */
+  usage?: { input_tokens: number; output_tokens: number };
 }
 
 export interface SessionInfo {

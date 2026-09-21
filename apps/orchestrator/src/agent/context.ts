@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Sql } from '@luna/database';
 
 /**
  * Context Builder mínimo (§7.9) — pack CLIENT_CONVERSATION.
@@ -32,7 +32,7 @@ interface ConversationRow {
 }
 
 export async function buildClientConversationPack(
-  pool: Pool,
+  pool: Sql,
   conversationId: string,
 ): Promise<ClientConversationPack> {
   const conv = await pool.query<ConversationRow>(

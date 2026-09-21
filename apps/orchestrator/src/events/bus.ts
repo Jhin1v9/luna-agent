@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
-import { createEvent, validateEvent, type EventEnvelope, type CreateEventInput } from '@luna/events';
-import { recordAudit } from '@luna/database';
+import { validateEvent, type EventEnvelope, type CreateEventInput } from '@luna/events';
+import { recordAudit, publishEvent } from '@luna/database';
 
 /**
  * Event bus do Orchestrator (§7.1 módulo `events/`, §7.8 outbox, §7.7 DLQ,
@@ -94,73 +94,11 @@ export class EventBus {
   /**
    * Publica um evento: envelope validado, persistido em `events` + `outbox`
    * e idempotency_key registrada — tudo na mesma transação (§7.8).
+   * Delega ao publisher compartilhado do @luna/database (mesmo caminho
+   * usado pelo WhatsPlay e por scripts).
    */
   async publish(input: PublishInput): Promise<PublishResult> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      if (input.idempotency_key) {
-        const seen = await client.query<{ event_id: string }>(
-          'SELECT event_id FROM idempotency_keys WHERE key = $1',
-          [input.idempotency_key],
-        );
-        if (seen.rowCount && seen.rowCount > 0) {
-          await client.query('COMMIT');
-          const original = await this.fetchEvent(seen.rows[0]!.event_id);
-          return { event: original, duplicate: true };
-        }
-      }
-
-      const event = createEvent(input);
-      await client.query(
-        `INSERT INTO events
-           (event_id, event_type, version, organization_id, client_id,
-            conversation_id, correlation_id, causation_id, priority, payload, occurred_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          event.event_id,
-          event.event_type,
-          event.version,
-          event.organization_id,
-          event.client_id,
-          event.conversation_id,
-          event.correlation_id,
-          event.causation_id,
-          event.priority,
-          event,
-          event.timestamp,
-        ],
-      );
-      await client.query(
-        `INSERT INTO outbox (event_id, event_type, payload, occurred_at)
-         VALUES ($1, $2, $3, $4)`,
-        [event.event_id, event.event_type, event, event.timestamp],
-      );
-      if (input.idempotency_key) {
-        await client.query(
-          'INSERT INTO idempotency_keys (key, event_id) VALUES ($1, $2)',
-          [input.idempotency_key, event.event_id],
-        );
-      }
-
-      await client.query('COMMIT');
-      return { event, duplicate: false };
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  private async fetchEvent(eventId: string): Promise<EventEnvelope> {
-    const res = await this.pool.query<{ payload: unknown }>(
-      'SELECT payload FROM events WHERE event_id = $1',
-      [eventId],
-    );
-    if (!res.rowCount) throw new Error(`evento ${eventId} não encontrado em events`);
-    return validateEvent(res.rows[0]!.payload);
+    return publishEvent(this.pool, input);
   }
 
   private async runHandlers(event: EventEnvelope): Promise<void> {

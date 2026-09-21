@@ -3,13 +3,16 @@ import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
 import { getPool, closePool, checkConnection, recordActivity } from '@luna/database';
 import { migrate } from '@luna/database/migrate';
-import { createAdapter } from '@luna/agent';
+import { createAdapter, assertProductionAdapter } from '@luna/agent';
 import { EventBus } from './events/bus.js';
 import { createMessageHandler } from './agent/handler.js';
 import { createSimulateHandler } from './test/simulate.js';
 
 loadDotEnv();
 const config = loadConfig();
+// ADR-016: em produção, boot com adapter mock é recusado — resposta de
+// cliente nunca sai do mock.
+assertProductionAdapter(config.KIMI_ADAPTER_MODE, config.NODE_ENV);
 const log = createLogger({ name: 'orchestrator' });
 
 // Adapter do cérebro vivo (§7.3, ADR-010/015). Nunca expor à internet.
@@ -129,7 +132,9 @@ async function main(): Promise<void> {
 
   // 3. Event bus (outbox dispatcher — §7.8) + handler do cérebro vivo (§7.1 agent/)
   const bus = new EventBus(pool, { dispatcherId: 'orchestrator' });
-  bus.on('client.message.received', createMessageHandler({ pool, adapter, log }));
+  const messageHandler = createMessageHandler({ pool, adapter, log });
+  bus.on('client.message.received', messageHandler);
+  bus.on('whatsapp.message.received', messageHandler);
   bus.start();
   log.info({ interval_ms: 200, adapter: adapter.mode }, 'event bus dispatcher started');
 

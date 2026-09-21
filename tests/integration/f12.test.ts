@@ -77,7 +77,11 @@ describe('migrator (integração)', () => {
     try {
       const scratchUrl = TEST_URL.replace(TEST_DB_NAME, scratch);
       const applied = await migrate(scratchUrl);
-      expect(applied).toEqual(['001_foundation.sql', '002_events_outbox_dlq_audit.sql']);
+      expect(applied).toEqual([
+        '001_foundation.sql',
+        '002_events_outbox_dlq_audit.sql',
+        '003_messages_send_tracking.sql',
+      ]);
 
       const c = new pg.Client({ connectionString: scratchUrl });
       await c.connect();

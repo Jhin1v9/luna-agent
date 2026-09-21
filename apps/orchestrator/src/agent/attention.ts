@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Sql } from '@luna/database';
 
 /**
  * State machine de atenção (§7.11) — nasce mínima:
@@ -32,7 +32,7 @@ export class InvalidTransition extends Error {
 
 /** Transiciona e PERSISTE o estado na conversation (fonte da verdade = DB). */
 export async function transitionConversation(
-  pool: Pool,
+  pool: Sql,
   conversationId: string,
   to: AttentionState,
 ): Promise<void> {

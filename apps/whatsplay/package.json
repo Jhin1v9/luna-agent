@@ -1,8 +1,26 @@
 {
   "name": "whatsplay",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "echo \"whatsplay: placeholder (F1.1) — implementado em fases futuras\"" },
-  "devDependencies": { "typescript": "^5.6.0" }
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "discover": "tsx src/discover.ts",
+    "login": "tsx src/discover.ts --login",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@luna/shared": "workspace:*",
+    "@luna/logging": "workspace:*",
+    "@luna/database": "workspace:*",
+    "playwright-core": "^1.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
 }

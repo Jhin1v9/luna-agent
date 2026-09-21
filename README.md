@@ -34,7 +34,23 @@ cola = tabela `jobs` + worker.
 > WhatsPlay real é F1.4), reaper de locks travados no worker, e **primeiro
 > evento end-to-end validado ao vivo** (curl → evento → resposta persistida →
 > RESOLVED → evidência com correlation). Migração 003: não precisou.
-> Testes: 18 unitários + 21 de integração, verdes. Próxima: F1.4 WhatsPlay.
+> Testes: 18 unitários + 21 de integração, verdes.
+>
+> **F1.4 WhatsPlay + Brain Real ✅ (critério PARCIAL — falta a KIMI_API_KEY e o
+> pareamento do QR)** — KimiApiAdapter (fast brain real, §7.2; decreto do owner:
+> resposta de cliente NUNCA sai do mock — guarda de boot em produção, sem
+> fallback silencioso — ADR-016; key pendente, adapter testado com fetch
+> injetado). WhatsPlay real: Chrome dedicado (perfil próprio, nunca o do
+> usuário), captura por MUTAÇÃO de DOM (zero polling), WhatsAppTransport
+> isolado (zero seletor no orchestrator), watchdog 5 estados com evidência
+> (screenshot+DOM), regras de grupo §5 (privado sempre, grupo só @luna/reply),
+> debounce §19, client lock (advisory lock), fila de saída por LISTEN/NOTIFY,
+> Telegram fallback §15, selector memory `.brain/luna/selectors/whatsapp.md`
+> (append-only). Migração `003_messages_send_tracking` aplicada (29 tabelas).
+> Descoberta ao vivo: sessão dedicada está `QR_PENDING` — owner pareia uma vez
+> com `pnpm --filter whatsplay login` (ADR-017). Testes: 28 unitários + 26 de
+> integração, verdes; daemon WhatsPlay validado ao vivo (boot, watchdog,
+> LISTEN, shutdown limpo). Próxima: F1.5 Recovery/E2E.
 
 ## Quick start
 

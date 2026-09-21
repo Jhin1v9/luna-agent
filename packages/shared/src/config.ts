@@ -17,9 +17,24 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   // KimiAdapter (§7.3, ADR-010/015): mock = dev/testes determinístico;
   // kimi-web = servidor local em 127.0.0.1 (sendTurn ainda não mapeado — ADR-015).
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web']).default('mock'),
+  // kimi-api = fast brain REAL (§7.2, ADR-016) — único modo permitido em produção.
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api']).default('mock'),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
   KIMI_WEB_TOKEN: z.string().optional(),
+  KIMI_API_KEY: z.string().optional(),
+  KIMI_API_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
+  KIMI_API_MODEL: z.string().default('kimi-k2-0905-preview'),
+  // WhatsPlay (§13): Chrome DEDICADO com user-data-dir próprio — nunca o
+  // perfil do Chrome do usuário.
+  WHATSAPP_CHROME_PATH: z
+    .string()
+    .default('C:/Program Files/Google/Chrome/Application/chrome.exe'),
+  WHATSAPP_USER_DATA_DIR: z.string().default(''),
+  WHATSAPP_HEADLESS: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  WHATSAPP_DEBOUNCE_MS: z.coerce.number().int().positive().default(4000),
+  // Telegram fallback vivo (§15): sessão WhatsApp caiu → msg ao time.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_TEAM_CHAT_ID: z.string().optional(),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
 });

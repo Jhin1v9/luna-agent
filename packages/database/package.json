@@ -14,7 +14,8 @@
   "dependencies": {
     "pg": "^8.13.0",
     "@luna/shared": "workspace:*",
-    "@luna/logging": "workspace:*"
+    "@luna/logging": "workspace:*",
+    "@luna/events": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

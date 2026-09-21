@@ -1,25 +1,27 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
 import type { KimiLiveAdapter } from '@luna/agent';
-import { recordActivity, recordAudit } from '@luna/database';
+import { recordActivity, recordAudit, type Sql } from '@luna/database';
 import { buildClientConversationPack, renderConversationPrompt } from './context.js';
 import { transitionConversation } from './attention.js';
 
 /**
- * Handler de client.message.received — o ciclo vivo (§7.1 módulo `agent/`):
+ * Handler de mensagens de cliente (client.message.received do simulador e
+ * whatsapp.message.received do WhatsPlay) — o ciclo vivo (§7.1 módulo agent/):
  *
- *   evento → estado AI_HANDLING (persistido, §7.11)
+ *   evento → client lock (advisory lock por conversa, §19)
+ *          → estado AI_HANDLING (persistido, §7.11)
  *          → Context Builder (pack CLIENT_CONVERSATION, §7.9)
- *          → sessão Kimi persistente via adapter (sendTurn)
- *          → resposta gravada em messages (outbound, sender=luna)
+ *          → brain REAL via adapter (kimi-api na produção — mock só dev/teste, ADR-016)
+ *          → resposta em messages (outbound, send_state queued → WhatsPlay entrega)
+ *          → usage_entries quando o backend informa tokens (§23)
  *          → agent_runs + activity (humano) + audit (máquina, com correlation_id)
  *          → estado RESOLVED
  *
- * Idempotência dupla: a publish já deduplica por idempotency_key (§7.6) e,
- * como o dispatcher do outbox retenta handlers, a resposta gravada leva
- * metadata.reply_to_event — reprocessamento do mesmo evento é detectado e
- * ignorado (duplicata nunca gera segunda resposta ao cliente).
+ * Idempotência dupla: publish deduplica por idempotency_key (§7.6) e a resposta
+ * gravada leva metadata.reply_to_event — reprocessamento do mesmo evento é
+ * detectado e ignorado (retry nunca gera segunda resposta ao cliente).
  */
 
 export interface MessageHandlerDeps {
@@ -31,21 +33,23 @@ export interface MessageHandlerDeps {
 interface HandlerPayload {
   conversation_id?: string;
   text?: string;
+  /** true = mensagem de canal real (WhatsPlay entrega); false = simulação. */
+  deliver?: boolean;
 }
 
 export function createMessageHandler(deps: MessageHandlerDeps) {
   const { pool, adapter, log } = deps;
 
-  return async function handleClientMessage(event: EventEnvelope): Promise<void> {
-    const payload = event.payload as HandlerPayload;
-    const conversationId = payload.conversation_id;
+  async function processLocked(
+    db: Sql & Pick<PoolClient, 'query'>,
+    event: EventEnvelope,
+    payload: HandlerPayload,
+  ): Promise<void> {
+    const conversationId = payload.conversation_id!;
     const text = payload.text ?? '';
-    if (!conversationId) {
-      throw new Error('client.message.received sem conversation_id no payload');
-    }
 
     // Reprocessamento (retry do dispatcher)? Resposta já existe → ignora.
-    const already = await pool.query(
+    const already = await db.query(
       `SELECT id FROM messages
        WHERE conversation_id = $1 AND direction = 'outbound'
          AND metadata->>'reply_to_event' = $2
@@ -54,7 +58,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     );
     if (already.rowCount) {
       log.info({ event_id: event.event_id }, 'resposta já existe — evento duplicado ignorado');
-      await recordAudit(pool, {
+      await recordAudit(db, {
         actor: 'orchestrator',
         action: 'agent.reply.duplicate_ignored',
         tool: 'message_handler',
@@ -66,30 +70,54 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     }
 
     const runStartedAt = new Date();
-    await transitionConversation(pool, conversationId, 'AI_HANDLING');
+    await transitionConversation(db, conversationId, 'AI_HANDLING');
 
-    const pack = await buildClientConversationPack(pool, conversationId);
+    const pack = await buildClientConversationPack(db, conversationId);
     const prompt = renderConversationPrompt(pack, text);
 
-    const turn = await adapter.sendTurn({
-      session_key: conversationId,
-      prompt,
-    });
+    // Brain real. Se falhar: erro sobe pro dispatcher (retry → DLQ), nunca
+    // fallback silencioso pro mock (ADR-016).
+    const turn = await adapter.sendTurn({ session_key: conversationId, prompt });
 
-    // Resposta persistida — mensagem outbound ligada ao evento que a gerou.
-    await pool.query(
-      `INSERT INTO messages (conversation_id, direction, channel, sender, body, metadata)
-       VALUES ($1, 'outbound', $2, 'luna', $3, $4)`,
+    // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
+    const deliver = payload.deliver !== false;
+    const inserted = await db.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, direction, channel, sender, body, metadata, send_state)
+       VALUES ($1, 'outbound', $2, 'luna', $3, $4, $5)
+       RETURNING id`,
       [
         conversationId,
         pack.channel,
         turn.reply_text,
         { reply_to_event: event.event_id, correlation_id: event.correlation_id, adapter: adapter.mode },
+        deliver ? 'queued' : 'simulated',
       ],
     );
+    const replyMessageId = inserted.rows[0]!.id;
+
+    // Avisa o WhatsPlay (LISTEN/NOTIFY) sem poluir o log binário da fila.
+    if (deliver) {
+      await db.query('SELECT pg_notify($1, $2)', ['luna_outbound', replyMessageId]);
+    }
+
+    // Usage ledger (§23): entrada real por resposta gerada.
+    if (turn.usage) {
+      await db.query(
+        `INSERT INTO usage_entries (client_id, event_id, provider, model, input_tokens, output_tokens)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          event.client_id,
+          event.event_id,
+          adapter.mode === 'kimi-api' ? 'kimi-api' : adapter.mode,
+          adapter.mode === 'kimi-api' ? 'kimi-k2' : adapter.mode,
+          turn.usage.input_tokens,
+          turn.usage.output_tokens,
+        ],
+      );
+    }
 
     const finishedAt = new Date();
-    await pool.query(
+    await db.query(
       `INSERT INTO agent_runs (event_id, client_id, agent, brain, status, input, output, started_at, finished_at)
        VALUES ($1, $2, 'luna', $3, 'completed', $4, $5, $6, $7)`,
       [
@@ -97,23 +125,23 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         event.client_id,
         adapter.mode,
         { prompt_lines: prompt.split('\n').length, pack: { client: pack.client_name, channel: pack.channel } },
-        { reply_text: turn.reply_text, session_id: turn.session_id },
+        { reply_text: turn.reply_text, session_id: turn.session_id, reply_message_id: replyMessageId },
         runStartedAt,
         finishedAt,
       ],
     );
 
-    await transitionConversation(pool, conversationId, 'RESOLVED');
+    await transitionConversation(db, conversationId, 'RESOLVED');
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.
     const snippet = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-    await recordActivity(pool, {
+    await recordActivity(db, {
       client_id: event.client_id,
       kind: 'action',
       summary: `Respondi ${pack.contact_name ?? pack.client_name} (${pack.client_name}): "${snippet}"`,
       correlation_id: event.correlation_id,
     });
-    await recordAudit(pool, {
+    await recordAudit(db, {
       actor: 'orchestrator',
       action: 'agent.run.completed',
       tool: 'kimi_adapter',
@@ -126,12 +154,36 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         conversation_id: conversationId,
         adapter: adapter.mode,
         reply_chars: turn.reply_text.length,
+        deliver,
       },
     });
 
     log.info(
-      { event_id: event.event_id, correlation_id: event.correlation_id, conversation_id: conversationId },
+      { event_id: event.event_id, correlation_id: event.correlation_id, conversation_id: conversationId, adapter: adapter.mode },
       'cliente respondido',
     );
+  }
+
+  return async function handleClientMessage(event: EventEnvelope): Promise<void> {
+    const payload = event.payload as HandlerPayload;
+    const conversationId = payload.conversation_id;
+    if (!conversationId) {
+      throw new Error(`${event.event_type} sem conversation_id no payload`);
+    }
+
+    // Client lock (§19): mensagens da mesma conversa se processam em série;
+    // clientes diferentes, em paralelo. Lock transacional Postgres.
+    const client = await pool.connect();
+    try {
+      await client.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [
+        `luna:conv:${conversationId}`,
+      ]);
+      await processLocked(client, event, payload);
+    } finally {
+      await client
+        .query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [`luna:conv:${conversationId}`])
+        .catch(() => {});
+      client.release();
+    }
   };
 }

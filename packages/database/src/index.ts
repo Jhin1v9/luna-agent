@@ -41,3 +41,14 @@ export { enqueueJob } from './jobs.js';
 export type { EnqueueJobInput, EnqueueJobResult } from './jobs.js';
 export { reapStaleLocks } from './reaper.js';
 export type { ReapResult } from './reaper.js';
+export { publishEvent } from './publisher.js';
+export type { PublishInput, PublishResult } from './publisher.js';
+export {
+  ensureOrganization,
+  ensureClient,
+  ensureContact,
+  openConversation,
+  insertInboundMessage,
+  resolveIngressIdentity,
+} from './ingress.js';
+export type { IngressIdentity } from './ingress.js';
