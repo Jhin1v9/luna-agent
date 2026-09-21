@@ -25,9 +25,7 @@
    Postgres respondem) é do owner quando chegar a vez; até lá, este guardrail
    é a fronteira.
 
-## Escopo de ingestão (acréscimo do mesmo decreto, 2026-09-21)
-
-O owner também liberou o grupo **"🏆Production - 2026🙏🏻"** para testes (além
+## Escopo de ingestão (acréscimo do mesmo decreto, 2026-09-21)O owner também liberou o grupo **"🏆Production - 2026🙏🏻"** para testes (além
 do "Pai" — só esses dois destinos, ninguém mais). E fechou o problema
 operacional que tinha me obrigado a parar o daemon: `WHATSAPP_INGEST_ALLOWLIST`.
 
@@ -43,6 +41,24 @@ operacional que tinha me obrigado a parar o daemon: `WHATSAPP_INGEST_ALLOWLIST`.
   adicioná-lo à lista (mais estável que nome).
 - Validado ao religar: log "fora do escopo de ingestão — ignorado (zero
   tokens)" disparando em runtime real na primeira janela.
+
+## Novo destino autorizado (2026-09-21, segundo decreto)
+
+**"Meu Amorzinho 💖🌻"** (+34 633 34 48 34 — namorada do owner) entrou no
+escopo: `WHATSAPP_OUTBOUND_ALLOWLIST` e `WHATSAPP_INGEST_ALLOWLIST` agora têm
+3 entradas (Pai, 🏆Production - 2026🙏🏻, Meu Amorzinho 💖🌻). Contexto:
+**uso pessoal OCASIONAL** — a Luna só fala lá quando chamada com @luna (regra
+de menção §5 já existente; como privado no escopo, responde sempre). Ela não
+é cobaia de teste: nenhuma mensagem de teste é enviada por iniciativa do
+sistema.
+
+**Matcher endurecido com normalização**: nomes são comparados com marcas
+invisíveis de bidi (\u202A-\u202E, \u200E/\u200F) removidas dos DOIS lados —
+títulos do WhatsApp às vezes carregam essas marcas e um match exato cru
+quebraria silenciosamente (a namorada entrou com emoji no nome e sem jid
+estável disponível; jid continua sendo a alternativa mais estável quando
+existente, casando por sufixo). Substring segue proibido ("Pai" ≠ "Papai"),
+case-sensitive.
 
 ## Validação (2026-09-21)
 
