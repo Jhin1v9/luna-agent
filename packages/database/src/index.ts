@@ -54,3 +54,6 @@ export {
   resolveIngressIdentity,
 } from './ingress.js';
 export type { IngressIdentity } from './ingress.js';
+
+export { buildAdminFullPack } from './admin-pack.js';
+export type { AdminPack } from './admin-pack.js';

@@ -59,6 +59,21 @@ async function main(): Promise<void> {
   const { ensureBrainStructure } = await import('@luna/brain');
   ensureBrainStructure();
 
+  // F4 mínimo — chat admin via Telegram (§25): o time pergunta, a Luna
+  // responde com dados REAIS (ADMIN_FULL). Sem TELEGRAM_CHAT_ID o loop fica
+  // IDLE explícito (fail-closed — nunca responde chat não autorizado).
+  const { buildAdminFullPack } = await import('@luna/database');
+  const { createTelegramAdmin } = await import('./admin/telegram-admin.js');
+  const telegramAdmin = createTelegramAdmin({
+    pool,
+    adapter: classifyAdapter,
+    log,
+    botToken: config.TELEGRAM_BOT_TOKEN,
+    allowedChatId: config.TELEGRAM_CHAT_ID ?? config.TELEGRAM_TEAM_CHAT_ID,
+    buildAdminPack: () => buildAdminFullPack(pool),
+  });
+  await telegramAdmin.start();
+
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 
