@@ -13,6 +13,8 @@ export interface OutboundDeps {
   pool: Pool;
   transport: WhatsAppTransport;
   log: Logger;
+  /** Anti-ban (ADR-004): espera humana (com jitter) antes de enviar. Default 6s. */
+  humanDelayMs?: number;
 }
 
 interface OutboundMessageRow {
@@ -44,6 +46,12 @@ export function createOutboundListener(deps: OutboundDeps) {
       return;
     }
     try {
+      // Anti-ban: gente não responde em 300ms. Espera configurada + jitter,
+      // e o sendMessage ainda soma delay de digitação (ADR-004).
+      const base = deps.humanDelayMs ?? 6_000;
+      const wait = base + Math.floor(Math.random() * 3_000);
+      deps.log.info({ message_id: messageId, wait_ms: wait }, 'espera humana antes de enviar');
+      await new Promise((r) => setTimeout(r, wait));
       await transport.sendMessage(target, row.body);
       await mark(messageId, 'sent');
       await recordAudit(pool, {

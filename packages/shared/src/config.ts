@@ -25,6 +25,12 @@ const envSchema = z.object({
   KIMI_API_KEY: z.string().optional(),
   KIMI_API_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
   KIMI_API_MODEL: z.string().default('kimi-k2-0905-preview'),
+  // LLM_* — contrato Model Router §9: trocar de provider = só trocar o .env.
+  // Decreto do owner: modelo SEMPRE o mais barato; NUNCA 2.7, NUNCA K3 (ADR-019).
+  LLM_PROVIDER: z.enum(['kimi', 'gemini']).default('kimi'),
+  LLM_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
+  LLM_API_KEY: z.string().optional(),
+  LLM_MODEL: z.string().default('kimi-k2.6'),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_BASE_URL: z.string().url().default('https://generativelanguage.googleapis.com/v1beta/openai/'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
@@ -41,6 +47,9 @@ const envSchema = z.object({
   TELEGRAM_TEAM_CHAT_ID: z.string().optional(),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  // Anti-ban (ADR-004): espera humana antes de entregar a resposta no
+  // WhatsApp — "responde como gente", não em 300ms.
+  HUMAN_RESPONSE_DELAY_MS: z.coerce.number().int().min(0).default(6_000),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

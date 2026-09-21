@@ -8,3 +8,6 @@ coverage/
 
 # evidências do watchdog/auto-reparo (screenshots + DOM simplificado)
 .brain/luna/incidents/
+
+# logs locais dos daemons (Start-Process detached)
+logs-*.log

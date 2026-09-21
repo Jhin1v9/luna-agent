@@ -29,6 +29,7 @@ export interface KimiAdapterConfig {
   apiBaseUrl?: string;
   apiModel?: string;
   apiTimeoutMs?: number;
+  apiTemperature?: number;
 }
 
 /** Um turno de conversa: prompt montado (persona + contexto) + mensagem do cliente. */

@@ -64,6 +64,7 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
   private readonly apiKey: string;
   private readonly fetchImpl: FetchLike;
   private readonly timeoutMs: number;
+  private readonly temperature: number | undefined;
   readonly provider: string;
 
   constructor(
@@ -73,13 +74,27 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
   ) {
     this.mode = opts.mode;
     this.provider = opts.provider;
-    const key = config.apiKey ?? process.env[opts.keyEnv];
-    if (!key) throw new ApiKeyMissing(opts.keyEnv);
+    // Contrato §9: LLM_* é a fonte primária (troca de provider = só .env);
+    // overrides específicos do modo (GEMINI_*/KIMI_API_*) e defaults por último.
+    const key =
+      config.apiKey ?? process.env.LLM_API_KEY ?? process.env[opts.keyEnv];
+    if (!key) throw new ApiKeyMissing('LLM_API_KEY/' + opts.keyEnv);
     this.apiKey = key;
-    this.baseUrl = (config.apiBaseUrl ?? process.env[`${opts.mode === 'gemini' ? 'GEMINI' : 'KIMI_API'}_BASE_URL`] ?? opts.defaultBaseUrl).replace(/\/$/, '');
-    this.model = config.apiModel ?? process.env[`${opts.mode === 'gemini' ? 'GEMINI' : 'KIMI_API'}_MODEL`] ?? opts.defaultModel;
+    const modePrefix = opts.mode === 'gemini' ? 'GEMINI' : 'KIMI_API';
+    this.baseUrl = (
+      config.apiBaseUrl ??
+      process.env.LLM_BASE_URL ??
+      process.env[`${modePrefix}_BASE_URL`] ??
+      opts.defaultBaseUrl
+    ).replace(/\/$/, '');
+    this.model =
+      config.apiModel ??
+      process.env.LLM_MODEL ??
+      process.env[`${modePrefix}_MODEL`] ??
+      opts.defaultModel;
     this.fetchImpl = fetchImpl ?? fetch;
     this.timeoutMs = config.apiTimeoutMs ?? 60_000;
+    this.temperature = config.apiTemperature;
   }
 
   async ensureSession(sessionKey: string): Promise<SessionInfo> {
@@ -104,7 +119,9 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
         body: JSON.stringify({
           model: this.model,
           messages: [{ role: 'user', content: request.prompt }],
-          temperature: 0.6,
+          // Kimi k2.6 (coding endpoint) rejeita temperature ≠ 1
+          // ("only 1 is allowed for this model") — default = não enviar.
+          ...(this.temperature !== undefined ? { temperature: this.temperature } : {}),
         }),
         signal: controller.signal,
       });

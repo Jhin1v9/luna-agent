@@ -36,22 +36,22 @@ cola = tabela `jobs` + worker.
 > RESOLVED → evidência com correlation). Migração 003: não precisou.
 > Testes: 18 unitários + 21 de integração, verdes.
 >
-> **F1.4 WhatsPlay + Brain Real ✅ (critério PARCIAL — falta key de brain válida
-> e confirmação do owner p/ envio)** — KimiApiAdapter (fast brain oficial,
-> §7.2; anti-mock por decreto — ADR-016) e **GeminiAdapter (fast brain
-> INTERINO p/ teste, ADR-018)** sobre OpenAiCompatAdapter compartilhado.
-> WhatsPlay real: Chrome dedicado, captura por mutação de DOM, transport
-> isolado, watchdog 5 estados, grupo §5, debounce §19, client lock, fila de
-> saída NOTIFY, Telegram §15, selector memory. **Falso negativo de detecção
-> corrigido** (ADR-017 corrigido: a sessão ESTAVA pareada; heurística pura em
-> `state.ts` + polling; leitura real validada — badges, abertura de painel,
-> extração de mensagens). Bug de robustez do dispatcher corrigido (payload
-> inválido → DLQ `invalid_envelope`, nunca 'running' preso). Chamada real à
-> Gemini: **key rejeitada pelo endpoint (400 Invalid Auth key)** — key não tem
-> formato Google (`AIza…`); pendente do owner reemitir (ver ADR-018). Ciclo
-> vivo completo até o envio validado: publish real → dispatch → brain → falha
-> EXPLÍCITA auditada (5 tentativas → DLQ), zero resposta fake. Testes:
-> 46 unitários + 26 de integração, verdes. Próxima: F1.5 Recovery/E2E.
+> **F1.4 WhatsPlay + Brain Real ✅ FECHADO (ciclo real validado)** — KimiApiAdapter
+> com key REAL do owner: modelo **`kimi-k2.6`** via `https://api.kimi.com/coding/v1`
+> (key do Coding Plan; rejeita temperature≠1 — adapter não envia; ADR-019).
+> Decreto registrado: modelo sempre o mais barato, NUNCA 2.7/K3. Config LLM_*
+> no zod (contrato §9: troca de provider = só .env). **Ciclo real
+> ponta-a-ponta validado ao vivo**: msg real de grupo no WhatsApp do owner →
+> watcher (baseline não-invasivo, zero disparo em conversa parada) → evento →
+> Context Builder → kimi-k2.6 real (399/447 tokens, 15.4s) → resposta na
+> persona → **envio real autorizado** com espera humana anti-ban (~87s) →
+> sent + activity + audit num correlation_id só → RESOLVED. Achado do teste
+> vivo: grupo detectado como privado (heurística de nome) — violação §5,
+> corrigido com jid `@g.us`, daemon reiniciado. Ingest = watcher de badges
+> (ADR no watcher.ts; mutation-driven 100% fica pra F1.5). Gemini interino
+> mantido como opção (ADR-018; key anterior inválida). Testes: 77 verdes.
+> Daemons em produção local: orchestrator + whatsplay detached (ver relatório
+> da fase). Próxima: F1.5 Recovery/E2E.
 
 ## Quick start
 

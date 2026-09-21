@@ -168,7 +168,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         if (this.lastSeenMessageKey.get(chat.chat_id) === key) continue;
         this.lastSeenMessageKey.set(chat.chat_id, key);
 
-        const isGroup = chat.chat_name.includes(':') || chat.chat_name.toUpperCase().includes('GRUPO');
+        const isGroup = chat.chat_id.includes('@g.us');
 
         unread.push({
           chat_id: chat.chat_id,

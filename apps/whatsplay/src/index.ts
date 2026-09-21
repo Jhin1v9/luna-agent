@@ -2,12 +2,13 @@ import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
 import { getPool, closePool, checkConnection } from '@luna/database';
 import { WhatsAppWebTransport } from './browser.js';
+import { SELECTORS } from './selectors.js';
 import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { createOutboundListener } from './outbound.js';
+import { IngestWatcher } from './watcher.js';
 import { Watchdog } from './watchdog.js';
 import { sendTeamMessage, TelegramNotConfigured } from './telegram.js';
-import type { UnreadMessage } from './transport.js';
 
 /**
  * WhatsPlay (§13) — o corpo: Chrome dedicado + Playwright + WhatsApp Web.
@@ -57,26 +58,31 @@ async function main(): Promise<void> {
   }
 
   const ingest = createIngest({ pool, transport, log });
-  const debouncer = new Debouncer({ flushMs: config.WHATSAPP_DEBOUNCE_MS });
 
-  // Mensagens por mutação de DOM → debounce por chat → ingest.
-  await transport.installMutationObserver((unread: UnreadMessage[]) => {
-    for (const msg of unread) {
-      debouncer.push(
-        msg.chat_id,
-        msg.text || '(mensagem sem texto — possível mídia)',
-        async (combined) => {
-          lastInboundAt = new Date();
-          await ingest.ingestOne({ ...msg, text: combined }).catch((err) =>
-            log.error({ err, chat: msg.chat_name }, 'ingest falhou'),
-          );
-        },
-      );
-    }
-  });
+  // Ingress: watcher de badges com baseline (ADR — ver watcher.ts): coleta
+  // não-invasiva, seed do que já está não-lido (zero resposta em conversa
+  // pessoal parada), abre só a conversa novidade pra extrair o texto real.
+  const page = (
+    transport as unknown as { requirePage(): import('playwright-core').Page }
+  ).requirePage();
+  const watcher = new IngestWatcher(
+    {
+      pool,
+      transport,
+      log,
+      page,
+      selectors: SELECTORS,
+      debounceMs: config.WHATSAPP_DEBOUNCE_MS,
+    },
+    { intervalMs: 4_000 },
+  );
+  await transport.ensureMainChatList();
+  await watcher.tick(); // arma o baseline
+  watcher.start();
+  log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
 
   // Fila de saída (respostas da Luna).
-  const outbound = createOutboundListener({ pool, transport, log });
+  const outbound = createOutboundListener({ pool, transport, log, humanDelayMs: config.HUMAN_RESPONSE_DELAY_MS });
   const listenClient = await outbound.start();
 
   // Fallback Telegram (§15).
@@ -108,7 +114,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     log.info({ signal }, 'shutting down');
     clearInterval(watchdogTimer);
-    debouncer.clear();
+    watcher.stop();
     listenClient.release();
     transport
       .close()
