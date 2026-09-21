@@ -85,6 +85,7 @@ describe('migrator (integração)', () => {
         '005_service_heartbeats.sql',
         '006_notifications_delivery.sql',
         '007_conversations_classification.sql',
+        '008_escalation_sla.sql',
       ]);
 
       const c = new pg.Client({ connectionString: scratchUrl });
