@@ -5,7 +5,14 @@ import type { EventEnvelope } from '@luna/events';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordActivity, recordAudit, publishEvent, enqueueJob, type Sql } from '@luna/database';
-import { buildClientConversationPack, renderConversationPrompt } from './context.js';
+import {
+  buildClientConversationPack,
+  renderConversationPrompt,
+  buildClientProjectPack,
+  buildAdminFullPack,
+  renderPackPrompt,
+  type ClientConversationPack,
+} from './context.js';
 import { transitionConversation, getConversationState } from './attention.js';
 import { runFastRoute, selectRoute } from './router/router.js';
 
@@ -187,11 +194,26 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     const runStartedAt = new Date();
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
-    const pack = await buildClientConversationPack(db, conversationId);
-    const prompt = renderConversationPrompt(pack, text, payload.author_name);
-
-    // §10: route determinística + FAST estruturado com guardas (§5.1).
+    // §10: route determinística primeiro — o context pack vem DA ROUTE (§7.9):
+    // só o contexto relevante, nunca "tudo".
     const route = await selectRoute({ pool: eventPool, adapter, log }, event);
+    let pack: ClientConversationPack | import('./context.js').ContextPack;
+    let prompt: string;
+    if (route.contextPack === 'ADMIN_FULL') {
+      const adminPack = await buildAdminFullPack(db);
+      pack = adminPack;
+      prompt = renderPackPrompt(adminPack, text, payload.author_name);
+    } else if (route.contextPack === 'CLIENT_PROJECT') {
+      const projectPack = await buildClientProjectPack(db, conversationId);
+      pack = projectPack;
+      prompt = renderPackPrompt(projectPack, text, payload.author_name);
+    } else {
+      const convPack = await buildClientConversationPack(db, conversationId);
+      pack = convPack;
+      prompt = renderConversationPrompt(convPack, text, payload.author_name);
+    }
+    const packName = (pack as { name?: string }).name ?? 'CLIENT_CONVERSATION';
+
     const decision = await runFastRoute(
       { pool: eventPool, adapter, log },
       { event, prompt, sessionKey: conversationId, allowLiveHandoff: route.allowLiveHandoff },
@@ -205,7 +227,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
        RETURNING id`,
       [
         conversationId,
-        pack.channel,
+        (pack as { channel?: string }).channel ?? 'whatsapp',
         decision.answerText,
         {
           reply_to_event: event.event_id,
@@ -251,7 +273,10 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         adapter.mode,
         {
           prompt_lines: prompt.split('\n').length,
-          pack: { client: pack.client_name, channel: pack.channel },
+          pack: {
+            name: packName,
+            client: (pack as { client_name?: string }).client_name ?? 'admin',
+          },
           route: route.destination,
           router_output: decision.output.type,
           tool_rounds: decision.toolRounds,
@@ -307,13 +332,14 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.
     const snippet = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-    const author = payload.author_name ?? pack.contact_name ?? pack.client_name;
+    const author = payload.author_name ?? (pack as { contact_name?: string | null }).contact_name ?? (pack as { client_name?: string }).client_name ?? `admin (${packName})`;
+    const clientLabel = (pack as { client_name?: string }).client_name ?? packName;
     await recordActivity(db, {
       client_id: event.client_id,
       kind: decision.escalate ? 'incident' : 'action',
       summary: decision.escalate
-        ? `Escalonei ${author} (${pack.client_name}) para humano: "${snippet}"`
-        : `Respondi ${author} (${pack.client_name}): "${snippet}"`,
+        ? `Escalonei ${author} (${clientLabel}) para humano: "${snippet}"`
+        : `Respondi ${author} (${clientLabel}): "${snippet}"`,
       correlation_id: event.correlation_id,
     });
     await recordAudit(db, {

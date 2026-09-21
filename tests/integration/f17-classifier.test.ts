@@ -16,6 +16,7 @@ import { JobRunner } from '../../apps/worker/src/jobs/poller.js';
 import { createClassifyHandler } from '../../apps/worker/src/jobs/classify.js';
 import { createMessageHandler } from '../../apps/orchestrator/src/agent/handler.js';
 import { simulateMessage } from '../../apps/orchestrator/src/test/simulate.js';
+import { resolveIngressIdentity } from '../../packages/database/src/index.js';
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? 'postgres://luna:luna@localhost:5433/luna_test';
 const ADMIN_URL = (() => {
@@ -160,3 +161,90 @@ describe('classifier pós-conversa (§27) — pipeline completo', () => {
     void first;
   });
 });
+
+// ─────────────────────────── Context packs + summaries (F3) ───────────────────────────
+
+describe('Context packs (§7.9) — CLIENT_PROJECT e ADMIN_FULL', () => {
+  it('CLIENT_PROJECT traz projetos e tarefas do cliente + histórico nomeado', async () => {
+    const identity = await resolveIngressIdentity(pool, { client_name: 'Cliente Pack', channel: 'whatsapp', address: 'Pai' });
+    await pool.query(
+      `INSERT INTO projects (client_id, name) VALUES ($1, 'Site Pack')`,
+      [identity.client_id],
+    );
+    await pool.query(
+      `INSERT INTO tasks (client_id, title, status) VALUES ($1, 'Tarefa aberta', 'in_progress')`,
+      [identity.client_id],
+    );
+    const { buildClientProjectPack } = await import('../../apps/orchestrator/src/agent/context.js');
+    const pack = await buildClientProjectPack(pool, identity.conversation_id);
+    const all = pack.sections.join('\n');
+    expect(pack.name).toBe('CLIENT_PROJECT');
+    expect(all).toContain('Site Pack');
+    expect(all).toContain('Tarefa aberta');
+  });
+
+  it('ADMIN_FULL traz serviços, filas e custo do dia', async () => {
+    await pool.query(
+      `INSERT INTO service_heartbeats (service, pid) VALUES ('orchestrator', 1) ON CONFLICT (service) DO NOTHING`,
+    );
+    await pool.query(`INSERT INTO usage_entries (provider, model, estimated_cost) VALUES ('kimi-api','kimi-k2.6',0.002)`);
+    const { buildAdminFullPack } = await import('../../apps/orchestrator/src/agent/context.js');
+    const pack = await buildAdminFullPack(pool);
+    const all = pack.sections.join('\n');
+    expect(pack.name).toBe('ADMIN_FULL');
+    expect(all).toContain('orchestrator');
+    expect(all).toContain('Custo Kimi hoje');
+    expect(all).toContain('Filas:');
+  });
+});
+
+describe('memory.summarize — resumo mensal pro Brain (§11)', () => {
+  it('cliente com mensagens no mês e sem resumo → MEMORY.md + memory_index + profile', async () => {
+    const brainRoot = mkdtempSync(join(tmpdir(), 'brain-sum-'));
+    const identity = await resolveIngressIdentity(pool, { client_name: 'Cliente Sum', channel: 'whatsapp', address: 'Pai' });
+    await simulateMessage(pool, await makeBus(), {
+      client_name: 'Cliente Sum',
+      text: 'preciso atualizar o site até sexta',
+      external_id: 'wamid-sum-1',
+    });
+    await simulateMessage(pool, await makeBus(), {
+      client_name: 'Cliente Sum',
+      text: 'e o blog também por favor',
+      external_id: 'wamid-sum-2',
+    });
+
+    const { createSummarizeHandler } = await import('../../apps/worker/src/jobs/summarize.js');
+    const adapter = {
+      mode: 'kimi-api' as const,
+      async ensureSession(k: string) {
+        return { session_id: `kimi-api:${k}`, busy: false };
+      },
+      async sendTurn() {
+        return {
+          reply_text: JSON.stringify({ summary: 'Cliente pediu atualização do site e do blog até sexta.', open_points: ['confirmar prazo do blog'] }),
+          session_id: 'k',
+          duration_ms: 1,
+          model: 'kimi-k2.6',
+        };
+      },
+      async readMessages() {
+        return [];
+      },
+    };
+    const handler = createSummarizeHandler({ pool, adapter: adapter as never, log, brainRoot });
+    await handler({ payload: {} });
+
+    const code = (await pool.query('SELECT code FROM clients WHERE id = $1', [identity.client_id])).rows[0]!.code;
+    const memPath = join(brainRoot, 'clients', code, 'MEMORY.md');
+    expect(existsSync(memPath)).toBe(true);
+    expect(readFileSync(memPath, 'utf8')).toContain('até sexta');
+    const mem = await pool.query("SELECT * FROM memory_index WHERE type = 'summary'");
+    expect(mem.rowCount).toBe(1);
+    const profile = await pool.query('SELECT profile FROM clients WHERE id = $1', [identity.client_id]);
+    expect(profile.rows[0]!.profile.summarized_month).toBe(new Date().toISOString().slice(0, 7));
+  });
+});
+
+async function makeBus(): Promise<EventBus> {
+  return new EventBus(pool, { dispatcherId: 'seed-only' });
+}

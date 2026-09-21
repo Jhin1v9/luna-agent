@@ -133,3 +133,119 @@ export function renderConversationPrompt(
     'no registro certo.',
   ].join('\n');
 }
+
+// ─────────────────────────── Context packs (§7.9) — F3 ───────────────────────────
+
+/** Pack genérico: seções de texto montadas por cada builder. */
+export interface ContextPack {
+  name: string;
+  sections: string[];
+}
+
+/** CLIENT_PROJECT (§7.9): cliente + projetos + tarefas abertas + conversa recente. */
+export async function buildClientProjectPack(pool: Sql, conversationId: string): Promise<ContextPack> {
+  const base = await buildClientConversationPack(pool, conversationId);
+  const clientId = await pool
+    .query<{ client_id: string | null }>('SELECT client_id FROM conversations WHERE id = $1', [conversationId])
+    .then((r) => r.rows[0]?.client_id ?? null);
+  const sections: string[] = [
+    `Cliente: ${base.client_name} — canal ${base.channel}, estado: ${base.conversation_state}.`,
+  ];
+  if (clientId) {
+    const projects = await pool.query(
+      'SELECT name, status FROM projects WHERE client_id = $1 ORDER BY created_at DESC LIMIT 5',
+      [clientId],
+    );
+    sections.push(
+      projects.rowCount
+        ? `Projetos:\n${projects.rows.map((p) => `- ${p.name} (${p.status})`).join('\n')}`
+        : 'Projetos: nenhum cadastrado.',
+    );
+    const tasks = await pool.query(
+      `SELECT title, status FROM tasks WHERE client_id = $1 AND status NOT IN ('done','cancelled') LIMIT 8`,
+      [clientId],
+    );
+    if (tasks.rowCount) {
+      sections.push(`Tarefas abertas:\n${tasks.rows.map((t) => `- [${t.status}] ${t.title}`).join('\n')}`);
+    }
+  }
+  const history = base.recent_messages
+    .map((m) => `${m.author_name ?? (m.direction === 'inbound' ? 'cliente' : m.sender)}: ${m.body}`)
+    .join('\n');
+  sections.push('Últimas mensagens:', history || '(sem histórico)');
+  return { name: 'CLIENT_PROJECT', sections };
+}
+
+/** ADMIN_FULL (§7.9): visão do time — saúde, fila, incidentes, escalções, custo do dia. */
+export async function buildAdminFullPack(pool: Sql): Promise<ContextPack> {
+  const sections: string[] = ['Visão ADMIN_FULL do sistema:'];
+  const hb = await pool
+    .query(`SELECT service, meta->>'state' AS state, round(extract(epoch from now()-seen_at)) AS idade
+            FROM service_heartbeats ORDER BY service`)
+    .catch(() => ({ rows: [] as Array<{ service: string; state: string | null; idade: number }> }));
+  sections.push(
+    `Serviços (heartbeat):\n${hb.rows.map((r) => `- ${r.service}: ${r.state ?? 'ok'} (${r.idade}s atrás)`).join('\n') || '- sem heartbeats'}`,
+  );
+  const incidents = await pool.query(
+    `SELECT severity, title FROM incidents WHERE status = 'open' ORDER BY created_at DESC LIMIT 5`,
+  );
+  sections.push(
+    incidents.rowCount
+      ? `Incidentes abertos:\n${incidents.rows.map((i) => `- [${i.severity}] ${i.title}`).join('\n')}`
+      : 'Incidentes abertos: nenhum. ✅',
+  );
+  const escalations = await pool.query(
+    `SELECT priority, reason FROM escalations WHERE status = 'open' ORDER BY created_at DESC LIMIT 5`,
+  );
+  sections.push(
+    escalations.rowCount
+      ? `Escalções ativas (§8 coordenação):\n${escalations.rows.map((e) => `- [${e.priority}] ${e.reason}`).join('\n')}`
+      : 'Escalções ativas: nenhuma. ✅',
+  );
+  const queue = await pool.query(
+    `SELECT (SELECT count(*) FROM jobs WHERE status='pending') AS jobs,
+            (SELECT count(*) FROM messages WHERE send_state='queued') AS outbound,
+            (SELECT count(*) FROM outbox WHERE status='pending') AS outbox`,
+  );
+  sections.push(
+    `Filas: jobs=${queue.rows[0]!.jobs} · outbound=${queue.rows[0]!.outbound} · outbox=${queue.rows[0]!.outbox}`,
+  );
+  const usage = await pool.query(
+    `SELECT coalesce(round(sum(estimated_cost)::numeric, 4), 0) AS custo_hoje, count(*) AS chamadas
+     FROM usage_entries WHERE created_at::date = now()::date`,
+  );
+  sections.push(
+    `Custo Kimi hoje: $${usage.rows[0]!.custo_hoje} em ${usage.rows[0]!.chamadas} chamada(s) (usage ledger §23).`,
+  );
+  const activity = await pool.query(
+    `SELECT summary FROM activity_log ORDER BY id DESC LIMIT 8`,
+  );
+  if (activity.rowCount) {
+    sections.push(`Últimas atividades (§20):\n${activity.rows.map((a) => `- ${a.summary}`).join('\n')}`);
+  }
+  return { name: 'ADMIN_FULL', sections };
+}
+
+/** Render genérico de pack: persona + seções + mensagem. */
+export function renderPackPrompt(pack: ContextPack, userMessage: string, authorName?: string | null): string {
+  const quem = authorName ? ` de ${authorName}` : '';
+  return [
+    PERSONA_SUMMARY,
+    '',
+    `Context pack: ${pack.name} (§7.9) — só o contexto relevante, nunca "tudo".`,
+    ...pack.sections,
+    '',
+    `Mensagem nova${quem}: ${userMessage}`,
+    '',
+    'Responda como Luna, no registro adequado (cliente vs time).',
+  ].join('\n');
+}
+
+/**
+ * Promotion protocol (§10): temporal → sessão → DB → Brain.
+ *  - "Jess acabou de dizer obrigada" fica em DB (operacional).
+ *  - Padrão recorrente (reclamação que cresce, preferência estável) sobe pro
+ *    Brain via classifier/summaries (aprendizado duradouro, append-only).
+ * Este módulo monta o contexto; a subida é feita por conversation.classify
+ * (§27) e memory.summarize (job diário do worker) — sempre assinado.
+ */

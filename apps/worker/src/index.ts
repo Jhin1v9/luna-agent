@@ -44,6 +44,20 @@ async function main(): Promise<void> {
     apiModel: config.LLM_MODEL,
   });
   runner.register('conversation.classify', createClassifyHandler({ pool, adapter: classifyAdapter, log }));
+  const { createSummarizeHandler } = await import('./jobs/summarize.js');
+  runner.register('memory.summarize', createSummarizeHandler({ pool, adapter: classifyAdapter, log }));
+  // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
+  const { enqueueJob } = await import('@luna/database');
+  const day = new Date().toISOString().slice(0, 10);
+  await enqueueJob(pool, { job_type: 'memory.summarize', payload: {}, idempotency_key: 'summarize:' + day });
+  const summarizeTimer = setInterval(() => {
+    const d = new Date().toISOString().slice(0, 10);
+    enqueueJob(pool, { job_type: 'memory.summarize', payload: {}, idempotency_key: 'summarize:' + d }).catch(() => {});
+  }, 24 * 60 * 60_000);
+  summarizeTimer.unref();
+  // Estrutura-base do Brain (§11) garantida no boot do worker.
+  const { ensureBrainStructure } = await import('@luna/brain');
+  ensureBrainStructure();
 
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');

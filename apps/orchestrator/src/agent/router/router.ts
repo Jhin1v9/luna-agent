@@ -171,6 +171,7 @@ export async function selectRoute(deps: RouterDeps, event: EventEnvelope): Promi
   destination: 'fast' | 'live';
   allowLiveHandoff: boolean;
   timeoutMs: number;
+  contextPack: string;
 }> {
   const config = deps.config ?? loadRouterConfig();
   const { route, defaulted } = routeFor(config, event.event_type);
@@ -183,5 +184,10 @@ export async function selectRoute(deps: RouterDeps, event: EventEnvelope): Promi
     causation_id: event.event_id,
     payload: { event_type: event.event_type, destination: route.destination, route: event.event_type in config.routes ? event.event_type : null },
   }).catch(() => {});
-  return { destination: route.destination, allowLiveHandoff: route.allow_live_handoff, timeoutMs: route.timeout_ms };
+  return {
+    destination: route.destination,
+    allowLiveHandoff: route.allow_live_handoff,
+    timeoutMs: route.timeout_ms,
+    contextPack: Array.isArray(route.context_pack) ? route.context_pack[0] : route.context_pack,
+  };
 }

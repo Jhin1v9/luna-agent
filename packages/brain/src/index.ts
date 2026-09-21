@@ -63,3 +63,29 @@ export function appendClientOpinion(
   appendFileSync(path, entry, 'utf8');
   return path;
 }
+
+/** Garante a estrutura-base do Brain (§11) existir. Idempotente. */
+export function ensureBrainStructure(root: string = BRAIN_ROOT): void {
+  const dirs = [
+    'global',
+    'clients',
+    join('luna', 'learnings'),
+    join('luna', 'incidents'),
+    join('luna', 'selectors'),
+    join('luna', 'synapses'),
+    'system',
+  ];
+  for (const d of dirs) mkdirSync(join(root, d), { recursive: true });
+  const readme = join(root, 'README.md');
+  if (!existsSync(readme)) {
+    appendFileSync(
+      readme,
+      '# Brain da Luna (§11)\n\nAppend-only, sempre assinado `data + autor: Luna`.\n' +
+        '- global/ — empresa, identidade, procedimentos, decisões\n' +
+        '- clients/<code>/ — FICHA, MEMORY, OPINIONES, chat/, projetos/\n' +
+        '- luna/ — learnings, incidents, selectors (whatsapp.md), synapses/\n' +
+        '- system/ — arquitetura, runbooks, decisões\n',
+      'utf8',
+    );
+  }
+}
