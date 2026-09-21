@@ -77,3 +77,14 @@ parent `cell-frame-title`.
 
 **ESTADO (heurística final):** `apps/whatsplay/src/state.ts` — LOGGED vence QR sempre;
 QR só com landing estrutural (nunca canvas solto); LOADING = splash; polling 2s até 30s.
+
+### 2026-09-21 · consolidação pós-F1.4 (seletores validados ao vivo) — autor: Luna
+Build atual do WhatsApp Web, todos confirmados com extração read-only real:
+- Autor de mensagem em grupo: `[data-testid="author"]` ✅ (antes: heurística de aria-label)
+- Direção (inbound/outbound): `[data-testid="tail-in"]` / `[data-testid="tail-out"]`
+  no container ✅ — SUBSTITUI o aria "Tú:" que falhava intermitentemente
+- Mensagem: `[data-testid="msg-container"]` · texto: `.selectable-text`
+- Painel: `conversation-panel-wrapper` · campo: `conversation-compose-box-input`
+- Lista: `#pane-side` + `cell-frame-container` (chat-list virtualizada — só
+  rows visíveis existem no DOM; sweep abre por nome direto)
+- Estado de sessão: heurística em `apps/whatsplay/src/state.ts` (LOGGED vence QR)

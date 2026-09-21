@@ -17,6 +17,8 @@
     "@luna/shared": "workspace:*",
     "@luna/logging": "workspace:*",
     "@luna/database": "workspace:*",
+    "@luna/channels": "workspace:*",
+    "@luna/agent": "workspace:*",
     "playwright-core": "^1.49.0"
   },
   "devDependencies": {

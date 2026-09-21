@@ -41,6 +41,8 @@ export { enqueueJob } from './jobs.js';
 export type { EnqueueJobInput, EnqueueJobResult } from './jobs.js';
 export { reapStaleLocks } from './reaper.js';
 export type { ReapResult } from './reaper.js';
+export { writeHeartbeat, readHeartbeats } from './heartbeat.js';
+export type { HeartbeatRow } from './heartbeat.js';
 export { publishEvent } from './publisher.js';
 export type { PublishInput, PublishResult } from './publisher.js';
 export {

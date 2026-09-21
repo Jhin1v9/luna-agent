@@ -118,7 +118,17 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
         },
         body: JSON.stringify({
           model: this.model,
-          messages: [{ role: 'user', content: request.prompt }],
+          messages: [
+            {
+              role: 'user',
+              content: request.image_base64
+                ? [
+                    { type: 'text', text: request.prompt },
+                    { type: 'image_url', image_url: { url: `data:image/png;base64,${request.image_base64}` } },
+                  ]
+                : request.prompt,
+            },
+          ],
           // Kimi k2.6 (coding endpoint) rejeita temperature ≠ 1
           // ("only 1 is allowed for this model") — default = não enviar.
           ...(this.temperature !== undefined ? { temperature: this.temperature } : {}),

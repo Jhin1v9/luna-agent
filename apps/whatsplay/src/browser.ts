@@ -199,10 +199,12 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return messages.filter((m) => m.text);
   }
 
-  async sendMessage(chatId: string, text: string): Promise<string> {
+  async sendMessage(chatId: string, text: string, opts?: { inputSelector?: string }): Promise<string> {
     const page = this.requirePage();
     await this.openChat(chatId);
-    await page.click(SELECTORS.inputBox);
+    // Seletor do campo: override vem do auto-reparo (§14); default = SELECTORS.
+    const inputSelector = opts?.inputSelector ?? SELECTORS.inputBox;
+    await page.click(inputSelector);
     // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
     await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
     await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });

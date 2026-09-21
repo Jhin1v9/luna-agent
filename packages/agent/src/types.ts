@@ -38,6 +38,8 @@ export interface TurnRequest {
   session_key: string;
   /** Prompt completo: persona + context pack + mensagem (prompt+contexto+personalidade). */
   prompt: string;
+  /** Imagem (PNG/JPEG base64) para análise visual — auto-reparo §14. Opcional. */
+  image_base64?: string;
 }
 
 export interface TurnResult {

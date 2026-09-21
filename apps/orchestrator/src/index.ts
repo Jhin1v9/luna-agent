@@ -1,9 +1,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection, recordActivity } from '@luna/database';
+import { getPool, closePool, checkConnection, recordActivity, writeHeartbeat } from '@luna/database';
 import { migrate } from '@luna/database/migrate';
-import { createAdapter, assertProductionAdapter } from '@luna/agent';
+import { createAdapter, assertProductionAdapter, probeVisionSupport } from '@luna/agent';
 import { EventBus } from './events/bus.js';
 import { createMessageHandler } from './agent/handler.js';
 import { createSimulateHandler } from './test/simulate.js';
@@ -124,6 +124,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 async function main(): Promise<void> {
   log.info({ node: process.version, env: config.NODE_ENV }, 'orchestrator starting');
 
+  // Contrato §9: validar capability de VISÃO do FAST no boot (auto-reparo §14).
+  probeVisionSupport({
+    mode: 'kimi-api',
+    apiKey: config.LLM_API_KEY,
+    apiBaseUrl: config.LLM_BASE_URL,
+    apiModel: config.LLM_MODEL,
+  })
+    .then((r) => log.info({ vision: r.supported, detail: r.detail }, 'capability visão do FAST (probe)'))
+    .catch((err) => log.error({ err }, 'probe de visão falhou'));
+
   // 1. Pool Postgres
   const pool = getPool(config.DATABASE_URL);
   const dbOk = await checkConnection(pool);
@@ -169,6 +179,13 @@ async function main(): Promise<void> {
   ready = true;
   log.info({ host: config.HOST, port: config.PORT }, 'orchestrator ready — /health /ready /metrics up');
 
+  // Heartbeat pro watchdog geral (§20)
+  const hbTimer = setInterval(() => {
+    writeHeartbeat(pool, 'orchestrator', process.pid, { ready, adapter: adapter.mode }).catch(() => {});
+  }, 15_000);
+  hbTimer.unref();
+  await writeHeartbeat(pool, 'orchestrator', process.pid, { ready, adapter: adapter.mode }).catch(() => {});
+
   // 5. Graceful shutdown
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
@@ -176,6 +193,7 @@ async function main(): Promise<void> {
     log.info({ signal }, 'shutting down');
     ready = false;
     bus.stop();
+    clearInterval(hbTimer);
     server.close(async () => {
       await closePool().catch((err) => log.error({ err }, 'pool close failed'));
       log.info('bye');

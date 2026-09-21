@@ -11,7 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "pino": "^9.5.0"
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

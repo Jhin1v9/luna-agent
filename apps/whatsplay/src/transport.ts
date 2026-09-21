@@ -50,7 +50,7 @@ export interface WhatsAppTransport {
   /** Histórico recente de uma conversa (Context Builder, §7.9). */
   readConversation(chatId: string, limit?: number): Promise<ConversationMessage[]>;
   /** Envia texto. Retorna o external_id da mensagem enviada. */
-  sendMessage(chatId: string, text: string): Promise<string>;
+  sendMessage(chatId: string, text: string, opts?: { inputSelector?: string }): Promise<string>;
   /** Mídia fica para F1.5 (áudio/print); a interface já reserva o lugar. */
   sendMedia?(chatId: string, mediaPath: string, caption?: string): Promise<string>;
   /** Chat aberto no momento é grupo? (best-effort, v0 — sweep de teste). */

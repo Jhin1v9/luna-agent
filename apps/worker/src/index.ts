@@ -1,6 +1,6 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection, reapStaleLocks } from '@luna/database';
+import { getPool, closePool, checkConnection, reapStaleLocks, writeHeartbeat } from '@luna/database';
 import { JobRunner } from './jobs/poller.js';
 
 // F1.2 — worker real: polla a tabela `jobs` (FOR UPDATE SKIP LOCKED) e executa
@@ -35,6 +35,13 @@ async function main(): Promise<void> {
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 
+  // Heartbeat pro watchdog geral (§20)
+  const hbTimer = setInterval(() => {
+    writeHeartbeat(pool, 'worker', process.pid, {}).catch(() => {});
+  }, 15_000);
+  hbTimer.unref();
+  writeHeartbeat(pool, 'worker', process.pid, {}).catch(() => {});
+
   // Reaper: locks 'running' travados por crash voltam para a fila.
   const reap = async () => {
     try {
@@ -57,6 +64,7 @@ async function main(): Promise<void> {
     log.info({ signal }, 'shutting down');
     runner.stop();
     clearInterval(reaperTimer);
+    clearInterval(hbTimer);
     closePool()
       .catch(() => {})
       .finally(() => process.exit(0));

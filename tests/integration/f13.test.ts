@@ -366,3 +366,37 @@ describe('identidade/time no system prompt (feedback owner: confusão com quem �
     expect(prompt).toContain('Jhin');
   });
 });
+
+// ─────────────────────────── isolamento A/B (§31 acceptance) ───────────────────────────
+
+describe('isolamento por cliente — A nunca vê contexto de B (§19/§31)', () => {
+  it('context pack da conversa A contém só mensagens de A, mesmo após B falar', async () => {
+    const bus = await makeBus();
+    const a = await simulateMessage(pool, bus, {
+      client_name: 'Cliente Alpha',
+      contact_name: 'Ana',
+      text: 'meu segredo é azul-123',
+      external_id: 'wamid-iso-a1',
+    });
+    const b = await simulateMessage(pool, bus, {
+      client_name: 'Cliente Beta',
+      contact_name: 'Bruno',
+      text: 'meu segredo é verde-456',
+      external_id: 'wamid-iso-b1',
+    });
+    expect(a.conversation_id).not.toBe(b.conversation_id);
+    await bus.dispatchOnce();
+
+    const packA = await buildClientConversationPack(pool, a.conversation_id);
+    const packB = await buildClientConversationPack(pool, b.conversation_id);
+
+    const textoA = packA.recent_messages.map((m) => m.body).join(' ');
+    const textoB = packB.recent_messages.map((m) => m.body).join(' ');
+    expect(textoA).toContain('azul-123');
+    expect(textoA).not.toContain('verde-456'); // isolamento: A nunca vê B
+    expect(textoB).toContain('verde-456');
+    expect(textoB).not.toContain('azul-123');
+    expect(packA.client_name).toBe('Cliente Alpha');
+    expect(packB.client_name).toBe('Cliente Beta');
+  });
+});

@@ -1,6 +1,7 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection } from '@luna/database';
+import { getPool, closePool, checkConnection, writeHeartbeat } from '@luna/database';
+import { createAdapter } from '@luna/agent';
 import { WhatsAppWebTransport } from './browser.js';
 import { SELECTORS } from './selectors.js';
 import { parseAllowlist } from './allowlist.js';
@@ -9,7 +10,7 @@ import { createIngest } from './ingest.js';
 import { createOutboundListener } from './outbound.js';
 import { IngestWatcher } from './watcher.js';
 import { Watchdog } from './watchdog.js';
-import { sendTeamMessage, TelegramNotConfigured } from './telegram.js';
+import { sendTeamMessage, TelegramNotConfigured } from '@luna/channels';
 
 /**
  * WhatsPlay (§13) — o corpo: Chrome dedicado + Playwright + WhatsApp Web.
@@ -21,6 +22,16 @@ import { sendTeamMessage, TelegramNotConfigured } from './telegram.js';
 loadDotEnv();
 const config = loadConfig();
 const log = createLogger({ name: 'whatsplay' });
+
+// Brain do auto-reparo (§14): mesmo provider do orchestrator (LLM_*).
+const isGeminiMode = config.KIMI_ADAPTER_MODE === 'gemini';
+const llmIsGemini = config.LLM_PROVIDER === 'gemini';
+const repairAdapter = createAdapter({
+  mode: config.KIMI_ADAPTER_MODE,
+  apiKey: isGeminiMode && !llmIsGemini ? config.GEMINI_API_KEY : config.LLM_API_KEY,
+  apiBaseUrl: isGeminiMode && !llmIsGemini ? config.GEMINI_BASE_URL : config.LLM_BASE_URL,
+  apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
+});
 
 const userDataDir =
   config.WHATSAPP_USER_DATA_DIR || 'C:/Users/Abner/.luna/chrome-whatsapp';
@@ -86,12 +97,17 @@ async function main(): Promise<void> {
   watcher.start();
   log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
 
+  // Telegram fallback (§15) — configurado antes da fila de saída (auto-reparo alerta por ele).
+  const telegramConfig = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID };
+
   // Fila de saída (respostas da Luna).
   const outbound = createOutboundListener({
     pool,
     transport,
     log,
     humanDelayMs: config.HUMAN_RESPONSE_DELAY_MS,
+    adapter: repairAdapter, // §14 auto-reparo visual no envio
+    telegram: telegramConfig,
     // GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção,
     // só a allowlist recebe mensagem. Lista vazia em dev = recusa tudo.
     allowlist: config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim()),
@@ -99,8 +115,6 @@ async function main(): Promise<void> {
   });
   const listenClient = await outbound.start();
 
-  // Fallback Telegram (§15).
-  const telegramConfig = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID };
   const telegram =
     telegramConfig.botToken && telegramConfig.teamChatId
       ? (text: string) => sendTeamMessage(text, telegramConfig)
@@ -119,15 +133,32 @@ async function main(): Promise<void> {
     telegram,
     log,
   });
-  const watchdogTimer = setInterval(() => watchdog.runOnce().catch(() => {}), 15_000);
-  watchdogTimer.unref();
+  // Watchdog interno (§13) + heartbeat pro watchdog GERAL (§20) + auto-reparo
+  // de página morta: Chrome dedicado relança sozinho (evidência E2E F1.5).
+  const wdTimer = setInterval(async () => {
+    await watchdog.runOnce().catch(() => {});
+    const status = await transport.getStatus().catch(() => null);
+    await writeHeartbeat(pool, 'whatsplay', process.pid, {
+      state: watchdog.getState(),
+      pageAlive: status?.pageAlive ?? false,
+      session: status?.state ?? 'UNKNOWN',
+    }).catch(() => {});
+    const st = watchdog.getState();
+    if ((st === 'DISCONNECTED' || st === 'FAILED') && status && !status.pageAlive) {
+      log.warn('página WhatsApp morta — relançando Chrome dedicado (auto-reparo)');
+      await transport.close().catch(() => {});
+      await transport.launch().catch((err) => log.error({ err }, 'relaunch do Chrome falhou'));
+    }
+  }, 15_000);
+  wdTimer.unref();
   await watchdog.runOnce();
+  await writeHeartbeat(pool, 'whatsplay', process.pid, { state: watchdog.getState() }).catch(() => {});
 
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info({ signal }, 'shutting down');
-    clearInterval(watchdogTimer);
+    clearInterval(wdTimer);
     watcher.stop();
     listenClient.release();
     transport

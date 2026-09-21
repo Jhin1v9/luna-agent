@@ -1,2 +1,5 @@
-// @luna/channels — placeholder (F1.1). Implementado nas próximas fases.
-export {};
+export {
+  sendTeamMessage,
+  TelegramNotConfigured,
+} from './telegram.js';
+export type { TelegramConfig } from './telegram.js';

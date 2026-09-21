@@ -1,8 +1,11 @@
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
+import type { KimiLiveAdapter } from '@luna/agent';
+import type { TelegramConfig } from '@luna/channels';
 import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
+import { withAutoRepair, type RepairableTransport } from './auto-repair.js';
 
 /**
  * Fila de saída (zero polling): o handler da Luna grava a resposta com
@@ -22,6 +25,9 @@ export interface OutboundDeps {
    * silencioso: recusa gera audit explícito + send_state='failed'. */
   allowlist?: string[];
   enforceAllowlist?: boolean;
+  /** Auto-reparo visual (§14): brain p/ análise + Telegram p/ alerta. */
+  adapter?: KimiLiveAdapter;
+  telegram?: TelegramConfig;
 }
 
 interface OutboundMessageRow {
@@ -81,11 +87,29 @@ export function createOutboundListener(deps: OutboundDeps) {
     try {
       // Anti-ban: gente não responde em 300ms. Espera configurada + jitter
       // curto (3-4s, decreto owner), e o sendMessage ainda soma typing delay.
-      const base = deps.humanDelayMs ?? 3_500;
-      const wait = base + Math.floor(Math.random() * 1_000);
-      deps.log.info({ message_id: messageId, wait_ms: wait }, 'espera humana antes de enviar');
-      await new Promise((r) => setTimeout(r, wait));
-      await transport.sendMessage(target, row.body);
+      // Anti-ban: espera humana DENTRO de cada tentativa (inclusive reparos).
+      const send = async (opts: { suggestedSelector: string | null; attempt: number }) => {
+        const base = deps.humanDelayMs ?? 3_500;
+        const wait = base + Math.floor(Math.random() * 1_000);
+        deps.log.info({ message_id: messageId, wait_ms: wait }, 'espera humana antes de enviar');
+        await new Promise((r) => setTimeout(r, wait));
+        return transport.sendMessage(
+          target,
+          row.body,
+          opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
+        );
+      };
+      if (deps.adapter) {
+        // §14: envio com auto-reparo (screenshot + visão + máx 3 tentativas).
+        await withAutoRepair(
+          { pool, adapter: deps.adapter, transport: transport as RepairableTransport, log, telegram: deps.telegram },
+          'sendMessage',
+          { conversationTarget: target, correlationId: row.correlation_id },
+          send,
+        );
+      } else {
+        await send({ suggestedSelector: null, attempt: 1 });
+      }
       await mark(messageId, 'sent');
       await recordAudit(pool, {
         actor: 'whatsplay',

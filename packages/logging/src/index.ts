@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { pino, type Logger, type LoggerOptions } from 'pino';
 
 /**
@@ -63,12 +64,14 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
   };
 
   if (opts.pretty ?? process.env.NODE_ENV !== 'production') {
-    // pino-pretty é dev-only; carregado dinamicamente para não pesar prod.
+    // pino-pretty é dev-only. Caminho ABSOLUTO resolvido a partir DESTE
+    // pacote — com cwd variável (pm2, apps/, root) o target nominal
+    // 'pino-pretty' não resolve (diagnóstico F1.5).
+    const prettyPath = createRequire(import.meta.url).resolve('pino-pretty');
     return pino(
       options,
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       (pino as unknown as { transport: (t: unknown) => unknown }).transport({
-        target: 'pino-pretty',
+        target: prettyPath,
         options: { colorize: true, translateTime: 'HH:MM:ss.l' },
       }) as never,
     );

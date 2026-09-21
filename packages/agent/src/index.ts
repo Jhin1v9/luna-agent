@@ -49,6 +49,8 @@ export { MockKimiAdapter } from './mock.js';
 export { KimiWebAdapter } from './kimi-web.js';
 export { KimiApiAdapter, KimiApiError, KimiApiMissingKey, assertKimiApiKey } from './kimi-api.js';
 export { GeminiAdapter } from './gemini.js';
+export { probeVisionSupport } from './vision-probe.js';
+export type { VisionProbeResult } from './vision-probe.js';
 export {
   OpenAiCompatAdapter,
   ApiKeyMissing,
