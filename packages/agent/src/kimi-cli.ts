@@ -209,10 +209,21 @@ export class KimiCliAdapter implements KimiLiveAdapter {
 
     const durationMs = this.now() - startedAt;
     const parsed = parseStreamJson(out);
-    if (!parsed.reply.trim()) {
-      throw new KimiAdapterError(
-        `kimi-cli: resposta vazia (exit ok). Raw: ${out.slice(-600)}`,
-      );
+    let reply = parsed.reply;
+    if (!reply.trim()) {
+      // FALLBACK (sondado ao vivo 2026-09-22): em alguns runs o CLI imprime
+      // a resposta em texto pretty na stdout em vez de NDJSON (intermitente,
+      // não reproduzível por prompt/dir). Se sobrou texto não-JSON
+      // substancial, ELE é a resposta — nunca perder o turno por formato.
+      const nonJson = out
+        .split(/\r?\n/)
+        .filter((l) => !l.trimStart().startsWith('{'))
+        .join('\n')
+        .trim();
+      if (nonJson.length > 10) reply = nonJson;
+    }
+    if (!reply.trim()) {
+      throw new KimiAdapterError(`kimi-cli: resposta vazia (exit ok). Raw: ${out.slice(-600)}`);
     }
     const sessionId = parsed.sessionId ?? `kimi-cli:${sanitize(request.session_key)}`;
     this.started.set(request.session_key, true);
@@ -222,7 +233,7 @@ export class KimiCliAdapter implements KimiLiveAdapter {
       /* marcador é melhor-esforço */
     }
     return {
-      reply_text: parsed.reply.trim(),
+      reply_text: reply.trim(),
       session_id: sessionId,
       duration_ms: durationMs,
       model: this.model ?? 'kimi-cli',

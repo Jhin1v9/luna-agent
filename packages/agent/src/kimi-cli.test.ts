@@ -172,6 +172,15 @@ describe('KimiCliAdapter (ADR-033 — CLI headless, spawn injetado)', () => {
     expect(r.session_id).toBe('session_multi');
   });
 
+  it('FALLBACK: CLI em modo texto pretty (sem NDJSON) → o texto vira a resposta', async () => {
+    const pretty = '• Recebi o handoff, mas chegou vazio — preciso do contexto.\n\nMe passa o objetivo?';
+    const adapter = makeAdapter(() =>
+      fakeChild({ stdout: pretty.split('\n') }),
+    );
+    const r = await adapter.sendTurn({ session_key: 'conv-pretty', prompt: 'oi' });
+    expect(r.reply_text).toContain('preciso do contexto');
+  });
+
   it('readMessages devolve [] (documentado ADR-033)', async () => {
     const adapter = makeAdapter(() => fakeChild({}));
     expect(await adapter.readMessages('qualquer')).toEqual([]);
