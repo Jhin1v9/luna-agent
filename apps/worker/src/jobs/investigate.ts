@@ -46,18 +46,21 @@ interface Round {
 
 const ROUND_PROMPT = (objective: string, context: string, rounds: Round[], last: boolean): string =>
   [
-    'Você é a Luna no CÉREBRO VIVO (HANDOFF_LIVE §6): o FAST não conseguiu responder sozinho e te passou a investigação.',
-    `Objetivo: ${objective}`,
-    context ? `Contexto acumulado: ${context}` : '',
+    'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE). Você tem FERRAMENTAS:',
+    'leitura de arquivos, execução de comandos e busca no repositório.',
+    `O repositório do projeto é C:/Users/Abner/Documents/Luna cto/luna-agent (use caminhos absolutos).`,
+    '',
+    `TAREFA DESTA INVESTIGAÇÃO: ${objective}`,
+    context ? `Contexto do FAST: ${context}` : '',
     rounds.length
       ? `Rondas anteriores:\n${rounds.map((r) => `--- ronda ${r.round} ---\n${r.finding}`).join('\n')}`
       : '',
     last
-      ? 'ÚLTIMA RONDA: feche a investigação. Responda em PT-BR com a RESPOSTA FINAL para o cliente ' +
-        '(direta, sem mencionar rondas nem ferramentas). Se ainda não tem conclusão confiável, escreva ' +
+      ? 'ÚLTIMA RONDA: EXECUTE o que falta AGORA e responda em PT-BR com a RESPOSTA FINAL para o cliente ' +
+        '(direta, sem mencionar rondas nem ferramentas). Se de fato não for possível concluir, escreva ' +
         '"NÃO RESOLVIDO: <motivo>".'
-      : 'Investigue (leia arquivos/logs/ferramentas disponíveis). Responda com o que DESCobriu nesta ronda ' +
-        '(fatos + evidências), e o que falta investigar na próxima.',
+      : 'EXECUTE a tarefa agora (não peça confirmação, não peça contexto — o objetivo acima é completo). ' +
+        'Responda com o que você EXECTOU e DESCOBRIU nesta ronda (fatos + evidências), e o que falta na próxima.',
   ]
     .filter(Boolean)
     .join('\n\n');
