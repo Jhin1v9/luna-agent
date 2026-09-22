@@ -57,8 +57,12 @@ function fakePage(initialCompose: string) {
     keyboard,
     isClosed: () => false,
     async click() {},
+    async reload() {},
+    async waitForSelector() {},
     async waitForTimeout() {},
     async evaluate(script: string) {
+      // saúde da página: fake sempre saudável
+      if (script.includes('noscript')) return true;
       // fallback DOM de clearComposeBox
       if (script.includes("el.textContent = ''")) {
         state.composeText = '';
