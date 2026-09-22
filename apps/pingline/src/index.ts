@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const server = createServer((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', service: 'pingline' }));
+      res.end(JSON.stringify({ status: 'broken', service: 'pingline' }));
       return;
     }
     res.writeHead(404).end();
