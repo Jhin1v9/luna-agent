@@ -156,12 +156,28 @@ describe('KimiCliAdapter (ADR-033 — CLI headless, spawn injetado)', () => {
     ).rejects.toThrow(/imagem não suportada/);
   });
 
+  it('parse tolerante: resposta multilinha com newlines literais no content (formato quebrado do CLI)', async () => {
+    const multiline = '{"role":"assistant","content":"Linha 1\n\nLinha 2 com **negrito**\nLinha 3"}';
+    const adapter = makeAdapter(() =>
+      fakeChild({
+        stdout: [
+          '{"role":"meta","type":"system.version","version":"0.42.0"}',
+          multiline,
+          '{"role":"meta","type":"session.resume_hint","session_id":"session_multi","command":"x"}',
+        ],
+      }),
+    );
+    const r = await adapter.sendTurn({ session_key: 'conv-ml', prompt: 'oi' });
+    expect(r.reply_text).toBe('Linha 1\n\nLinha 2 com **negrito**\nLinha 3');
+    expect(r.session_id).toBe('session_multi');
+  });
+
   it('readMessages devolve [] (documentado ADR-033)', async () => {
     const adapter = makeAdapter(() => fakeChild({}));
     expect(await adapter.readMessages('qualquer')).toEqual([]);
   });
 
-  it('autonomia yolo/auto e model chegam como flags', async () => {
+  it('modelo chega como flag; autonomia NÃO (-y/--auto são rejeitadas com -p pelo CLI)', async () => {
     const calls: string[][] = [];
     const adapter = makeAdapter(
       (_cmd, args) => {
@@ -171,7 +187,8 @@ describe('KimiCliAdapter (ADR-033 — CLI headless, spawn injetado)', () => {
       { autonomy: 'yolo', model: 'k2.6' },
     );
     await adapter.sendTurn({ session_key: 'x', prompt: 'p' });
-    expect(calls[0]).toContain('-y');
     expect(calls[0]).toContain('k2.6');
+    expect(calls[0]).not.toContain('-y');
+    expect(calls[0]).not.toContain('--auto');
   });
 });

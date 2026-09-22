@@ -9,9 +9,17 @@
 ## Decisão
 
 1. **`kimi -p "<prompt>" --output-format stream-json`** é a primitiva do
-   Cérebro Vivo: NDJSON estável na stdout (`role:assistant` com o texto,
+   Cérebro Vivo: NDJSON na stdout (`role:assistant` com o texto,
    `meta/session.resume_hint` com o session_id). `--output-format` aceita
    só `text|stream-json` (sondado ao vivo `--help`).
+   Duas armadilhas sondadas ao vivo no mesmo dia:
+   · **`-p` é incompatível com `-y`/`--auto`** ("Cannot combine --prompt
+     with --yolo") — o modo headless já executa sem interagir; as flags de
+     autonomia ficam pro modo interativo/ACP.
+   · **respostas multilinha quebram o NDJSON**: o content vem com newlines
+     LITERAIS dentro da string (serializador não escapa). O parser reagrupa
+     os objetos por linhas que começam com `{"role":` e salva o content à
+     força quando o JSON.parse falha.
 2. **Sessão persistente por diretório de trabalho**: cada `session_key` do
    adapter mapeia para um dir fixo (`~/.luna/kimi-cli-sessions/<key>/`);
    o 1º turno roda sem flag, os seguintes com `-c/--continue` ("continue a

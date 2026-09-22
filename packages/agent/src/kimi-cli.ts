@@ -50,7 +50,11 @@ export interface KimiCliAdapterDeps {
   sessionsRoot?: string;
   /** Timeout de parede por turno (default 10 min). */
   timeoutMs?: number;
-  /** Autonomia: 'yolo' (-y) ou 'auto' (--auto). Default sem flag (perguntas). */
+  /** Autonomia: 'yolo' (-y) ou 'auto' (--auto). Default sem flag (perguntas).
+   *  ATENÇÃO (sondado ao vivo 2026-09-22): o CLI REJEITA -p combinado com
+   *  -y/--auto ("Cannot combine --prompt with --yolo") — no modo headless o
+   *  CLI já executa sem interagir, então a flag é omitida. O campo fica
+   *  para uso futuro em modo interativo/ACP. */
   autonomy?: 'none' | 'yolo' | 'auto';
   /** Modelo (-m). */
   model?: string;
@@ -69,6 +73,47 @@ interface StreamJsonLine {
 
 const sanitize = (key: string): string =>
   key.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'session';
+
+/**
+ * Parse tolerante do stream-json. Dois formatos reais observados (smoke
+ * 2026-09-22): NDJSON válido (respostas de linha única) e objetos assistant
+ * com NEWLINES LITERAIS dentro de "content" (respostas multilinha — o
+ * serializador não escapa; quebra o JSON por linha). Reagrupa por linhas que
+ * começam com {"role": e, no objeto quebrado, salva o content à força.
+ */
+export function parseStreamJson(out: string): { reply: string; sessionId: string | null } {
+  const objects: string[] = [];
+  let buf = '';
+  for (const line of out.split(/\r?\n/)) {
+    if (/^\s*\{"role":/.test(line)) {
+      if (buf.trim()) objects.push(buf);
+      buf = line;
+    } else {
+      buf += '\n' + line;
+    }
+  }
+  if (buf.trim()) objects.push(buf);
+
+  let reply = '';
+  let sessionId: string | null = null;
+  for (const obj of objects) {
+    try {
+      const parsed = JSON.parse(obj) as StreamJsonLine;
+      if (parsed.role === 'assistant' && typeof parsed.content === 'string') reply += parsed.content;
+      if (parsed.role === 'meta' && parsed.type === 'session.resume_hint' && parsed.session_id) {
+        sessionId = parsed.session_id;
+      }
+      continue;
+    } catch {
+      /* objeto quebrado — tentativa de salva abaixo */
+    }
+    const m = obj.match(/^\s*\{"role":"assistant"[\s\S]*?"content":"([\s\S]*)"\}\s*$/);
+    if (m) {
+      reply += m[1]!.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
+  }
+  return { reply, sessionId };
+}
 
 function defaultSpawn(cmd: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }): CliSpawned {
   // Windows: o shim npm do kimi é um .cmd — spawn via cmd /c.
@@ -99,7 +144,6 @@ export class KimiCliAdapter implements KimiLiveAdapter {
   private readonly bin: string;
   private readonly sessionsRoot: string;
   private readonly timeoutMs: number;
-  private readonly autonomy: 'none' | 'yolo' | 'auto';
   private readonly model?: string;
   private readonly spawnImpl: CliSpawn;
   private readonly now: () => number;
@@ -113,7 +157,6 @@ export class KimiCliAdapter implements KimiLiveAdapter {
       deps.sessionsRoot ??
       join(process.env.HOME ?? process.env.USERPROFILE ?? '.', '.luna/kimi-cli-sessions');
     this.timeoutMs = deps.timeoutMs ?? 600_000;
-    this.autonomy = deps.autonomy ?? 'none';
     this.model = deps.model;
     this.spawnImpl = deps.spawnImpl ?? defaultSpawn;
     this.now = deps.now ?? Date.now;
@@ -145,8 +188,8 @@ export class KimiCliAdapter implements KimiLiveAdapter {
     const continuing = this.started.get(request.session_key) === true;
     const args = ['-p', request.prompt, '--output-format', 'stream-json'];
     if (continuing) args.push('-c');
-    if (this.autonomy === 'yolo') args.push('-y');
-    if (this.autonomy === 'auto') args.push('--auto');
+    // -y/--auto são incompatíveis com -p (CLI rejeita) — modo headless já
+    // executa sem interagir. Ver KimiCliAdapterDeps.autonomy.
     if (this.model) args.push('-m', this.model);
 
     const startedAt = this.now();
@@ -165,29 +208,13 @@ export class KimiCliAdapter implements KimiLiveAdapter {
     }
 
     const durationMs = this.now() - startedAt;
-    const lines = out
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    let reply = '';
-    let sessionId = `kimi-cli:${sanitize(request.session_key)}`;
-    for (const line of lines) {
-      let obj: StreamJsonLine;
-      try {
-        obj = JSON.parse(line) as StreamJsonLine;
-      } catch {
-        continue; // linhas de log soltas do CLI
-      }
-      if (obj.role === 'assistant' && typeof obj.content === 'string') reply += obj.content;
-      if (obj.role === 'meta' && obj.type === 'session.resume_hint' && obj.session_id) {
-        sessionId = obj.session_id;
-      }
-    }
-    if (!reply.trim()) {
+    const parsed = parseStreamJson(out);
+    if (!parsed.reply.trim()) {
       throw new KimiAdapterError(
-        `kimi-cli: resposta vazia (exit ok, ${lines.length} linhas stream-json) — o turno pode ter falhado`,
+        `kimi-cli: resposta vazia (exit ok). Raw: ${out.slice(-600)}`,
       );
     }
+    const sessionId = parsed.sessionId ?? `kimi-cli:${sanitize(request.session_key)}`;
     this.started.set(request.session_key, true);
     try {
       writeFileSync(join(dir, '.session-started'), new Date().toISOString());
@@ -195,7 +222,7 @@ export class KimiCliAdapter implements KimiLiveAdapter {
       /* marcador é melhor-esforço */
     }
     return {
-      reply_text: reply.trim(),
+      reply_text: parsed.reply.trim(),
       session_id: sessionId,
       duration_ms: durationMs,
       model: this.model ?? 'kimi-cli',
