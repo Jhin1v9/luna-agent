@@ -266,6 +266,20 @@ export function createOutboundListener(deps: OutboundDeps) {
       if (n.payload) deliverOne(n.payload).catch((err) => log.error({ err }, 'entrega falhou'));
     });
     log.info('ouvindo NOTIFY luna_outbound (fila de saída)');
+    // Dreno no boot: NOTIFY disparado durante um restart do daemon se perde
+    // (ninguém ouvindo) e a mensagem ficava 'queued' pra sempre — evidência
+    // ao vivo 2026-09-22 (teste de entrega do owner travado em queued).
+    const stale = await pool
+      .query<{ id: string }>(
+        `SELECT id FROM messages
+         WHERE send_state = 'queued' AND created_at > now() - interval '6 hours'
+         ORDER BY created_at LIMIT 20`,
+      )
+      .catch(() => ({ rows: [] as Array<{ id: string }> }));
+    for (const row of stale.rows) {
+      log.info({ message_id: row.id }, 'fila: mensagem queued encontrada no boot — drenando');
+      deliverOne(row.id).catch((err) => log.error({ err }, 'entrega falhou'));
+    }
     return client;
   }
 
