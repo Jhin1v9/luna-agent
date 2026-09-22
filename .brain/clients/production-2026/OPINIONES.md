@@ -287,3 +287,98 @@ Cliente definiu tarefa: substituir imagem do slider atual da onadance.com por v�
 }
 ```
 
+## 2026-09-22 — Luna
+
+Cliente definiu a tarefa: substituir imagem do slider atual da onadance.com por vídeo vertical de 41s preparado para mobile; precisa revisar duração/corte. Tarefa já existe no Dashboard Pro, pendente de completar. Luna organizou o briefing, mas a resposta final apareceu truncada.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site da onadance.com",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Confirmar definição sobre corte do vídeo de 41s (vertical) e completar a tarefa do Dashboard Pro de trocar imagem do slider por vídeo.",
+  "quality_score": 4,
+  "summary": "Cliente definiu a tarefa: substituir imagem do slider atual da onadance.com por vídeo vertical de 41s preparado para mobile; precisa revisar duração/corte. Tarefa já existe no Dashboard Pro, pendente de completar. Luna organizou o briefing, mas a resposta final apareceu truncada.",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-09-22 — Luna
+
+Cliente enviou hero e vídeo vertical (41s) da Jess via Drive. Dúvida inicial sobre item 'temporal/a de 10' foi esclarecida: trata-se da tarefa de trocar a imagem do slider do hero da onadance.com por vídeo, revisando a duração. Tarefa já existe no Dashboard Pro, pendente de completar. Cliente elogiou o atendimento e demonstrou satisfação.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site da onadance.com (Dashboard Pro)",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Completar a tarefa no Dashboard Pro: revisar vídeo vertical de 41s da Jess, avaliar corte/duração e implementar no slider do hero da onadance.com; definir solução para desktop posteriormente.",
+  "quality_score": 4,
+  "summary": "Cliente enviou hero e vídeo vertical (41s) da Jess via Drive. Dúvida inicial sobre item 'temporal/a de 10' foi esclarecida: trata-se da tarefa de trocar a imagem do slider do hero da onadance.com por vídeo, revisando a duração. Tarefa já existe no Dashboard Pro, pendente de completar. Cliente elogiou o atendimento e demonstrou satisfação.",
+  "client_signal": "elogio"
+}
+```
+
+## 2026-09-22 — Luna
+
+Cliente explicou a tarefa: trocar imagem do slider da onadance.com por vídeo vertical de 41s (pasta Jess no Drive). Revisar duração para mobile; desktop será pensado depois. Tarefa já está no Dashboard Pro, só falta completar. Cliente está satisfeito e engajado, elogiou o atendimento com humor
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site onadance.com",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Concluir análise do vídeo de 41s (avaliar corte para mobile) e executar tarefa do Dashboard Pro de trocar imagem do slider por vídeo vertical",
+  "quality_score": 4,
+  "summary": "Cliente explicou a tarefa: trocar imagem do slider da onadance.com por vídeo vertical de 41s (pasta Jess no Drive). Revisar duração para mobile; desktop será pensado depois. Tarefa já está no Dashboard Pro, só falta completar. Cliente está satisfeito e engajado, elogiou o atendimento com humor",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-09-22 — Luna
+
+Após esclarecer confusão sobre o item 'temporal/de 10', cliente explicou a tarefa real: trocar a imagem do slider do hero da onadance.com por um vídeo vertical de 41s. Luna registrou os pontos (revisar duração, foco mobile, versão desktop depois). Cliente está animado e satisfeito com o atendimento.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site onadance.com",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Completar tarefa no Dashboard Pro: substituir imagem do slider por vídeo vertical de 41s, revisando corte/duração (mobile primeiro, depois pensar versão para desktop). Materiais no Drive > Nexo > Cliente > Jess.",
+  "quality_score": 4,
+  "summary": "Após esclarecer confusão sobre o item 'temporal/de 10', cliente explicou a tarefa real: trocar a imagem do slider do hero da onadance.com por um vídeo vertical de 41s. Luna registrou os pontos (revisar duração, foco mobile, versão desktop depois). Cliente está animado e satisfeito com o atendimento.",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-09-22 — Luna
+
+Cliente esclareceu a dúvida sobre 'temporal/de 10': trata-se de trocar a imagem do slider atual da onadance.com por um vídeo vertical de 41s (mobile). Vídeo e hero da Jess já estão no Drive (pasta Nexo > Cliente > Jess). Tarefa já está no Dashboard Pro, falta completá-la: revisar duração do vídeo e pensar em solução para desktop. Cliente está muito satisfeito com o atendimento e com bom humor.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com (slider/hero)",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Confirmar corte do vídeo de 41s e definir solução para versão desktop da onadance.com; tarefa já existe no Dashboard Pro",
+  "quality_score": 4,
+  "summary": "Cliente esclareceu a dúvida sobre 'temporal/de 10': trata-se de trocar a imagem do slider atual da onadance.com por um vídeo vertical de 41s (mobile). Vídeo e hero da Jess já estão no Drive (pasta Nexo > Cliente > Jess). Tarefa já está no Dashboard Pro, falta completá-la: revisar duração do vídeo e pensar em solução para desktop. Cliente está muito satisfeito com o atendimento e com bom humor.",
+  "client_signal": "pedido"
+}
+```
+

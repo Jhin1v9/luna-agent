@@ -142,3 +142,27 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - seletor antigo: (seletor anterior falhou)
 - seletor novo: #pane-side span[title='🏆Production - 2026🙏🏻']
 - fallback visual: screenshot + DOM no incidente
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: ul[role='grid'] li[role='row'] div[role='button'] span[title='🏆Production - 2026🙏🏻']
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: #pane-side [role="list"] [role="listitem"] span[title*="Production - 2026"]
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: #main footer div[contenteditable="true"]
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: div[contenteditable="true"][data-tab="3"]
+- fallback visual: screenshot + DOM no incidente

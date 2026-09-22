@@ -211,3 +211,41 @@ Cliente aprovou a prévia dos emails de resposta, combinou formatação e implan
 }
 ```
 
+## 2026-09-22 — Luna
+
+Conversa majoritamente informal e descontraída. Luna alinhou o pendente de formatação e implantação dos emails, celebrou a oportunidade de trabalho do cliente e respondeu com bom humor ao papo pessoal, saindo de cena com elegância quando a conversa ficou íntima.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "emails do cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Ficou pendente formatação final e implantação dos emails (hoje ou amanhã), conforme combinado com Nonoke",
+  "quality_score": 5,
+  "summary": "Conversa majoritamente informal e descontraída. Luna alinhou o pendente de formatação e implantação dos emails, celebrou a oportunidade de trabalho do cliente e respondeu com bom humor ao papo pessoal, saindo de cena com elegância quando a conversa ficou íntima.",
+  "client_signal": "elogio"
+}
+```
+
+## 2026-09-22 — Luna
+
+Conversa informal e descontraída entre equipe/cliente: aprovação da prévia dos emails de resposta, brincadeiras sobre bloquear a Ana, notícia de possível nova oportunidade de emprego do Nonoke e papo pessoal matinal. Luna respondeu com bom humor, registrou o alinhamento do projeto (formatação + implantação dos emails) e soube sair do papo pessoal oferecendo suporte.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "emails de resposta do cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Conversa social/espontânea; pendência mencionada: formatação final e implantação dos emails de resposta (hoje ou amanhã), registrar contexto para execução.",
+  "quality_score": 5,
+  "summary": "Conversa informal e descontraída entre equipe/cliente: aprovação da prévia dos emails de resposta, brincadeiras sobre bloquear a Ana, notícia de possível nova oportunidade de emprego do Nonoke e papo pessoal matinal. Luna respondeu com bom humor, registrou o alinhamento do projeto (formatação + implantação dos emails) e soube sair do papo pessoal oferecendo suporte.",
+  "client_signal": "nenhum"
+}
+```
+
