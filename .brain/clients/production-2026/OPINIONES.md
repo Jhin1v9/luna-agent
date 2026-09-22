@@ -40,3 +40,22 @@ Cliente confirmou a tarefa do Dashboard Pro: substituir a imagem do slider da on
 }
 ```
 
+## 2026-09-22 — Luna
+
+Cliente elogiou o atendimento com humor e esclareceu a dúvida: a tarefa é trocar a imagem do slider da onadance.com por um vídeo vertical de 41s (foco mobile), com necessidade de revisar duração e pensar adaptação para desktop. Tarefa já existe no Dashboard pro e precisa ser completada.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site onadance.com",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Confirmar no Dashboard pro a tarefa do slider: decidir se corta o vídeo de 41s (vertical/mobile) e como adaptar para desktop",
+  "quality_score": 4,
+  "summary": "Cliente elogiou o atendimento com humor e esclareceu a dúvida: a tarefa é trocar a imagem do slider da onadance.com por um vídeo vertical de 41s (foco mobile), com necessidade de revisar duração e pensar adaptação para desktop. Tarefa já existe no Dashboard pro e precisa ser completada.",
+  "client_signal": "pedido"
+}
+```
+
