@@ -53,6 +53,9 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
   let polling = false;
   let conflicts = 0;
   let conflictAlerted = false;
+  let authFails = 0;
+  let authAlerted = false;
+  let slowMode = false;
 
   const reply = deps.replyImpl ?? (async (chatId: string, text: string) => {
     await fetchImpl(`${base}/sendMessage`, {
@@ -83,7 +86,20 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
     if (!res) return;
     const data = (await res.json().catch(() => null)) as { ok: boolean; result: unknown[]; description?: string } | null;
     if (!data?.ok) {
-      if (res.status === 409) {
+      if (res.status === 401 || res.status === 403) {
+        // Token morto/revogado (ao vivo 2026-09-22: owner regenerou no
+        // BotFather pra matar o consumidor externo → 401 em tudo). Retry
+        // rápido só gera spam: throttle duro + log único de ação.
+        authFails += 1;
+        if (!authAlerted) {
+          authAlerted = true;
+          deps.log.error(
+            { status: res.status, desc: data?.description ?? null },
+            'admin telegram: TOKEN REJEITADO — atualize TELEGRAM_BOT_TOKEN (BotFather) e restarte o worker; poll em modo lento até lá',
+          );
+        }
+        slowMode = true;
+      } else if (res.status === 409) {
         conflicts += 1;
         // alerta único: outro consumidor está comendo o getUpdates
         if (conflicts >= 30 && !conflictAlerted) {
@@ -109,10 +125,17 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       polling = false;
       return;
     }
-    if (conflicts > 0) {
-      deps.log.info({ conflicts }, 'admin telegram: getUpdates de volta (conflito resolvido)');
+    if (conflicts > 0 || slowMode) {
+      deps.log.info({ conflicts, slowMode }, 'admin telegram: getUpdates de volta (conflito resolvido)');
       conflicts = 0;
       conflictAlerted = false;
+      authFails = 0;
+      authAlerted = false;
+      if (slowMode) {
+        // token curado: volta pro poll rápido
+        slowMode = false;
+        restartTimer(1_200);
+      }
     }
     polling = false;
     for (const raw of data.result) {
@@ -173,6 +196,16 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
     void hb;
   }
 
+  function restartTimer(ms: number): void {
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      pollOnce().catch((err) => deps.log.error({ err }, 'admin telegram: poll falhou'));
+      // jitter evita lockstep com o consumidor externo (corridas em fase
+      // deixam um dos dois ganhar sempre)
+    }, ms + Math.floor(Math.random() * 400));
+    timer.unref();
+  }
+
   return {
     /** Expuesto para testes: executa um ciclo de poll. */
     pollOnce,
@@ -182,12 +215,7 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
         return;
       }
       await restoreOffset();
-      timer = setInterval(() => {
-        pollOnce().catch((err) => deps.log.error({ err }, 'admin telegram: poll falhou'));
-        // jitter evita lockstep com o consumidor externo (corridas em fase
-        // deixam um dos dois ganhar sempre)
-      }, pollMs + Math.floor(Math.random() * 400));
-      timer.unref();
+      restartTimer(slowMode ? 120_000 : pollMs);
       deps.log.info({ chat: deps.allowedChatId ?? 'AGUARDANDO_CHAT_ID' }, 'admin telegram: loop ativo (F4 mínimo)');
     },
     stop(): void {
