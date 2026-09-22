@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   KimiAdapterConfig,
@@ -115,11 +115,29 @@ export function parseStreamJson(out: string): { reply: string; sessionId: string
   return { reply, sessionId };
 }
 
+function resolveCliEntry(bin: string): { cmd: string; prefixArgs: string[] } | null {
+  if (process.platform !== 'win32') return { cmd: bin, prefixArgs: [] };
+  // Windows: o shim npm é um .cmd — passar por cmd.exe quebra prompts longos
+  // (newlines terminam o argumento, não-ASCII sofre codepage — evidência ao
+  // vivo 2026-09-22: o CLI recebeu o prompt TRUNCADO). O caminho certo é
+  // spawnar o node direto no entrypoint real (argv como array UTF-16, nada
+  // de parsing de shell).
+  const entry =
+    process.env.KIMI_CLI_ENTRY ??
+    join(process.env.APPDATA ?? '', 'npm', 'node_modules', '@moonshot-ai', 'kimi-code', 'dist', 'main.mjs');
+  if (existsSync(entry)) return { cmd: process.execPath, prefixArgs: [entry] };
+  return null; // fallback: shim via cmd /c
+}
+
 function defaultSpawn(cmd: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }): CliSpawned {
-  // Windows: o shim npm do kimi é um .cmd — spawn via cmd /c.
-  const full = process.platform === 'win32' ? 'cmd.exe' : cmd;
-  const fullArgs = process.platform === 'win32' ? ['/c', cmd, ...args] : args;
-  const child = spawn(full, fullArgs, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const resolved = resolveCliEntry(cmd);
+  const full = resolved?.cmd ?? (process.platform === 'win32' ? 'cmd.exe' : cmd);
+  const fullArgs = resolved
+    ? [...resolved.prefixArgs, ...args]
+    : process.platform === 'win32'
+      ? ['/c', cmd, ...args]
+      : args;
+  const child = spawn(full, fullArgs, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   return {
     stdout: child.stdout!,
     stderr: child.stderr!,
