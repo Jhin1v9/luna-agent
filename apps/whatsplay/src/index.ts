@@ -54,6 +54,7 @@ async function main(): Promise<void> {
     userDataDir,
     headless: config.WHATSAPP_HEADLESS,
     evidenceDir,
+    log,
     outgoingQueueCount: async () => {
       const r = await pool.query(
         `SELECT count(*)::int AS n FROM messages WHERE send_state = 'queued'`,

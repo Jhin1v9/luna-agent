@@ -39,6 +39,8 @@ export interface BrowserConfig {
   chromePath: string;
   userDataDir: string;
   headless: boolean;
+  /** Logger p/ warns operacionais (resíduo no campo de composição etc.). */
+  log?: import('pino').Logger;
   /** Conta mensagens outbound com send_state='queued' (watchdog). */
   outgoingQueueCount?: () => Promise<number>;
   /** Diretório de evidências (screenshot + DOM simplificado). */
@@ -294,10 +296,29 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         if (inMain > 0) inputSelector = opts.inputSelector;
       }
       await page.click(inputSelector);
+      // LIMPEZA DO CAMPO (decreto owner 2026-09-22, "msg esquisita"): abort
+      // anterior deixava rascunho no campo e o texto novo concatenava com o
+      // resíduo. Sempre limpa antes de digitar; resíduo = warn (indica abort).
+      const residue = await this.clearComposeBox(page, inputSelector);
+      if (residue > 0) {
+        this.config.log?.warn(
+          { chars: residue, chat: chatId },
+          'campo de composição continha resíduo — limpo (abort anterior provável)',
+        );
+      }
+      await page.waitForTimeout(150);
       // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
       await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
       await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
       await page.keyboard.press('Enter');
+      // Pós-envio: o campo DEVE estar vazio. Se sobrou texto, o Enter não
+      // enviou (ficou de rascunho) — limpa pra não poluir o próximo envio.
+      await page.waitForTimeout(400);
+      const leftover = await this.composeBoxTextLen(page, inputSelector);
+      if (leftover > 0) {
+        this.config.log?.warn({ chars: leftover, chat: chatId }, 'campo de composição não esvaziou após envio — limpando');
+        await this.clearComposeBox(page, inputSelector);
+      }
       this.lastHeartbeatAt = new Date();
       return `sent:${chatId}:${Date.now()}`;
     } finally {
@@ -308,6 +329,51 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         /* PanelStuckError já reportou via onStuck */
       }
     }
+  }
+
+  /** Nº de caracteres de texto no campo de composição (-1 = campo não achado). */
+  private async composeBoxTextLen(page: Page, selector: string): Promise<number> {
+    const len = await evalWithArg(
+      page,
+      `((sel) => {
+        const el = document.querySelector(sel);
+        return el ? (el.textContent || '').trim().length : -1;
+      })`,
+      selector,
+    ).catch(() => -1);
+    return typeof len === 'number' ? len : -1;
+  }
+
+  /**
+   * Limpa o campo de composição por TECLADO (Ctrl+A + Backspace — o
+   * execCommand não limpa o contenteditable do WA Web) com fallbacks:
+   * segundo passe de teclado e, se ainda houver texto, limpeza via DOM com
+   * InputEvent. Retorna quantos chars havia (0 = já estava limpo).
+   */
+  private async clearComposeBox(page: Page, selector: string): Promise<number> {
+    const before = await this.composeBoxTextLen(page, selector);
+    if (before <= 0) return 0;
+    await page.click(selector).catch(() => {});
+    for (let pass = 0; pass < 2; pass++) {
+      await page.keyboard.press('Control+a');
+      await page.keyboard.press('Backspace');
+      await page.waitForTimeout(250);
+      if ((await this.composeBoxTextLen(page, selector)) <= 0) return before;
+    }
+    // último recurso: via DOM (com InputEvent pra UI do WA reagir)
+    await evalWithArg(
+      page,
+      `((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return;
+        el.focus();
+        el.textContent = '';
+        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      })`,
+      selector,
+    ).catch(() => {});
+    await page.waitForTimeout(250);
+    return before;
   }
 
   /**
