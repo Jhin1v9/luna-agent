@@ -4,6 +4,48 @@
 > owner** — mixagem duplex não tem como validar sem o hardware instalado.
 > Siga na ordem; cada checkpoint tem como conferir.
 
+## Status automático (2026-09-22, verificado pela Luna)
+
+- ✅ **VoiceMeeter instalado** — porém a edição é **STANDARD** (1 VAIO, 1 bus
+  virtual B1). A mixagem duplex do §2 precisa de **BANANA** (AUX input + B2).
+  Instalação atual saudável: drivers VAIO OK, dispositivos de som reais intactos.
+- ⚠️ **Cabos**: nenhum VB-Cable instalado (sem "CABLE-A/B Output" no Painel de
+  Som). Existe UM instalador bundled em
+  `C:\Program Files (x86)\VB\Voicemeeter\VBCABLE_Setup_x64.exe` (instala 1 cabo
+  "CABLE" genérico). O guia precisa de DOIS.
+- ⛔ **Bloqueio**: instalação de driver exige **UAC (admin)** — a Luna roda sem
+  elevação e não vai forçar isso. Checklist exato abaixo.
+- 🔎 Instaladores baixados pelo owner: varredura completa do perfil
+  (Downloads/Desktop/Documents/AppData, profundidade 3) — **nenhum
+  instalador de Banana ou VB-Cable encontrado**. O "já baixei" provavelmente
+  se refere ao VoiceMeeter Standard (que já estava instalado). Os downloads
+  oficiais são email-gated (passo 1 do checklist).
+
+### Checklist manual do owner (UAC + reboot)
+
+1. **VoiceMeeter Banana**: baixar em <https://shop.vb-audio.com> ( Banana é
+   donationware — download grátis; o site pede email pra gerar o link). Se já
+   baixou, o instalador é tipo `VoicemeeterBananaSetup.exe` — executar como
+   admin. Instala POR CIMA do Standard (mesma pasta).
+2. **VB-Cable A+B**: <https://vb-audio.com/Cable/> (também email-gated; pack
+   "CABLE A+B"). Instalar como admin. Alternativa imediata: rodar o
+   `VBCABLE_Setup_x64.exe` bundled (dá 1 cabo genérico "CABLE" — dá pra começar
+   o Checkpoint 2 com ele + o VAIO do Banana, usando só 1 cabo: veja §2-nota).
+3. **REBOOT quando o instalador pedir** (driver de áudio só ativa no boot).
+   O som do PC volta normal após o reboot — os drivers VB-Audio convivem com
+   o som real (verificado: dispositivos reais intactos ao lado do VAIO).
+4. Após o reboot, a Luna configura o roteamento do §2 automaticamente se
+   possível (registry/Remote) ou guia o owner nos cliques.
+
+### §2-nota — versão mínima com 1 cabo (só pra testar antes do pack A+B)
+
+Com Banana + 1 cabo "CABLE" + VAIO dá pra fazer o duplex usando VAIO como um
+dos lados: Hardware In 1 = mic real; VAIO = voz do ChatGPT (Virtual Input);
+AUX = CABLE Output (voz de Abner do WhatsApp); B1 (VAIO out) = CABLE Input
+(voz ChatGPT → chamada WhatsApp); B2 (AUX out) = alto-falante do Chrome do
+ChatGPT... ou seja, 1 cabo resolve se o WhatsPlay usar o VAIO como microfone.
+Menos limpo que A+B, mas valida o Checkpoint 2.
+
 ## 0. Inventário necessário
 
 - 2× **VB-Cable** (VB-Audio, gratuito) — cabos virtuais de áudio.
