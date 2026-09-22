@@ -78,8 +78,10 @@ export async function runHeal(deps: HealDeps, input: HealInput): Promise<{ heale
   const lkg = lkgRow.rows[0]?.meta?.lkg ?? 'main';
   const baseCommit = (await exec('git', ['-C', root, 'rev-parse', '--short', 'HEAD'])).stdout.trim();
 
+  let lastBranch = '';
   for (let attempt = 1; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
     const branch = `luna/fix-${Date.now()}`;
+    lastBranch = branch;
     try {
       await exec('git', ['-C', root, 'checkout', '-b', branch]);
       await input.applyFix();
@@ -126,7 +128,7 @@ export async function runHeal(deps: HealDeps, input: HealInput): Promise<{ heale
       // ROLLBACK pro LKG antes de tentar de novo (rede de segurança).
       await exec('git', ['-C', root, 'checkout', 'main']).catch(() => {});
       await exec('git', ['-C', root, 'reset', '--hard', lkg]).catch(() => {});
-      await exec('git', ['-C', root, 'branch', '-D', `luna/fix-`]).catch(() => {}); // branch nome varia; limpeza best-effort
+      await exec('git', ['-C', root, 'branch', '-D', lastBranch]).catch(() => {});
       if (attempt < MAX_REPAIR_ATTEMPTS) continue;
 
       // Esgotou: incident + alerta (rollback já deixou o repo no LKG).

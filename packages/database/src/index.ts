@@ -43,6 +43,8 @@ export { reapStaleLocks } from './reaper.js';
 export type { ReapResult } from './reaper.js';
 export { writeHeartbeat, readHeartbeats } from './heartbeat.js';
 export type { HeartbeatRow } from './heartbeat.js';
+export { redriveDeadLetter, redriveTransientDeadLetters } from './redrive.js';
+export type { RedriveResult } from './redrive.js';
 export { publishEvent } from './publisher.js';
 export type { PublishInput, PublishResult } from './publisher.js';
 export {

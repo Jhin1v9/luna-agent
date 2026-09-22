@@ -357,3 +357,49 @@ describe('audit + activity log (§20)', () => {
     expect(rows.rows[0]!.summary).toContain('Jess');
   });
 });
+
+// ─────────────────────────── DLQ redrive (§7.7) ───────────────────────────
+
+describe('DLQ redrive (§7.7 — falhas transientes voltam pra fila)', () => {
+  it('redrive reenfileira no outbox e remove da DLQ; reprocessamento não duplica resposta', async () => {
+    const { redriveDeadLetter } = await import('../../packages/database/src/index.js');
+    // evento que morreu por quota (transiente), com envelope real
+    const { EventBus } = await import("../../apps/orchestrator/src/events/bus.js");
+    const bus = new EventBus(pool, { dispatcherId: "redrive-test" });
+    await bus.publish({
+      event_type: 'system.health.degraded', source: 'redrive-test', payload: { component: 'x' },
+      idempotency_key: 'rd:1',
+    });
+    const evId = (await pool.query("SELECT event_id FROM events WHERE source='redrive-test'")).rows[0]!.event_id;
+    await pool.query(
+      `UPDATE outbox SET status = 'dead' WHERE event_id = $1`,
+      [evId],
+    );
+    await pool.query(
+      `INSERT INTO dead_letter_events (event_id, event_type, source, payload, reason, last_error, attempts)
+       VALUES ($1, 'system.health.degraded', 'orchestrator-test', '{}', 'handler_failed', 'chat completions HTTP 403: quota', 5)`,
+      [evId],
+    );
+
+    expect(await redriveDeadLetter(pool, evId)).toBe(true);
+    const ob = await pool.query('SELECT status FROM outbox WHERE event_id = $1', [evId]);
+    expect(ob.rows[0]!.status).toBe('pending');
+    expect((await pool.query('SELECT * FROM dead_letter_events WHERE event_id = $1', [evId])).rowCount).toBe(0);
+
+    // reprocessa: dispatcher roda de novo sem erro (handler ausente = publica limpo)
+    await bus.dispatchOnce();
+    const ob2 = await pool.query('SELECT status FROM outbox WHERE event_id = $1', [evId]);
+    expect(ob2.rows[0]!.status).toBe('published');
+  });
+
+  it('redrive em lote pula erros NÃO transientes (invalid_envelope não reentra)', async () => {
+    const { redriveTransientDeadLetters } = await import('../../packages/database/src/index.js');
+    await pool.query(
+      `INSERT INTO dead_letter_events (event_id, event_type, source, payload, reason, last_error, attempts)
+       VALUES ('evt_fix_1', 'x.y', 't', '{}', 'invalid_envelope', 'zod: invalid_type', 1)`,
+    );
+    const r = await redriveTransientDeadLetters(pool);
+    expect(r.skipped.some((s) => s.event_id === 'evt_fix_1')).toBe(true);
+    expect(r.redriven).not.toContain('evt_fix_1');
+  });
+});

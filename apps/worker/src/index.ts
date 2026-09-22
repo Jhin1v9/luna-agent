@@ -90,6 +90,21 @@ async function main(): Promise<void> {
   const escTimer = setInterval(escTick, 60_000);
   escTimer.unref();
 
+  // DLQ redrive (§7.7): falhas transientes (quota, provedor fora) voltam pra
+  // fila sozinhas quando a causa passa. Não-transientes ficam (precisam de fix).
+  const { redriveTransientDeadLetters } = await import('@luna/database');
+  const redrive = async () => {
+    try {
+      const r = await redriveTransientDeadLetters(pool);
+      if (r.redriven.length) log.info({ redriven: r.redriven.length }, 'dlq: redrive de falhas transientes');
+    } catch (err) {
+      log.error({ err }, 'dlq redrive falhou');
+    }
+  };
+  await redrive();
+  const redriveTimer = setInterval(redrive, 10 * 60_000);
+  redriveTimer.unref();
+
   runner.start();
   log.info('job runner polling (batch=5, interval=1000ms)');
 
