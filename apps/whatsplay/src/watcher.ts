@@ -230,11 +230,13 @@ export class IngestWatcher {
               .slice(-3)
               .map((m) => `${(m as { author?: string | null }).author ?? m.sender ?? 'contato'}: ${m.text}`)
               .join('\n') || text,
-          // §7.6: discriminador estável POR MENSAGEM (data-id do WA) — com
-          // hash de texto, mensagem nova com texto igual a uma antiga virava
-          // "duplicada" e o cliente era ignorado (bug ao vivo 2026-09-22:
-          // owner reenviou "@luna teste" e nunca virou evento).
-          external_id: `wa:${entry}:${last.mid || Buffer.from(last.text).toString('base64').slice(0, 24)}`,
+          // §7.6: discriminador estável POR MENSAGEM. O data-id do WA não
+          // existe nesta build (msg-container sem atributo), então usa
+          // base64 COMPLETO de autor+texto — o slice(0,24) antigo colidia
+          // para textos-prefixo ("@luna teste diga 1" vs "...diga 123" =
+          // mesmo hash, mensagem engolida como "duplicada"; ao vivo
+          // 2026-09-22) e o hash de texto puro engolia reenvio idêntico.
+          external_id: `wa:${entry}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
           author_name: (last as { author?: string | null }).author ?? null,
@@ -269,7 +271,7 @@ export class IngestWatcher {
         .slice(-3)
         .map((m) => m.text)
         .join(' '),
-      external_id: `wa:${badge.chat_id}:${last.mid || Buffer.from(last.text).toString('base64').slice(0, 24)}`,
+      external_id: `wa:${badge.chat_id}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
       mentioned_luna: extractMention(last.text),
       quoted_from_luna: false,
       author_name: (last as { author?: string | null }).author ?? badge.chat_name,
