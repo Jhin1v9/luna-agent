@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { Logger } from 'pino';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { recordActivity, recordAudit, readHeartbeats } from '@luna/database';
+import { classifyAdminMessage } from './orders.js';
 import { z } from 'zod';
 
 /**
@@ -20,7 +21,7 @@ const updateSchema = z.object({
   message: z.object({
     chat: z.object({ id: z.number() }),
     text: z.string().optional(),
-    from: z.object({ first_name: z.string().optional() }).optional(),
+    from: z.object({ id: z.number().optional(), first_name: z.string().optional() }).optional(),
   }),
 });
 
@@ -30,6 +31,15 @@ export interface TelegramAdminDeps {
   log: Logger;
   botToken?: string;
   allowedChatId?: string;
+  /** P3 (ADR-035): whitelist de user_ids do Telegram que podem dar ORDENS.
+   *  Vazia = qualquer membro do chat autorizado pode (log warn no boot). */
+  allowedUserIds?: string[];
+  /** P3: live brain (KimiCliAdapter) que executa ordens. */
+  live?: KimiLiveAdapter;
+  /** P3: exige confirmação inline para ordens destrutivas. Default true. */
+  confirmDestructive?: boolean;
+  /** P3: timeout de parede por ordem. Default 5 min. */
+  orderTimeoutMs?: number;
   buildAdminPack: () => Promise<{ sections: string[] }>;
   /** Injetação pra testes. */
   fetchImpl?: FetchLike;
@@ -41,7 +51,7 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const base = `https://api.telegram.org/bot${deps.botToken}`;
   // 409-resilience (diagnóstico ao vivo 2026-09-22): consumidor externo
-  // segurava o getUpdates ~100% do tempo e o admin morria em silêncio.
+  // segurava o getUpdates ~100% do tempo e o admin mordia em silêncio.
   // Poll curto + guarda de reentrância: cada gap do outro consumidor é
   // nosso; quando vencemos, os updates acumulados chegam de uma vez.
   // Cadência 1,2s com jitter: corrida apertada — a cada queda do pipe do
@@ -56,6 +66,9 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
   let authFails = 0;
   let authAlerted = false;
   let slowMode = false;
+  /** P3: confirmação inline pendente por chat (ordem destrutiva). */
+  const pendingConfirm = new Map<string, { order: string; adminName: string; expiresAt: number }>();
+  let whitelistWarned = false;
 
   const reply = deps.replyImpl ?? (async (chatId: string, text: string) => {
     await fetchImpl(`${base}/sendMessage`, {
@@ -152,9 +165,68 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       }
       const text = (u.message.text ?? '').trim();
       if (!text) continue;
+      const fromId = u.message.from?.id != null ? String(u.message.from.id) : null;
+      const adminName = u.message.from?.first_name ?? '?';
 
-      deps.log.info({ from: u.message.from?.first_name ?? '?', text: text.slice(0, 80) }, 'admin telegram: pergunta recebida');
+      // P3 (ADR-035): whitelist de admins por user_id. Vazia = qualquer
+      // membro do chat autorizado (warn uma vez no boot — owner configura
+      // ADMIN_TELEGRAM_IDS pra fechar).
+      if (deps.allowedUserIds && deps.allowedUserIds.length > 0) {
+        if (!fromId || !deps.allowedUserIds.includes(fromId)) {
+          deps.log.warn({ from: fromId }, 'admin telegram: user FORA da whitelist — ordem recusada (fail-closed)');
+          await reply(String(u.message.chat.id), `⛔ Você (${fromId ?? 'sem id'}) não está na whitelist de admins.`);
+          await recordAudit(deps.pool, {
+            actor: 'admin-telegram',
+            action: 'admin.order.refused',
+            tool: 'telegram_admin',
+            correlation_id: `corr_admin_${Date.now()}`,
+            result: 'failed',
+            metadata: { reason: 'user_not_whitelisted', from_id: fromId, text: text.slice(0, 120) },
+          }).catch(() => {});
+          continue;
+        }
+      } else if (!whitelistWarned) {
+        whitelistWarned = true;
+        deps.log.warn('admin telegram: ADMIN_TELEGRAM_IDS vazia — qualquer membro do chat autorizado pode dar ordens');
+      }
 
+      deps.log.info({ from: adminName, text: text.slice(0, 80) }, 'admin telegram: pergunta recebida');
+
+      // ── P3: máquina de confirmação inline (ordem destrutiva pendente) ──
+      const chatKey = String(u.message.chat.id);
+      const pending = pendingConfirm.get(chatKey);
+      if (pending) {
+        pendingConfirm.delete(chatKey);
+        if (Date.now() > pending.expiresAt) {
+          await reply(chatKey, '⌛ A confirmação expirou (5 min) — manda a ordem de novo se ainda quiser.');
+          continue;
+        }
+        if (/^(sim|confirma|confirmo|pode|ok|yes|y|pode ir|manda)$/i.test(text)) {
+          deps.log.warn({ order: pending.order }, 'admin telegram: ordem destrutiva CONFIRMADA — executando');
+          await executeOrder(chatKey, pending.order, pending.adminName, fromId);
+        } else {
+          await reply(chatKey, '🚫 Cancelado. Nada foi executado.');
+        }
+        continue;
+      }
+
+      // ── P3: classificar pergunta vs ordem ──
+      const classification = classifyAdminMessage(text);
+      if (classification.kind === 'order' && deps.live) {
+        if (classification.destructive && deps.confirmDestructive !== false) {
+          pendingConfirm.set(chatKey, { order: text, adminName, expiresAt: Date.now() + 5 * 60_000 });
+          deps.log.warn({ order: text.slice(0, 100), from: fromId }, 'admin telegram: ordem DESTRUTIVA — aguardando confirmação inline');
+          await reply(
+            chatKey,
+            `⚠️ Isso parece DESTRUTIVO/irreversível:\n"${text.slice(0, 200)}"\n\nConfirma? Responda "sim" em até 5 min (qualquer outra coisa cancela).`,
+          );
+          continue;
+        }
+        await executeOrder(chatKey, text, adminName, fromId);
+        continue;
+      }
+
+      // PERGUNTA (fluxo F4 existente): FAST responde com dados reais.
       const correlation = `corr_admin_${Date.now()}`;
       const pack = await deps.buildAdminPack();
       const prompt = [
@@ -162,7 +234,7 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
         'Direta, técnica, parceira de time. Nada de placeholders: se o dado não está abaixo, diz que não tem.',
         ...pack.sections,
         '',
-        `Pergunta do time (${u.message.from?.first_name ?? '?'}): ${text}`,
+        `Pergunta do time (${adminName}): ${text}`,
       ].join('\n');
 
       const started = Date.now();
@@ -184,6 +256,52 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
         correlation_id: correlation,
       }).catch(() => {});
       deps.log.info({ question: text.slice(0, 80) }, 'admin telegram: respondido (§25)');
+    }
+  }
+
+  /** P3: executa uma ordem no live brain e responde com evidência. */
+  async function executeOrder(chatId: string, order: string, adminName: string, fromId: string | null): Promise<void> {
+    const correlation = `corr_admin_order_${Date.now()}`;
+    const started = Date.now();
+    try {
+      const { runAdminOrder } = await import('./orders.js');
+      const { text } = await runAdminOrder(
+        {
+          live: deps.live!,
+          timeoutMs: deps.orderTimeoutMs ?? 300_000,
+          confirmDestructive: deps.confirmDestructive ?? true,
+        },
+        { order, adminName, sessionKey: `admin:user:${fromId ?? 'unknown'}` },
+      );
+      await reply(chatId, text.slice(0, 3900));
+      await recordAudit(deps.pool, {
+        actor: 'admin-telegram',
+        action: 'admin.order.executed',
+        tool: 'kimi_cli',
+        correlation_id: correlation,
+        duration_ms: Date.now() - started,
+        result: 'success',
+        metadata: { order: order.slice(0, 200), from_id: fromId },
+      }).catch(() => {});
+      await recordActivity(deps.pool, {
+        kind: 'action',
+        summary: `Chat admin: ordem executada — "${order.slice(0, 60)}"`,
+        correlation_id: correlation,
+      }).catch(() => {});
+      deps.log.info({ order: order.slice(0, 80) }, 'admin telegram: ordem executada');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await reply(chatId, `❌ Falhei ao executar: ${msg.slice(0, 500)}`);
+      await recordAudit(deps.pool, {
+        actor: 'admin-telegram',
+        action: 'admin.order.executed',
+        tool: 'kimi_cli',
+        correlation_id: correlation,
+        duration_ms: Date.now() - started,
+        result: 'failed',
+        metadata: { order: order.slice(0, 200), from_id: fromId, error: msg.slice(0, 300) },
+      }).catch(() => {});
+      deps.log.error({ err: msg }, 'admin telegram: ordem falhou');
     }
   }
 

@@ -83,6 +83,11 @@ async function main(): Promise<void> {
     log,
     botToken: config.TELEGRAM_BOT_TOKEN,
     allowedChatId: config.TELEGRAM_CHAT_ID ?? config.TELEGRAM_TEAM_CHAT_ID,
+    // P3 (ADR-035): whitelist de admins por user_id + live brain p/ ordens
+    allowedUserIds: config.ADMIN_TELEGRAM_IDS.split(',').map((s) => s.trim()).filter(Boolean),
+    live: liveAdapter,
+    confirmDestructive: config.ADMIN_CONFIRM_DESTRUCTIVE,
+    orderTimeoutMs: Math.min(config.INVESTIGATE_TIMEOUT_MS, 300_000),
     buildAdminPack: () => buildAdminFullPack(pool),
   });
   await telegramAdmin.start();
