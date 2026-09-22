@@ -340,6 +340,21 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
   }
 
+  /** Valor VISÍVEL atual do campo de busca (null = não achado). */
+  private async searchFieldValue(page: Page): Promise<string | null> {
+    const v = await page
+      .evaluate(`(() => {
+        const boxes = document.querySelectorAll('#side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]');
+        for (const b of boxes) {
+          if (b.offsetParent === null) continue;
+          return (b.textContent || '').trim();
+        }
+        return null;
+      })`)
+      .catch(() => null);
+    return typeof v === 'string' ? v : null;
+  }
+
   /** Nº de caracteres de texto no campo de composição VISÍVEL (-1 = não achado). */
   private async composeBoxTextLen(page: Page, selector: string): Promise<number> {
     // Só conta elemento VISÍVEL: o WA Web mantém clones ocultos do campo no
@@ -541,7 +556,25 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.keyboard.press('Control+a').catch(() => {});
       await page.keyboard.press('Backspace').catch(() => {});
       await page.waitForTimeout(300);
-      await page.keyboard.type(searchKey, { delay: 40 });
+      // Digitação em blocos com re-foco (evidência ao vivo, repair-*.png
+      // 09:52): o WA Web RE-RENDERIZA o contenteditable no meio da digitação
+      // e o restante dos chars cai fora — "346850931" na busca e "92" virou
+      // rascunho no chat do Tú. Blocos de 3 com re-click + conferência do
+      // termo completo; se truncou, limpa e falha cedo (o retry recomeça
+      // do zero em vez de clicar em resultado errado).
+      for (let i = 0; i < searchKey.length; i += 3) {
+        await search.click({ timeout: 1_000 }).catch(() => {});
+        await page.keyboard.type(searchKey.slice(i, i + 3), { delay: 70 });
+        await page.waitForTimeout(120);
+      }
+      const typed = await this.searchFieldValue(page);
+      if (typed !== null && typed !== searchKey) {
+        this.config.log?.warn({ esperado: searchKey, obtido: typed }, 'busca truncada pelo WA — limpando pra retry');
+        await page.keyboard.press('Control+a').catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.keyboard.press('Escape').catch(() => {});
+        return false;
+      }
       await page.waitForTimeout(900);
       // Na view de busca o DOM muda: o resultado é role="listitem" (não "row")
       // e pode não ter data-testid="cell-frame-container" — cobre os três
@@ -566,16 +599,13 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.keyboard.press('Enter').catch(() => {});
         await page.waitForTimeout(2_000);
       }
-      // limpa a busca DE VERDADE (selectAll+delete) — Escape sozinho deixava
-      // o termo no campo e poluía o ciclo seguinte (bug ao vivo 2026-09-22).
-      await page
-        .evaluate(`(() => {
-          const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
-                      document.querySelector('#side [role="textbox"]') ||
-                      document.querySelector('#side div[contenteditable="true"]');
-          if (box) { box.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }
-        })`)
-        .catch(() => {});
+      // limpa a busca DE VERDADE (teclado: selectAll+delete) — Escape sozinho
+      // deixava o termo no campo e poluía o ciclo seguinte (bug ao vivo
+      // 2026-09-22).
+      await search.click({ timeout: 1_000 }).catch(() => {});
+      await page.keyboard.press('Control+a').catch(() => {});
+      await page.keyboard.press('Backspace').catch(() => {});
+      await page.waitForTimeout(200);
       await page.keyboard.press('Escape').catch(() => {});
       if (await matches()) return true;
     }
