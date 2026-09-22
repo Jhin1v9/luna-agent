@@ -152,12 +152,14 @@ export const SIMPLIFIED_DOM_SCRIPT = `(() => {
   return lines.join('\\n');
 })()`;
 
-/** Título do chat aberto no painel (verificação pós-clique). */
+/** Título do chat aberto no painel (verificação pós-clique). Só conta se o
+ *  elemento estiver VISÍVEL — DOM oculto do WA Web mantém título antigo e
+ *  gerava falso "aberto" (bug achado ao vivo 2026-09-22). */
 export const OPEN_CHAT_TITLE_SCRIPT = `(() => {
+  const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
   const el = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
-  if (!el) {
-    const t = document.querySelector('#main header [title]');
-    return t ? t.getAttribute('title') : null;
-  }
-  return (el.textContent || '').trim() || el.getAttribute('title');
+  if (el && visible(el)) return (el.textContent || '').trim() || el.getAttribute('title');
+  const t = document.querySelector('#main header [title]');
+  if (t && visible(t)) return t.getAttribute('title');
+  return null;
 })()`;

@@ -135,7 +135,24 @@ export class IngestWatcher {
   }
 
   /** Um ciclo: coleta, seed/diff, extrai e ingere novidades. */
+  private ticking = false;
+
+  /** Um ciclo: coleta, seed/diff, extrai e ingere novidades.
+   *  REENTRÂNCIA: um tick em andamento faz o próximo esperar — work de painel
+   *  (open/ler/fechar) demora mais que o intervalo em chats ativos, e ticks
+   *  concorrentes se pisavam (peek via painel do outro → falso 'fora de
+   *  ciclo' + race de leitura; bug ao vivo 2026-09-22). */
   async tick(): Promise<{ seeded: boolean; fresh: number }> {
+    if (this.ticking) return { seeded: false, fresh: 0 };
+    this.ticking = true;
+    try {
+      return await this.tickInner();
+    } finally {
+      this.ticking = false;
+    }
+  }
+
+  private async tickInner(): Promise<{ seeded: boolean; fresh: number }> {
     const badges = await this.collect();
     if (!this.seeded) {
       // Baseline de TODOS os chats (badge ou não): o que já existe nunca

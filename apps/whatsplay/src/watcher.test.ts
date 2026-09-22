@@ -238,3 +238,48 @@ describe('REGRESSÃO roteamento: resposta vai SEMPRE pro chat de origem (bug 202
     await expect(t.readConversation('B')).resolves.toEqual([]);
   });
 });
+
+describe('REGRESSÃO reentrância do tick (bug ao vivo 2026-09-22)', () => {
+  it('tick em andamento faz o próximo esperar — work de painel nunca concorrente', async () => {
+    let reads = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const perChat: Record<string, Array<{ sender: string; direction: 'inbound' | 'outbound'; text: string }>> = {
+      Pai: [{ sender: 'Tú', direction: 'outbound', text: '@luna oi' }],
+    };
+    const transport = {
+      readConversation: async () => {
+        reads++;
+        await gate; // work lento (simula open+ler+close > intervalo)
+        return perChat.Pai!;
+      },
+      currentChatIsGroup: async () => false,
+    };
+    const watcher = new IngestWatcher(
+      {
+        pool: {} as never,
+        transport: transport as never,
+        log: { info: () => {}, debug: () => {}, error: () => {} } as never,
+        page: { evaluate: async () => [] as unknown[] },
+        selectors: {},
+        debounceMs: 5,
+        ingestAllowlist: ['Pai'],
+        enforceIngestAllowlist: true,
+        ingestFn: async () => 'published',
+      },
+      { intervalMs: 60_000 },
+    );
+    const t1 = watcher.tick(); // seed
+    await t1;
+    await watcher.tick(); // sweepCount 1
+    await watcher.tick(); // sweepCount 2
+    const p1 = watcher.tick(); // sweepCount 3 → sweep (trava no gate)
+    await new Promise((r) => setTimeout(r, 50));
+    const r2 = await watcher.tick(); // reentrante → deve retornar na hora sem work
+    expect(r2.fresh).toBe(0);
+    expect(reads).toBe(1); // sweep 1 rodando, sweep 2 NÃO começou
+    release();
+    await p1;
+    expect(reads).toBe(1); // total: um único work de painel
+  });
+});
