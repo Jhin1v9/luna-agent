@@ -46,6 +46,19 @@ async function main(): Promise<void> {
   runner.register('conversation.classify', createClassifyHandler({ pool, adapter: classifyAdapter, log }));
   const { createSummarizeHandler } = await import('./jobs/summarize.js');
   runner.register('memory.summarize', createSummarizeHandler({ pool, adapter: classifyAdapter, log }));
+  // P2 — HANDOFF_LIVE real (ADR-034): investigação com o Cérebro Vivo
+  // (kimi CLI headless, ADR-033). Autonomia configurável (LIVE_AUTONOMY).
+  const { KimiCliAdapter } = await import('@luna/agent');
+  const liveAdapter = new KimiCliAdapter(
+    { mode: 'kimi-cli' },
+    {
+      timeoutMs: Math.min(config.INVESTIGATE_TIMEOUT_MS, 600_000),
+      autonomy: config.LIVE_AUTONOMY,
+    },
+  );
+  const { createInvestigateHandler } = await import('./jobs/investigate.js');
+  const investigationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
+  runner.register('investigate', createInvestigateHandler({ pool, live: liveAdapter, log, telegram: investigationTelegram }));
   // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
   const { enqueueJob } = await import('@luna/database');
   const day = new Date().toISOString().slice(0, 10);

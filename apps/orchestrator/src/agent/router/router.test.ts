@@ -46,11 +46,13 @@ function fakeAdapter(replies: string[]) {
   };
 }
 
-/** Pool stub mínimo (tools de leitura retornam vazio; publishEvent no-op). */
+/** Pool stub mínimo (tools de leitura retornam vazio; publishEvent no-op;
+ *  enqueueJob do HANDOFF devolve um id). */
 const stubPool = {
   async query(sql: string, params?: unknown[]) {
     if (sql.startsWith('INSERT INTO events') || sql.startsWith('INSERT INTO outbox')) return { rowCount: 1, rows: [] };
     if (sql.startsWith('INSERT INTO idempotency_keys')) return { rowCount: 1, rows: [] };
+    if (sql.startsWith('INSERT INTO jobs')) return { rowCount: 1, rows: [{ id: 'job-investigate-1' }] };
     if (sql.startsWith('BEGIN') || sql.startsWith('COMMIT') || sql.startsWith('ROLLBACK')) return { rowCount: 0, rows: [] };
     return { rowCount: 0, rows: [] };
   },
@@ -164,6 +166,39 @@ describe('guardas de bucle (§5.1)', () => {
     expect(d.handoff).toBe(true);
     expect(d.answerText.length).toBeGreaterThan(0); // cliente nunca fica em silêncio
     expect(d.answerText).not.toContain('verificar deploy'); // espera, não o resultado
+  });
+
+  it('HANDOFF_LIVE (P2): enfileira job investigate idempotente com budget/timeout da config', async () => {
+    const adapter = fakeAdapter([JSON.stringify({ type: 'HANDOFF_LIVE', objective: 'ver logs', context_summary: 'ctx' })]);
+    const inserts: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      async query(sql: string, params?: unknown[]) {
+        inserts.push({ sql, params: params ?? [] });
+        if (sql.startsWith('INSERT INTO jobs')) return { rowCount: 1, rows: [{ id: 'job-1' }] };
+        if (sql.startsWith('INSERT INTO events') || sql.startsWith('INSERT INTO outbox') || sql.startsWith('INSERT INTO idempotency_keys'))
+          return { rowCount: 1, rows: [] };
+        return { rowCount: 0, rows: [] };
+      },
+      async connect() {
+        return { query: async () => ({ rowCount: 0, rows: [] }), release: async () => {} };
+      },
+    } as never;
+    const d = await runFastRoute(
+      { pool, adapter: adapter as never, log },
+      { event: fakeEvent(), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: true },
+    );
+    expect(d.handoff).toBe(true);
+    const jobInsert = inserts.find((i) => i.sql.startsWith('INSERT INTO jobs'));
+    expect(jobInsert).toBeDefined();
+    // params: job_type, payload, priority, run_at, max_attempts, idempotency_key
+    expect(jobInsert!.params[0]).toBe('investigate');
+    const payload = jobInsert!.params[1] as { objective: string; budget: number; timeout_ms: number; conversation_id: string };
+    expect(payload.objective).toBe('ver logs');
+    expect(payload.budget).toBeGreaterThanOrEqual(1);
+    expect(payload.timeout_ms).toBeGreaterThanOrEqual(60_000);
+    expect(payload.conversation_id).toBeTruthy();
+    expect(jobInsert!.params[5]).toMatch(/^investigate:/); // idempotente por evento
+    expect(jobInsert!.params[4]).toBe(1); // max_attempts: rondas são o retry
   });
 
   it('ESCALATE_HUMAN do FAST vira decisão de escalación com prioridade', async () => {

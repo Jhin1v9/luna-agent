@@ -2,7 +2,7 @@ import type { Pool } from 'pg';
 import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
 import type { KimiLiveAdapter, TurnResult } from '@luna/agent';
-import { publishEvent, type Sql } from '@luna/database';
+import { publishEvent, enqueueJob, type Sql } from '@luna/database';
 import { loadRouterConfig, routeFor, type RouterConfig } from './config.js';
 import {
   STRUCTURED_INSTRUCTIONS,
@@ -117,6 +117,8 @@ export async function runFastRoute(deps: RouterDeps, input: {
 
   // §5.1 — HANDOFF_LIVE: máx 1 por evento. Como é a 1ª e única via, ok.
   if (output.type === 'HANDOFF_LIVE' && allowLiveHandoff && HANDOFF_MAX_PER_EVENT === 1) {
+    const budget = Number(process.env.INVESTIGATE_BUDGET_ROUNDS ?? 3);
+    const timeoutMs = Number(process.env.INVESTIGATE_TIMEOUT_MS ?? 600_000);
     await publishEvent(deps.pool, {
       event_type: 'router.handoff.live',
       source: 'model_router',
@@ -126,13 +128,32 @@ export async function runFastRoute(deps: RouterDeps, input: {
       causation_id: event.event_id,
       payload: {
         objective: output.objective,
-        budget: 3,
-        timeout_ms: 600_000,
+        budget,
+        timeout_ms: timeoutMs,
         context_summary: output.context_summary,
       },
     });
-    // ADR-023: sem live brain mapeado, o handoff vira: resposta de espera ao
-    // cliente (§6 cortesia) + registro estruturado pro admin (chat admin = F4).
+    // P2 (ADR-034): live brain real (KimiCliAdapter) — o HANDOFF vira job
+    // `investigate` no worker: budget de rondas + timeout de parede, resposta
+    // entregue no MESMO thread. Idempotente por evento (§7.6).
+    const eventPayload = event.payload as { chat_id?: string; author_name?: string; deliver?: boolean };
+    await enqueueJob(deps.pool, {
+      job_type: 'investigate',
+      payload: {
+        objective: output.objective,
+        context_summary: output.context_summary,
+        conversation_id: event.conversation_id,
+        client_id: event.client_id,
+        correlation_id: event.correlation_id,
+        chat_id: eventPayload.chat_id ?? null,
+        author_name: eventPayload.author_name ?? null,
+        budget,
+        timeout_ms: timeoutMs,
+      },
+      priority: 5,
+      max_attempts: 1,
+      idempotency_key: `investigate:${event.event_id}`,
+    });
     return {
       answerText: 'Deixa eu verificar isso direitinho — já te falo aqui mesmo, tá?',
       turn: trace.turn,

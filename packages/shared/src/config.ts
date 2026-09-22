@@ -48,6 +48,17 @@ const envSchema = z.object({
   TELEGRAM_TEAM_CHAT_ID: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
 
+  // ── P2/P3 — Ponte FAST↔LIVE (ADR-033): investigação HANDOFF_LIVE e
+  // canal admin rodam o kimi CLI headless. Budget de rondas, timeout de
+  // parede e autonomia do processo (-y yolo | --auto).
+  INVESTIGATE_BUDGET_ROUNDS: z.coerce.number().int().positive().default(3),
+  INVESTIGATE_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+  LIVE_AUTONOMY: z.enum(['none', 'yolo', 'auto']).default('yolo'),
+  // P3 — Canal admin: whitelist de user_ids do Telegram (vírgula) e
+  // confirmação inline para ações destrutivas/irreversíveis.
+  ADMIN_TELEGRAM_IDS: z.string().default(''),
+  ADMIN_CONFIRM_DESTRUCTIVE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+
   // ── F2 — Canais de notificação (§22). Fail-closed: sem credencial o
   // canal falha EXPLICITAMENTE na delivery; o boot loga a capability.
   SMTP_URL: z.string().optional(),           // smtp://user:pass@host:587
