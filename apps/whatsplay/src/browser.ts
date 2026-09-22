@@ -654,19 +654,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       }
       await page.waitForTimeout(900);
       // jid: o resultado da busca por número não tem title casável — clica no
-      // primeiro item da lista (matches() confere os dígitos no header e
-      // rejeita painel errado).
+      // primeiro item da lista com retry/verificação (helper acima). Só se
+      // isso falhar em tudo é que cai pro Enter de último recurso.
       if (isJid) {
-        const first = page.locator('#pane-side [role="row"], #pane-side [role="listitem"]').first();
-        await first.click({ timeout: 4_000 }).catch(() => {});
-        await page.waitForTimeout(1_500);
-        if (await matches()) {
+        if (await this.clickJidSearchResult(page, matches)) {
           await search.click({ timeout: 1_000 }).catch(() => {});
           await page.keyboard.press('Control+a').catch(() => {});
           await page.keyboard.press('Backspace').catch(() => {});
           await page.keyboard.press('Escape').catch(() => {});
           return true;
         }
+        this.config.log?.warn({}, 'openChat jid: clique no 1º resultado esgotou as tentativas — tentando Enter');
       }
       // Na view de busca o DOM muda: o resultado é role="listitem" (não "row")
       // e pode não ter data-testid="cell-frame-container" — cobre os três
@@ -700,6 +698,36 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.waitForTimeout(200);
       await page.keyboard.press('Escape').catch(() => {});
       if (await matches()) return true;
+    }
+    return false;
+  }
+
+  /**
+   * jid: clica no PRIMEIRO resultado da busca por número com retry de espera
+   * crescente (bug ao vivo 2026-09-22, decreto owner: "colocou o número certo
+   * mas não clicou, simplesmente apagou"). O clique antigo era único e com o
+   * catch silencioso: se o resultado ainda estava renderizando (ou o .first()
+   * pegou um row oculto da lista normal), o fluxo caía direto na limpeza.
+   * Aqui: aguarda o item ficar VISÍVEL (espera crescente 1,5s/3s/5s), clica
+   * com locator fresco, e confere matches() (dígitos do número no header) —
+   * painel errado NUNCA é aceito.
+   */
+  private async clickJidSearchResult(page: Page, matches: () => Promise<boolean>): Promise<boolean> {
+    const waits = [1_500, 3_000, 5_000];
+    for (let attempt = 0; attempt < waits.length; attempt++) {
+      const item = page.locator('#pane-side [role="listitem"], #pane-side [role="row"]').first();
+      try {
+        await item.waitFor({ state: 'visible', timeout: waits[attempt]! });
+        await item.click({ timeout: 3_000 });
+        await page.waitForTimeout(1_200);
+        if (await matches()) return true;
+        this.config.log?.warn({ tentativa: attempt + 1 }, 'openChat jid: 1º resultado clicado mas o painel não bateu com o número');
+      } catch (err) {
+        this.config.log?.warn(
+          { tentativa: attempt + 1, err: String(err).slice(0, 140) },
+          'openChat jid: clique no 1º resultado falhou — retry com espera maior',
+        );
+      }
     }
     return false;
   }
