@@ -43,34 +43,52 @@ Depois os dois Chromes (2 dropdowns cada, dentro da página):
 **Checkpoint 2** (após o passo 5): a Luna pode repetir o teste de loopback
 automático — a matriz deve mostrar VAIO→B1 e AUX→B2. É só pedir.
 
-### Checkpoint 2 — rodada 2026-09-22: resultado e diagnóstico
+### Checkpoint 2 — RODADA FINAL 2026-09-22: **PASSA COM Ressalvas** ✅
 
-O owner aplicou o roteamento (VAIO→B1, AUX→B2, A1 = fones). A Luna rodou o
-teste automatizado de matriz (tom 523Hz por playback, RMS por recording, via
-WebAudio num Chrome temporário) **em 3 modos** (headless, headless com audio
-service in-process, headed offscreen): **matriz zerada nos três** — nem
-FxSound/altos-falantes reais receberam tom (medido pelo medidor master A1 do
-Banana em screenshots PrintWindow, arquivados em
-`.brain/luna/incidents/vm-cp2-shots/`). A captura (recording) funciona — os
-streams abrem e medem silêncio consistente.
+Circuito confirmado funcionando (owner ouviu YouTube pelos fones via Banana).
+Teste automatizado (tom concorrente à medição — erro anterior: medir depois
+do tom parar):
 
-**Diagnóstico**: a injeção de áudio via Chrome está morta nesta máquina
-(provavelmente a pilha Chrome↔FxSound Audio Enhancer — suspeita nº 1);
-o roteamento do Banana em si NÃO pôde ser validado nem invalidado pela via
-automática. **O duplex não depende do default de áudio do Chrome** (os picks
-são por-endpoint dentro das páginas), então isso não bloqueia o Checkpoint 3.
+| Playback | Recordings com energia (RMS) | Leitura |
+|---|---|---|
+| `#0 Padrão` (= 1º VAIO, strip "Voicemeeter Input") | **Out 7 = 0.638**, Out 6 = 0.633 | VAIO → B1 = **Out 7** (limpo) |
+| `#4 Speakers` (= strip "Voicemeeter AUX Input", medidor do strip aceso em screenshot) | **Out 6 = 0.633** | AUX → B2 = **Out 6** |
+| demais 7 playbacks | 0 | mortos |
+| cruzamento AUX→Out 7 | 0 | **morto ✅** |
 
-**Validação manual de 1 min (owner)** — substitui a injeção automática:
-1. No Chrome dele, toque qualquer vídeo do YouTube → o medidor do strip VAIO
-   do Banana deve subir (e A1 tocar nos fones).
-2. Painel de Controle → Som → Gravação: fale no microfone real → a barra de
-   `Voicemeeter Out B1` deve responder.
-3. Se (1) subir o strip mas B1 não responder: o botão B1 do strip VAIO não
-   está ligado — clique nele. Idem AUX↔B2.
-4. Alternativa sem Chrome: no player embutido do Banana (topo), clique em
-   "Click to Select Audio file", escolha qualquer .wav/mp3, dê play com
-   A1+B1+B2 ligados nos botões do player — os medidores B1/B2 sobem = fiação
-   do driver ok isolando o Chrome da equação.
+Ressalva: o VAIO também aparece em Out 6 (0.633) — se houver **eco** na
+chamada real (a voz do owner voltando pra ele), desligar B2 no strip VAIO
+(1 clique) ou re-testar; o caminho limpo certificado é Out 7 (VAIO-only).
+
+### Estado dos Chromes e o BLOQUEIO restante (nomês duplicados)
+
+- **Chrome do WhatsPlay**: playback = default (cai no VAIO ✅, nada a fazer).
+  Microfone da chamada = **`Voicemeeter Out 6`** — pick manual de 2 cliques
+  no WhatsApp (⋮ → configurações da chamada → microfone) — a escolha persiste
+  no perfil.
+- **Chrome do ChatGPT (Operador)**: perfil dedicado `~/.luna/chrome-voice`
+  ainda não criado — **bloqueado pelos nomes**: os 8 playbacks se chamam
+  TODOS "Speakers (VB-Audio Voicemeeter VAIO)" — a flag `--audio-output-device`
+  foi testada e **falha** (nome ambíguo → cai no default). O desbloqueio é
+  renomear os endpoints (admin, one-time):
+  **Protocolo interativo (10 min, owner + Luna)**: a Luna toca tom em cada
+  playback por índice; no Painel de Som o owner renomeia o dispositivo que
+  está com a barra de nível mexendo ("VM In 1 (VAIO)", "VM In 2 (AUX)", ...).
+  Com nomes únicos, a Luna termina sozinha: cria o perfil chrome-voice com
+  `--audio-output-device="VM In 2 (AUX)"` e valida o loopback AUX→Out 6.
+
+### Passo a passo do Checkpoint 3 (chamada real) — assim que o rename existir
+
+1. WhatsApp no WhatsPlay: abrir configurações de chamada uma vez, microfone
+   = `Voicemeeter Out 6`, alto-falante = default (VAIO).
+2. Chrome do ChatGPT: logar no chatgpt.com, iniciar voice mode (microfone
+   default = mic real dele? NÃO — micro = `Voicemeeter Out 7` se o app
+   permitir pick; senão renomear Out 7 também: "VM Out B1 (voz do chamador)").
+3. `pnpm --filter whatsplay start` já escuta o popup de chamada — o owner
+   liga do próprio número → atende sozinho → VoiceBridge entra.
+4. Validar: owner fala na chamada → voz dele (VAIO→Out 7) chega no ChatGPT →
+   resposta do Operador (AUX→Out 6) entra na chamada. Eco = clicar B2 off no
+   strip VAIO.
 
 ## (arquivo histórico) Inventário necessário
 
