@@ -197,7 +197,11 @@ async function main(): Promise<void> {
       password: config.NEXO_API_PASSWORD,
     }),
   );
-  log.info('tools Nexo registradas no FAST (leitura; ações = restritas)');
+  // P4 — tools do Brain pra FAST: memória duradoura consultável no turno
+  // (brain.search + brain.client_ficha, leitura só).
+  const { createBrainTools } = await import('./agent/router/tools-brain.js');
+  registerFastTools(createBrainTools());
+  log.info('tools Nexo + Brain registradas no FAST (leitura; ações = restritas)');
 
   bus.on('client.message.received', messageHandler);
   bus.on('whatsapp.message.received', messageHandler);

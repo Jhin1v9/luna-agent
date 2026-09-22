@@ -72,13 +72,14 @@ export function createNexoTools(
   fetchImpl?: FetchLike,
 ): Record<string, (db: Sql, ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>> {
   const client = new NexoApiClient(config, fetchImpl);
-  const wrap = (fn: () => Promise<unknown>) => async (): Promise<ToolResult> => {
-    try {
-      return ok(await fn());
-    } catch (err) {
-      return fail(err instanceof Error ? err.message : String(err));
-    }
-  };
+  const wrap = (fn: (args: Record<string, unknown>) => Promise<unknown>) =>
+    async (_db: Sql, _ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> => {
+      try {
+        return ok(await fn(args));
+      } catch (err) {
+        return fail(err instanceof Error ? err.message : String(err));
+      }
+    };
 
   return {
     'nexo.finance.summary': wrap(() => client.get('/dashboard/api/finance/summary')),
@@ -103,5 +104,35 @@ export function createNexoTools(
       const data = (await client.get<{ reports?: unknown[] }>('/dashboard/api/reports/history')) ?? {};
       return { reports: (data.reports ?? []).slice(0, 5) };
     }),
+    // ── P5: visões por cliente sobre endpoints de leitura (leitura só) ──
+    'nexo.client_orders': wrap(async (args) => {
+      // args.client: nome/texto do cliente — filtra orçamentos/propostas.
+      const filter = clientFilter(args);
+      const data =
+        (await client.get<Array<Record<string, unknown>>>('/dashboard/api/quotes')) ?? [];
+      const rows = filter
+        ? data.filter((q) => JSON.stringify(q).toLowerCase().includes(filter))
+        : data;
+      return { quotes: rows.slice(0, 10), total: rows.length };
+    }),
+    'nexo.client_history': wrap(async (args) => {
+      // Histórico de solicitações/tarefas do cliente (tarefas do workspace).
+      const filter = clientFilter(args);
+      const data =
+        (await client.get<Array<Record<string, unknown>>>('/dashboard/api/tasks')) ?? [];
+      const rows = filter
+        ? data.filter((t) => JSON.stringify(t).toLowerCase().includes(filter))
+        : data;
+      return { tasks: rows.slice(0, 15), total: rows.length };
+    }),
   };
+}
+
+/** args.client normalizado (lowercase) pra filtro textual; vazio = sem filtro. */
+function clientFilter(args: Record<string, unknown>): string {
+  return String(args.client ?? args.query ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
 }
