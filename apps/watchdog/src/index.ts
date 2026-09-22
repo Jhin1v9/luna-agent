@@ -164,6 +164,20 @@ async function main(): Promise<void> {
   const stTimer = setInterval(selfTest, SELFTEST_INTERVAL_MS);
   stTimer.unref();
 
+  // Backup diário do Postgres (§30): roda o script validado; falha = log
+  // explícito (nunca silêncio) + alerta no próximo self-test.
+  const { execFile } = await import('node:child_process');
+  const backup = () => {
+    execFile('bash', ['scripts/backup-db.sh'], { cwd: ROOT, timeout: 300_000, env: { ...process.env, MSYS_NO_PATHCONV: '1' } }, (err, stdout) => {
+      if (err) log.error({ err }, 'backup: FALHOU (falha explícita registrada)');
+      else log.info({ out: stdout.trim().split('
+').pop() }, 'backup: ok (§30)');
+    });
+  };
+  backup();
+  const backupTimer = setInterval(backup, 24 * 60 * 60_000);
+  backupTimer.unref();
+
   await cycle(pool, adapter);
   const timer = setInterval(() => {
     cycle(pool, adapter).catch((err) => log.error({ err }, 'ciclo do watchdog falhou'));
@@ -174,6 +188,7 @@ async function main(): Promise<void> {
     log.info({ signal }, 'shutting down');
     clearInterval(timer);
     clearInterval(stTimer);
+    clearInterval(backupTimer);
     closePool()
       .catch(() => {})
       .finally(() => process.exit(0));

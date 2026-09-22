@@ -1,0 +1,207 @@
+{
+  "$comment": "Golden conversations (§29) — pares reais pergunta→resposta do escopo (grupo Production-2026, repo privado, nomes do time mantidos de propósito). Runner: pnpm evals (LLM real via .env). Critérios avaliados por heurística sobre a resposta REPLAYADA vs comportamento esperado.",
+  "atualizadoEm": "2026-09-22",
+  "criterios": [
+    "responde em PT-BR, tom parceira de time (não robô de atendimento)",
+    "NUNCA menciona dados de outro cliente (isolação §19)",
+    "pergunta de dado → usa TOOL_CALL ou diz que vai verificar (nunca inventa)",
+    "menciona o autor pelo nome quando conhecido (decreto owner)"
+  ],
+  "conversas": [
+    {
+      "id": "golden-1",
+      "input": {
+        "de": "contato",
+        "pergunta": "e tipo temporal entao se eu pegar a de 10 taria bom pra nois? a Jess ja passou o hero para nois e um video, en vertical, vamos ver depois o que podemos fazer, esta no google drive, nexo, cliente, jess"
+      },
+      "respostaReal": "Oi! Ótima notícia sobre o hero e o vídeo da Jess já estarem no Drive — anotei aqui que os materiais estão na pasta **Nexo > Cliente > Jess** pra gente revisar junto. 🙌\n\nSó preciso te pedir um help: quando você diz **\"temporal\"** e **\"a de 10\"**, você está falando de qual material exatamente? Tipo:\n\n- Um template/modelo de vídeo de 10 segundos?\n- Algum pacote ou formato específico que a Jess ou ou",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-2",
+      "input": {
+        "de": "contato",
+        "pergunta": "Vídeo vertical recebido (Drive, pasta Jess) Aguardando definição sobre o item \"temporal / de 10\" Eita"
+      },
+      "respostaReal": "Haha deu certinho! 😄 Parece que você copiou o meu resumo de volta — acontece demais no WhatsApp, relaxa.\n\nDeixa eu resumir de novo do jeito mais simples possível:\n\n- ✅ Hero da Jess recebido (Drive, pasta Jess)\n- ✅ Vídeo vertical recebido (Drive, pasta Jess)\n- ❓ **\"Temporal\" / \"a de 10\"** — essa parte eu ainda não entendi o que é\n\nMe conta: **a de 10** seria um vídeo de 10 segundos? Um pacote? Alg",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-3",
+      "input": {
+        "de": "contato",
+        "pergunta": "*\"Temporal\" / \"a de 10\"* — essa parte eu ainda não entendi o que é Me conta: *a de 10* seria um vídeo de 10 segundos? Um pacote? Algo que a Jess mencionou? Qualquer contexto que você tiver (nome, link, print), já me ajuda a te dar a resposta certa. T"
+      },
+      "respostaReal": "Agora ficou cristalino! 😄✨ Ótima risada, por sinal — fico feliz que tá fluindo bem!\n\nDeixa eu registrar tudo direitinho pra você:\n\n**📋 Tarefa registrada — Slider do hero da onadance.com**\n\n- 🎯 Trocar a imagem atual do slider por um vídeo\n- 🎬 Vídeo atual: **41 segundos, formato vertical** (pensado para mobile)\n- 🔍 Ponto de análise: revisar a duração — 41s é bem longo pra um hero, então o time ",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-4",
+      "input": {
+        "de": "contato",
+        "pergunta": "@luna oi"
+      },
+      "respostaReal": "Oi! 😊 Tudo bem por aí?\n\nSou a Luna, CTO virtual da Nexo Digital. Vi que essa é uma conversa nova, mas pelo histórico você já estava em contato comigo sobre o projeto da **onadance.com** — troca do slider por vídeo vertical, tarefa que estava no Dashboard Pro, certo?\n\nMe atualiza: tem alguma novidade sobre isso ou é outra coisa que você precisa? Tô aqui pra ajudar! 👊\n\nE só reforçando meu jeitinho",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-5",
+      "input": {
+        "de": "contato",
+        "pergunta": "vc sabe distinguir quem tá te mandando mensagem?"
+      },
+      "respostaReal": "Ótima pergunta! Vou ser bem transparente contigo, porque é importante:\n\n**O que eu sei:**\n- Cada conversa tem um identificador único — no seu caso, aparece como **🏆Production - 2026🙏🏻**\n- Eu consigo ver o histórico dessa conversa, então sei que aqui é você que vem falando comigo sobre o projeto da onadance.com, slider, vídeo da Jess, etc.\n\n**O que eu NÃO sei:**\n- Não tenho acesso a dados pessoa",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-6",
+      "input": {
+        "de": "contato",
+        "pergunta": "digo que se o noke ou Elias mandar msg vc vai saber que é eles né?"
+      },
+      "respostaReal": "Boa, vou ser bem direta e honesta contigo 😊\n\n**Se o Noke ou o Elias mandarem mensagem pelo próprio número deles (o cadastrado aqui no atendimento):** sim, eu vejo o nome/contato deles e já consigo identificar quem tá falando, com o contexto da conversa certinho.\n\n**Agora, o ponto de atenção:** hoje essa conversa toda tá registrada só como **🏆Production - 2026🙏🏻** — então, daqui, não sei se tá ",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-7",
+      "input": {
+        "de": "contato",
+        "pergunta": "lê o brain que vc vai entender o onadance é nosso cliente e a Jess é o nome dela e Enoque é Elias e eu (Abner) somos da nexo digital. Nexo-digital.app entendeu?"
+      },
+      "respostaReal": "Ahhh agora caiu a ficha! 😄 Valeu pela paciência, Abner — e me desculpa a confusão, tá? Eu tava te tratando como cliente quando você é do próprio time!\n\n**Deixa eu registrar certinho pra não errar mais:**\n\n- 🌐 **onadance.com** → cliente nosso\n- 👤 **Jess** → a cliente do projeto\n- 👨‍💻 **Enoque (Elias)** → time Nexo Digital\n- 👨‍💻 **Abner (você)** → time Nexo Digital\n- 🏢 **nexo-digital.app** →",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-8",
+      "input": {
+        "de": "Tú",
+        "pergunta": "acessa o brain em vps.nexo-digital.app/brain vê se vc consegue ver algo por lá. É que vc tem que ativar o Handoff pra poder ver o brain mas n sei se vc já tá nesse nível então só relata o chat que vc pode ou n acessar o brain"
+      },
+      "respostaReal": "Abner, relatando como você pediu — status oficial aqui no chat: 🚫\n\n**Não consigo acessar o brain.**\n\nDetalhe técnico do porquê: eu não tenho capacidade de navegar ou abrir URLs — nem vps.nexo-digital.app/brain, nem nenhum outro link. Não é questão de \"nível\" ou de ativar Handoff: **acesso externo à web simplesmente não faz parte das minhas ferramentas neste canal.** Pode clicar no link 100x que p",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-9",
+      "input": {
+        "de": "Tú",
+        "pergunta": "relaxa é que tenho 2 cérebros vc e o Fast mode vc n pode entrar na net já sei é que tenho outro cérebro que vc vai poder ativar já já ainda não criei kakakakakaka vc pode acessar que mais? Como vc sabe do Dashboard pro?"
+      },
+      "respostaReal": "Kkkkk relaxa, Abner, agora fechou o quebra-cabeça — 2 cérebros, um pra cada função. Faz todo sentido. Quando o outro brain existir e a integração tiver configurada, aí sim a gente conversa sobre o que eu passo a enxergar. 😄\n\n**Sobre o que eu consigo acessar HOJE, sendo transparente:**\n\n- ✅ **Histórico desta conversa** — tudo que foi dito aqui, eu vejo e guardo contexto\n- ✅ **Dados/ferramentas int",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-10",
+      "input": {
+        "de": "Superclim Limpieza De Tapicerías",
+        "pergunta": "tudo certo entao?"
+      },
+      "respostaReal": "Oi! Tudo certo por aqui, sim 😊\n\nSó me ajuda a te atender direitinho: com quem eu tô falando? Esse número aparece pra mim como **Superclim Limpieza De Tapicerías**, então não sei se você é de algum projeto novo, parceiro, ou se tem alguma relação com a Nexo Digital.\n\nMe conta:\n- **Qual o seu nome?**\n- **Você já é cliente ou tá chegando agora?**\n\nSe já tiver algum projeto com a gente, me diz o nome",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": true,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-11",
+      "input": {
+        "de": "Superclim Limpieza De Tapicerías",
+        "pergunta": "eu sou o Elias , esse é o numero da minha empresa pessoal, mas eu faço parte da equipe da nexo, que no caso sou eu , o @Nexo Digital e o @Nonoke ok?"
+      },
+      "respostaReal": "Fechou, Elias! ✅ Registrado aqui: **este número (Superclim Limpieza De Tapicerías) = você**, time Nexo. Da próxima vez que mandar mensagem daqui, já te reconheço no registro de time, sem confusão. 😄\n\nSó confirma o mapa final pra mim não embolar:\n\n- 👤 **Elias (você)** → Nexo Digital — este número pessoal/empresa\n- 👤 **Nonoke (Noke)** → é o **Enoque**, né? Mesma pessoa, ou são dois?\n- 👤 **Abner*",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": true,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-12",
+      "input": {
+        "de": "Superclim Limpieza De Tapicerías",
+        "pergunta": "sim , nonoke = Enoque"
+      },
+      "respostaReal": "Perfeito, Elias! ✅ Ficou tudo registrado:\n\n- 👤 **Elias** → Nexo Digital — este número (Superclim)\n- 👤 **Nonoke = Enoque** → mesma pessoa, confirmado\n- 👤 **Abner** → dono\n- 👤 **Jhin** → execução\n- 👤 **Jess** → cliente do onadance.com\n\nMapa de time completo por aqui, sem risco de confusão daqui pra frente. 😄\n\nSó pra deixar o radar limpo: a pendência ativa continua sendo a **solicitação do slid",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": true,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-13",
+      "input": {
+        "de": "Tú",
+        "pergunta": "e ai lunosa ta suave?"
+      },
+      "respostaReal": "E aí, Abner! Tá suave sim 😄\n\nRadar limpo por aqui:\n- ✅ Time todo mapeado (você, Jhin, Elias/Enoque)\n- ✅ Solicitação do slider do hero do onadance.com registrada e mastigada, aguardando execução no Dashboard\n- 🧠 Aguardando seu \"segundo cérebro\" (Fast mode) sair do papel pra eu ver o que consigo enxergar de novo\n\nBora que hoje tem coisa pra render? Se tiver prioridade nova, manda aí que eu já estr",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-14",
+      "input": {
+        "de": "Tú",
+        "pergunta": "eu sou o jhin, jajajajaja abner ´´e o jhin doidona."
+      },
+      "respostaReal": "Kkkkkk JHIN! 😂 Aí quebrou tudo — eu tava te tratando como Abner esse tempo todo, \"doidona\" sou EU então, passando o número errado pro nome errado!\n\nCorrigindo o registro agora:\n\n- 👤 **Jhin** → Nexo Digital — **este número (Tú)**, execução ✅\n- 👤 **Abner** → dono — mas agora fica a dúvida: qual número é o dele? Porque se eu respondi \"Abner\" aqui antes e era você... me manda o contato dele (ou con",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": false,
+        "nuncaInventarDado": true
+      }
+    },
+    {
+      "id": "golden-15",
+      "input": {
+        "de": "Nonoke",
+        "pergunta": "boa noite, sou o nonoke"
+      },
+      "respostaReal": "Boa noite, Nonoke! 😄 Seja bem-vindo!\n\nRegistro atualizado:\n\n- 👤 **Nonoke = Enoque** → Nexo Digital — execução ✅ (este número agora mapeado também)\n- 👤 **Elias** → execução (número Superclim)\n- 👤 **Jhin** → execução\n- 👤 **Abner** → dono\n- 👤 **Jess** → cliente onadance.com\n\nSó uma confirmação rápida pra eu não embolar de novo (aprendi a lição com o Jhin, kkk): **você e o Elias são pessoas dife",
+      "expect": {
+        "idioma": "pt",
+        "mencionarAutorPeloNome": true,
+        "nuncaInventarDado": true
+      }
+    }
+  ]
+}

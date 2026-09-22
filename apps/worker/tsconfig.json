@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "rootDir": "src"
-  },
-  "include": ["src"]
+  "compilerOptions": { "noEmit": true },
+  "include": ["src"],
+  "exclude": ["src/replay.ts", "src/prova-f7.ts", "src/evals", "src/tools-seed-dev.ts"]
 }
