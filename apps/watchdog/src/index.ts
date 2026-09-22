@@ -30,6 +30,8 @@ const telegram: TelegramConfig = {
 
 const lastRestart = new Map<string, number>();
 const restartCounts = new Map<string, number>();
+/** Estado do ciclo anterior (heal = transição para UP — backup ADR-032). */
+const prevStates = new Map<string, string>();
 
 async function checkOrchestratorHealth(): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {
@@ -77,7 +79,11 @@ async function alertTelegram(text: string): Promise<void> {
   }
 }
 
-async function cycle(pool: Awaited<ReturnType<typeof getPool>>, adapter: ReturnType<typeof createAdapter>): Promise<void> {
+async function cycle(
+  pool: Awaited<ReturnType<typeof getPool>>,
+  adapter: ReturnType<typeof createAdapter>,
+  onHeal?: (service: string) => void,
+): Promise<void> {
   const [orch, hbRows, dbOk] = await Promise.all([
     checkOrchestratorHealth(),
     readHeartbeats(pool).catch(() => [] as Awaited<ReturnType<typeof readHeartbeats>>),
@@ -124,6 +130,13 @@ async function cycle(pool: Awaited<ReturnType<typeof getPool>>, adapter: ReturnT
         `⚠️ WATCHDOG: ${c.name} caiu (${c.detail}) — ${pm2Managed ? 'pm2 reiniciando' : 'reiniciei'}. Próxima checagem em ${CHECK_INTERVAL_MS / 1000}s.`,
       );
     }
+    // Heal bem-sucedido (DOWN→saudável): backup do perfil do WhatsPlay (ADR-032).
+    const prev = prevStates.get(c.name);
+    if ((c.state === 'HEALTHY' || c.state === 'DEGRADED') && prev === 'DOWN') {
+      log.info({ service: c.name }, 'heal detectado — disparando backup do perfil');
+      onHeal?.(c.name);
+    }
+    prevStates.set(c.name, c.state);
   }
 
   await writeHeartbeat(pool, 'watchdog', process.pid, { overall }).catch(() => {});
@@ -177,9 +190,24 @@ async function main(): Promise<void> {
   const backupTimer = setInterval(backup, 24 * 60 * 60_000);
   backupTimer.unref();
 
-  await cycle(pool, adapter);
+  // Backup do perfil Chrome do WhatsPlay (ADR-032): 1x/dia + após cada
+  // recuperação (heal) de serviço — sessão recém-salva vale ouro quando o
+  // login cai. Falha = log explícito + alerta.
+  const profileBackup = () => {
+    execFile('bash', ['scripts/backup-profile.sh'], { cwd: ROOT, timeout: 600_000, env: { ...process.env, MSYS_NO_PATHCONV: '1' } }, (err, stdout) => {
+      if (err) {
+        log.error({ err }, 'backup-profile: FALHOU (falha explícita registrada)');
+        alertTelegram('⚠️ WATCHDOG: backup do perfil Chrome do WhatsPlay FALHOU — sessão sem cópia de segurança. Detalhes nos logs.');
+      } else log.info({ out: stdout.trim().split('\n').pop() }, 'backup-profile: ok (ADR-032)');
+    });
+  };
+  profileBackup();
+  const profileBackupTimer = setInterval(profileBackup, 24 * 60 * 60_000);
+  profileBackupTimer.unref();
+
+  await cycle(pool, adapter, () => profileBackup());
   const timer = setInterval(() => {
-    cycle(pool, adapter).catch((err) => log.error({ err }, 'ciclo do watchdog falhou'));
+    cycle(pool, adapter, () => profileBackup()).catch((err) => log.error({ err }, 'ciclo do watchdog falhou'));
   }, CHECK_INTERVAL_MS);
   timer.unref();
 

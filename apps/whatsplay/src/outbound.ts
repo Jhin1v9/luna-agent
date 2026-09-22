@@ -6,6 +6,7 @@ import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 import { withAutoRepair, type RepairableTransport } from './auto-repair.js';
+import { sanitizeOutboundText } from './outbound-text.js';
 
 /**
  * Fila de saída (zero polling): o handler da Luna grava a resposta com
@@ -188,7 +189,7 @@ export function createOutboundListener(deps: OutboundDeps) {
         await new Promise((r) => setTimeout(r, wait));
         return transport.sendMessage(
           target,
-          row.body,
+          sanitizeOutboundText(row.body),
           opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
         );
       };
