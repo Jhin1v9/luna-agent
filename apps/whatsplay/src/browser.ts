@@ -105,6 +105,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     if (!this.page.url().includes('web.whatsapp.com')) {
       await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
+    // Crash do renderer: não mata o daemon — o health loop (index.ts) detecta
+    // e recupera via reload.
+    this.page.on('crash', () => {
+      this.config.log?.error({}, 'página CRASHOU (renderer) — health loop vai recuperar');
+    });
   }
 
   /** Conecta num Chrome CDP existente ou sobe um novo (detached, sobrevive
@@ -194,6 +199,41 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       onUnread(payload as UnreadMessage[]);
     });
     await evalWithArg(page, MUTATION_OBSERVER_SCRIPT, SELECTORS);
+  }
+
+  /** Só re-injeta o script do observer (pós-reload o binding Node persiste). */
+  private async injectObserverScript(): Promise<void> {
+    await evalWithArg(this.requirePage(), MUTATION_OBSERVER_SCRIPT, SELECTORS).catch(() => {});
+  }
+
+  /**
+   * Saúde da página (diagnóstico ao vivo 2026-09-22): a sessão caía
+   * intermitentemente pro fallback noscript/splash (21 ocorrências no log —
+   * meta refresh _fb_noscript=1, #pane-side ausente) e a automação ficava
+   * cega até o próximo restart. Falso = página em fallback ou morta.
+   */
+  async isPageHealthy(): Promise<boolean> {
+    if (!this.page || this.page.isClosed()) return false;
+    const ok = await this.page
+      .evaluate(
+        `!document.querySelector('meta[http-equiv="refresh"][content*="noscript"]') && !!document.querySelector('#pane-side')`,
+      )
+      .catch(() => false);
+    return ok === true;
+  }
+
+  /** Recupera a página do fallback noscript: reload + espera renderizar +
+   *  re-anexa o observer. Retorna true se saudável no fim. */
+  async ensurePageHealthy(): Promise<boolean> {
+    if (await this.isPageHealthy()) return true;
+    const page = this.page;
+    if (!page || page.isClosed()) return false;
+    this.config.log?.warn({}, 'página caiu pro fallback noscript/splash — recuperando (reload)');
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
+    await page.waitForSelector('#pane-side', { timeout: 60_000 }).catch(() => null);
+    const ok = await this.isPageHealthy();
+    if (ok) await this.injectObserverScript();
+    return ok;
   }
 
   /**

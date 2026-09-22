@@ -40,6 +40,8 @@ export interface ConversationMessage {
   text: string;
   /** Quem falou (nome do membro no grupo; 'Tú'/null no outbound). */
   author?: string | null;
+  /** data-id estável da mensagem no WA (discriminador do external_id §7.6). */
+  mid?: string;
 }
 
 export interface WhatsAppTransport {

@@ -92,7 +92,7 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
     if (!direction) direction = 'inbound';
     const authorEl = row.querySelector('[data-testid="author"]');
     const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
-    return { sender, author, direction, text: textEl ? (textEl.textContent || '').trim() : '' };
+    return { sender, author, direction, text: textEl ? (textEl.textContent || '').trim() : '', mid: row.getAttribute('data-id') || '' };
   });
 }`;
 

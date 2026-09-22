@@ -133,6 +133,23 @@ async function main(): Promise<void> {
   watcher.start();
   log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
 
+  // Health loop da página (diagnóstico ao vivo 2026-09-22): a sessão caía
+  // pro fallback noscript/splash intermitentemente e a automação ficava cega
+  // (sweep detectava e a ingest falhava em silêncio) até restart. A cada 45s
+  // confere; se caiu, reload + re-anexa o observer de mutação.
+  const healthTimer = setInterval(() => {
+    transport.isPageHealthy().then((ok) => {
+      if (!ok) {
+        log.warn('health: página fora do estado saudável — recuperando');
+        transport.ensurePageHealthy().then((recovered) => {
+          if (recovered) log.info('health: página recuperada (reload + observer re-anexado)');
+          else log.error('health: página NÃO recuperou — pm2/watchdog vão ressober o serviço');
+        });
+      }
+    });
+  }, 45_000);
+  healthTimer.unref();
+
   // Telegram fallback (§15) — configurado antes da fila de saída (auto-reparo alerta por ele).
   const telegramConfig = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
 
