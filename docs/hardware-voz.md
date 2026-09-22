@@ -43,6 +43,35 @@ Depois os dois Chromes (2 dropdowns cada, dentro da página):
 **Checkpoint 2** (após o passo 5): a Luna pode repetir o teste de loopback
 automático — a matriz deve mostrar VAIO→B1 e AUX→B2. É só pedir.
 
+### Checkpoint 2 — rodada 2026-09-22: resultado e diagnóstico
+
+O owner aplicou o roteamento (VAIO→B1, AUX→B2, A1 = fones). A Luna rodou o
+teste automatizado de matriz (tom 523Hz por playback, RMS por recording, via
+WebAudio num Chrome temporário) **em 3 modos** (headless, headless com audio
+service in-process, headed offscreen): **matriz zerada nos três** — nem
+FxSound/altos-falantes reais receberam tom (medido pelo medidor master A1 do
+Banana em screenshots PrintWindow, arquivados em
+`.brain/luna/incidents/vm-cp2-shots/`). A captura (recording) funciona — os
+streams abrem e medem silêncio consistente.
+
+**Diagnóstico**: a injeção de áudio via Chrome está morta nesta máquina
+(provavelmente a pilha Chrome↔FxSound Audio Enhancer — suspeita nº 1);
+o roteamento do Banana em si NÃO pôde ser validado nem invalidado pela via
+automática. **O duplex não depende do default de áudio do Chrome** (os picks
+são por-endpoint dentro das páginas), então isso não bloqueia o Checkpoint 3.
+
+**Validação manual de 1 min (owner)** — substitui a injeção automática:
+1. No Chrome dele, toque qualquer vídeo do YouTube → o medidor do strip VAIO
+   do Banana deve subir (e A1 tocar nos fones).
+2. Painel de Controle → Som → Gravação: fale no microfone real → a barra de
+   `Voicemeeter Out B1` deve responder.
+3. Se (1) subir o strip mas B1 não responder: o botão B1 do strip VAIO não
+   está ligado — clique nele. Idem AUX↔B2.
+4. Alternativa sem Chrome: no player embutido do Banana (topo), clique em
+   "Click to Select Audio file", escolha qualquer .wav/mp3, dê play com
+   A1+B1+B2 ligados nos botões do player — os medidores B1/B2 sobem = fiação
+   do driver ok isolando o Chrome da equação.
+
 ## (arquivo histórico) Inventário necessário
 
 - **Driver de áudio**: UM único device (`ROOT\MEDIA\0000`, serviço
