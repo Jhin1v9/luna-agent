@@ -1,0 +1,17 @@
+{
+  "name": "pingline",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "tsx src/index.ts", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@luna/shared": "workspace:*",
+    "@luna/logging": "workspace:*",
+    "@luna/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
