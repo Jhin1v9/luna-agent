@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { SELECTORS } from './selectors.js';
@@ -65,6 +66,8 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   /** Guarda de painel (decreto owner) — setada pelo daemon após o launch. */
   panelGuard: import('./panel-guard.js').PanelGuard | null = null;
   private ctx: BrowserContext | null = null;
+  private cdp: import('playwright-core').Browser | null = null;
+  private chromeProc: import('node:child_process').ChildProcess | null = null;
   private page: Page | null = null;
   private lastHeartbeatAt = new Date();
   private lastSeenMessageKey = new Map<string, string>();
@@ -73,14 +76,63 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   async launch(): Promise<void> {
     mkdirSync(this.config.userDataDir, { recursive: true });
-    this.ctx = await chromium.launchPersistentContext(this.config.userDataDir, {
-      executablePath: this.config.chromePath,
-      headless: this.config.headless,
-      viewport: { width: 1280, height: 800 },
-      args: ['--disable-blink-features=AutomationControlled', '--no-first-run'],
-    });
-    this.page = this.ctx.pages()[0] ?? (await this.ctx.newPage());
-    await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    try {
+      this.ctx = await chromium.launchPersistentContext(this.config.userDataDir, {
+        executablePath: this.config.chromePath,
+        headless: this.config.headless,
+        viewport: { width: 1280, height: 800 },
+        args: ['--disable-blink-features=AutomationControlled', '--no-first-run'],
+      });
+      this.page = this.ctx.pages()[0] ?? (await this.ctx.newPage());
+      await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      return;
+    } catch {
+      // Chrome 153 (2026-09-22): após atualização automática o processo
+      // delegado sai com exit 21 e o browser fica órfão sem o pipe do
+      // Playwright — launchPersistentContext quebra pra sempre. Fallback:
+      // subir o Chrome nós mesmos com --remote-debugging-port e conectar
+      // por CDP (mesmo perfil, mesma sessão).
+    }
+    const port = Number(process.env.WHATSAPP_CDP_PORT ?? 9333);
+    this.cdp = await this.connectOrSpawnCdp(port);
+    this.ctx = this.cdp.contexts()[0] ?? (await this.cdp.newContext());
+    this.page =
+      this.ctx.pages().find((p) => p.url().includes('web.whatsapp')) ??
+      this.ctx.pages()[0] ??
+      (await this.ctx.newPage());
+    if (!this.page.url().includes('web.whatsapp.com')) {
+      await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+  }
+
+  /** Conecta num Chrome CDP existente ou sobe um novo (detached, sobrevive
+   *  ao daemon; fechado no close() do transport). */
+  private async connectOrSpawnCdp(port: number): Promise<import('playwright-core').Browser> {
+    const endpoint = `http://localhost:${port}`;
+    const tryConnect = () => chromium.connectOverCDP(endpoint).catch(() => null);
+    let browser = await tryConnect();
+    if (browser) return browser;
+    this.chromeProc = spawn(
+      this.config.chromePath,
+      [
+        this.config.headless ? '--headless' : '--start-maximized',
+        '--no-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--no-first-run',
+        `--remote-debugging-port=${port}`,
+        `--user-data-dir=${this.config.userDataDir}`,
+        WA_URL,
+      ],
+      { detached: true, stdio: 'ignore' },
+    );
+    this.chromeProc.unref();
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      browser = await tryConnect();
+      if (browser) return browser;
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
+    throw new Error(`Chrome não respondeu em ${endpoint} (fallback CDP)`);
   }
 
   private requirePage(): Page {
@@ -352,7 +404,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       const title = await this.currentOpenChatTitle();
       if (title === null) return false;
       if (isJid) return true; // busca por número é unicamente identificável
-      return normalizeName(title) === normalizeName(nameOrId);
+      // O header do WA Web (153) devolve o título SEM os emoji ("Production
+      // - 2026") enquanto a row da lista tem o title completo ("🏆Production
+      // - 2026🙏🏻") — comparação exata nunca casava e o openChat abortava
+      // com o painel aberto DE VERDADE (bug ao vivo 2026-09-22, 4ª
+      // evidência). Compara pelo núcleo alfanumérico.
+      const core = (s: string): string =>
+        normalizeName(s)
+          .replace(/[^\p{L}\p{N} ]/gu, '')
+          .replace(/\s+/g, ' ')
+          .toLowerCase();
+      return core(title) === core(nameOrId);
     };
 
     // 1) clique na row visível (caminho rápido; jid vai direto pra busca)
@@ -459,6 +521,23 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await this.ctx.close().catch(() => {});
       this.ctx = null;
       this.page = null;
+    }
+    if (this.cdp) {
+      await this.cdp.close().catch(() => {});
+      this.cdp = null;
+      this.page = null;
+    }
+    if (this.chromeProc && this.chromeProc.pid) {
+      try {
+        process.kill(-this.chromeProc.pid, 'SIGKILL');
+      } catch {
+        try {
+          this.chromeProc.kill('SIGKILL');
+        } catch {
+          /* já morto */
+        }
+      }
+      this.chromeProc = null;
     }
   }
 }
