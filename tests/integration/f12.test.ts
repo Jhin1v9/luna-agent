@@ -370,7 +370,7 @@ describe('DLQ redrive (§7.7 — falhas transientes voltam pra fila)', () => {
       event_type: 'system.health.degraded', source: 'redrive-test', payload: { component: 'x' },
       idempotency_key: 'rd:1',
     });
-    const evId = (await pool.query("SELECT event_id FROM events WHERE source='redrive-test'")).rows[0]!.event_id;
+    const evId = (await pool.query("SELECT event_id FROM events WHERE payload->>'source'='redrive-test'")).rows[0]!.event_id;
     await pool.query(
       `UPDATE outbox SET status = 'dead' WHERE event_id = $1`,
       [evId],
