@@ -556,7 +556,20 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     const matches = async (): Promise<boolean> => {
       const title = await this.currentOpenChatTitle();
       if (title === null) return false;
-      if (isJid) return true; // busca por número é unicamente identificável
+      if (isJid) {
+        // NUNCA aceitar qualquer painel aberto (risco de msg pro chat errado):
+        // confere os DÍGITOS do número no header do contato (o WA formata
+        // "346 850 931 92" — compara só os números). Diagnóstico ao vivo
+        // 2026-09-22: openChat por jid falhava e o retry abria painel
+        // aleatório que matches() dava como válido.
+        const hdr = await page
+          .evaluate(`(() => {
+            const h = document.querySelector('[data-testid="conversation-info-header"]');
+            return h ? (h.textContent || '').replace(/[^0-9]/g, '') : '';
+          })`)
+          .catch(() => '');
+        return typeof hdr === 'string' && hdr.includes(searchKey.replace(/[^0-9]/g, ''));
+      }
       // O header do WA Web (153) devolve o título SEM os emoji ("Production
       // - 2026") enquanto a row da lista tem o title completo ("🏆Production
       // - 2026🙏🏻") — comparação exata nunca casava e o openChat abortava
@@ -616,6 +629,21 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         return false;
       }
       await page.waitForTimeout(900);
+      // jid: o resultado da busca por número não tem title casável — clica no
+      // primeiro item da lista (matches() confere os dígitos no header e
+      // rejeita painel errado).
+      if (isJid) {
+        const first = page.locator('#pane-side [role="row"], #pane-side [role="listitem"]').first();
+        await first.click({ timeout: 4_000 }).catch(() => {});
+        await page.waitForTimeout(1_500);
+        if (await matches()) {
+          await search.click({ timeout: 1_000 }).catch(() => {});
+          await page.keyboard.press('Control+a').catch(() => {});
+          await page.keyboard.press('Backspace').catch(() => {});
+          await page.keyboard.press('Escape').catch(() => {});
+          return true;
+        }
+      }
       // Na view de busca o DOM muda: o resultado é role="listitem" (não "row")
       // e pode não ter data-testid="cell-frame-container" — cobre os três
       // formatos + casamento por prefixo (título com emoji varia no DOM).
