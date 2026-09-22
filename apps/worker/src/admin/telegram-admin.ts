@@ -40,10 +40,17 @@ export interface TelegramAdminDeps {
 export function createTelegramAdmin(deps: TelegramAdminDeps) {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const base = `https://api.telegram.org/bot${deps.botToken}`;
-  const pollMs = deps.pollIntervalMs ?? 20_000;
+  // 409-resilience (diagnóstico ao vivo 2026-09-22): consumidor externo
+  // segurava o getUpdates ~100% do tempo e o admin morria em silêncio.
+  // Poll curto + guarda de reentrância: cada gap do outro consumidor é
+  // nosso; quando vencemos, os updates acumulados chegam de uma vez.
+  const pollMs = deps.pollIntervalMs ?? 4_000;
   let offset = 0;
   let timer: NodeJS.Timeout | null = null;
   let bootLogged = false;
+  let polling = false;
+  let conflicts = 0;
+  let conflictAlerted = false;
 
   const reply = deps.replyImpl ?? (async (chatId: string, text: string) => {
     await fetchImpl(`${base}/sendMessage`, {
@@ -62,18 +69,50 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       }
       return; // sem chat autorizado: idle explícito (fail-closed)
     }
-    const res = await fetchImpl(`${base}/getUpdates?offset=${offset}&timeout=20`).catch((err) => {
+    if (polling) return; // poll anterior ainda em voo (timeout=20 > intervalo)
+    polling = true;
+    const res = await fetchImpl(`${base}/getUpdates?offset=${offset}&timeout=25`).catch((err) => {
       // Falha de rede/antigo silencioso: diagnóstico ao vivo 2026-09-22
       // (silêncio total do admin) — drop silencioso virou log.
       deps.log.warn({ err: String(err).slice(0, 200) }, 'admin telegram: getUpdates falhou (rede)');
+      polling = false;
       return null;
     });
     if (!res) return;
     const data = (await res.json().catch(() => null)) as { ok: boolean; result: unknown[]; description?: string } | null;
     if (!data?.ok) {
-      deps.log.warn({ status: res.status, desc: data?.description ?? null }, 'admin telegram: getUpdates rejeitado');
+      if (res.status === 409) {
+        conflicts += 1;
+        // alerta único: outro consumidor está comendo o getUpdates
+        if (conflicts >= 30 && !conflictAlerted) {
+          conflictAlerted = true;
+          deps.log.error({ conflicts }, 'admin telegram: 409 persistente — consumidor externo segura o getUpdates');
+          try {
+            const { sendTeamMessage } = await import('@luna/channels');
+            await sendTeamMessage(
+              '🚨 CHAT ADMIN MUDO: outro serviço está consumindo o getUpdates deste bot (~100% do tempo, 409 Conflict) — suas mensagens não chegam até mim. ' +
+                'Procure o consumidor (n8n Cloud, VPS, script antigo com este token) e desligue, ou crie um bot dedicado pra Luna. ' +
+                'Enquanto isso estou disputando a conexão a cada 4s e respondo nos gaps.',
+              { botToken: deps.botToken, teamChatId: deps.allowedChatId },
+            );
+          } catch (err) {
+            deps.log.error({ err }, 'admin telegram: alerta de conflito falhou');
+          }
+        }
+      } else if (conflicts > 0 && conflicts % 10 === 0) {
+        deps.log.warn({ conflicts }, 'admin telegram: getUpdates rejeitado (409) repetidamente');
+      } else if (res.status !== 409) {
+        deps.log.warn({ status: res.status, desc: data?.description ?? null }, 'admin telegram: getUpdates rejeitado');
+      }
+      polling = false;
       return;
     }
+    if (conflicts > 0) {
+      deps.log.info({ conflicts }, 'admin telegram: getUpdates de volta (conflito resolvido)');
+      conflicts = 0;
+      conflictAlerted = false;
+    }
+    polling = false;
     for (const raw of data.result) {
       const parsed = updateSchema.safeParse(raw);
       if (!parsed.success) {
