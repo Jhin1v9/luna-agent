@@ -89,3 +89,35 @@ export function ensureBrainStructure(root: string = BRAIN_ROOT): void {
     );
   }
 }
+
+export interface IncidentEntry {
+  date?: string;
+  component: string;
+  root_cause: string;
+  fix: string;
+  learning: string;
+  commit?: string | null;
+  correlation_id?: string | null;
+}
+
+/** Incidente vira aprendizado (§16): append em .brain/luna/incidents/YYYY-MM.md. */
+export function appendIncident(entry: IncidentEntry, root: string = BRAIN_ROOT): string {
+  const date = entry.date ?? new Date().toISOString().slice(0, 10);
+  const month = date.slice(0, 7);
+  const dir = join(root, 'luna', 'incidents');
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${month}.md`);
+  if (!existsSync(path)) {
+    appendFileSync(path, `# Incidentes — ${month}\n\n> Toda falha vira conhecimento (§16). Append-only.\n\n`, 'utf8');
+  }
+  const block =
+    `## ${date} — ${entry.component} — autor: Luna\n\n` +
+    `- causa raiz: ${entry.root_cause}\n` +
+    `- fix: ${entry.fix}\n` +
+    `- aprendizado: ${entry.learning}\n` +
+    (entry.commit ? `- commit: ${entry.commit}\n` : '') +
+    (entry.correlation_id ? `- correlation: ${entry.correlation_id}\n` : '') +
+    '\n';
+  appendFileSync(path, block, 'utf8');
+  return path;
+}
