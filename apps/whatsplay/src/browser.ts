@@ -718,8 +718,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const infoPanel = document.querySelector('[data-testid="contact_info_panel"]') ||
                           document.querySelector('div[role="complementary"]');
         const infoPanelOpen = !!(infoPanel && visible(infoPanel));
-        const callUi = !!Array.from(document.querySelectorAll('[data-testid]')).find((e) =>
-          /call|chamada/i.test(e.getAttribute('data-testid') || '') && visible(e));
+        const callUi = !!Array.from(document.querySelectorAll('button, [role="button"], [data-testid]')).find((e) => {
+          if (!visible(e)) return false;
+          const tid = (e.getAttribute('data-testid') || '').toLowerCase();
+          const aria = (e.getAttribute('aria-label') || '').toLowerCase();
+          // marcadores FORTES de chamada ATIVA (evidência call-ui-probe
+          // 2026-09-22: "Nueva llamada"/"Ir a Llamadas"/aba "Llamadas" são
+          // falso-positivos — não são chamada em andamento).
+          if (/voip|call-control|call_screen|call-end|call_end/.test(tid)) return true;
+          return /finalizar|colgar|terminar llamada|encerrar chamada|end call|silenciar|silencio|altavoz|speaker|mute|añadir participante|add people/.test(aria);
+        });
         let state = 'desconhecido';
         if (callUi) state = 'chamada';
         else if (infoPanelOpen) state = 'info-contato';
