@@ -311,13 +311,22 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
       await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
       await page.keyboard.press('Enter');
-      // Pós-envio: o campo DEVE estar vazio. Se sobrou texto, o Enter não
-      // enviou (ficou de rascunho) — limpa pra não poluir o próximo envio.
-      await page.waitForTimeout(400);
-      const leftover = await this.composeBoxTextLen(page, inputSelector);
+      // Confirmação REAL de envio (decreto owner + diagnóstico ao vivo
+      // 2026-09-22): mensagem marcada 'sent' SEM chegar no chat — o Enter nem
+      // sempre pega. O campo VISÍVEL tem que esvaziar; se não esvaziar, dá um
+      // segundo Enter; se AINDA ficar de rascunho, limpa e FALHA explícita
+      // (nunca 'sent' falso — falha retryável > silêncio com sucesso fake).
+      await page.waitForTimeout(500);
+      let leftover = await this.composeBoxTextLen(page, inputSelector);
       if (leftover > 0) {
-        this.config.log?.warn({ chars: leftover, chat: chatId }, 'campo de composição não esvaziou após envio — limpando');
+        this.config.log?.warn({ chars: leftover, chat: chatId }, 'campo não esvaziou no 1º Enter — tentando de novo');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(600);
+        leftover = await this.composeBoxTextLen(page, inputSelector);
+      }
+      if (leftover > 0) {
         await this.clearComposeBox(page, inputSelector);
+        throw new Error(`envio NÃO confirmado: campo ainda tinha ${leftover} chars após 2× Enter — rascunho limpo, mensagem NÃO enviada`);
       }
       this.lastHeartbeatAt = new Date();
       return `sent:${chatId}:${Date.now()}`;
@@ -331,13 +340,21 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
   }
 
-  /** Nº de caracteres de texto no campo de composição (-1 = campo não achado). */
+  /** Nº de caracteres de texto no campo de composição VISÍVEL (-1 = não achado). */
   private async composeBoxTextLen(page: Page, selector: string): Promise<number> {
+    // Só conta elemento VISÍVEL: o WA Web mantém clones ocultos do campo no
+    // DOM — o primeiro match de querySelector pode ser um clone vazio e
+    // mentir o estado real (falso "campo limpo", diagnóstico ao vivo
+    // 2026-09-22: envio marcado 'sent' sem a mensagem chegar ao chat).
     const len = await evalWithArg(
       page,
       `((sel) => {
-        const el = document.querySelector(sel);
-        return el ? (el.textContent || '').trim().length : -1;
+        const els = document.querySelectorAll(sel);
+        for (const el of els) {
+          if (el.offsetParent === null) continue;
+          return (el.textContent || '').trim().length;
+        }
+        return -1;
       })`,
       selector,
     ).catch(() => -1);
@@ -360,15 +377,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.waitForTimeout(250);
       if ((await this.composeBoxTextLen(page, selector)) <= 0) return before;
     }
-    // último recurso: via DOM (com InputEvent pra UI do WA reagir)
+    // último recurso: via DOM (com InputEvent pra UI do WA reagir) — limpa
+    // TODOS os matches visíveis (o WA mantém clones ocultos do campo).
     await evalWithArg(
       page,
       `((sel) => {
-        const el = document.querySelector(sel);
-        if (!el) return;
-        el.focus();
-        el.textContent = '';
-        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        document.querySelectorAll(sel).forEach((el) => {
+          if (el.offsetParent === null) return;
+          el.focus();
+          el.textContent = '';
+          el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        });
       })`,
       selector,
     ).catch(() => {});

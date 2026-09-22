@@ -13,10 +13,12 @@ interface FakeState {
   selectAll: boolean;
   sent: string[];
   failNextEnter: boolean;
+  /** true = Enter não registra (campo não esvazia) — 2 tentativas e falha. */
+  enterNoop: boolean;
 }
 
 function fakePage(initialCompose: string) {
-  const state: FakeState = { composeText: initialCompose, selectAll: false, sent: [], failNextEnter: false };
+  const state: FakeState = { composeText: initialCompose, selectAll: false, sent: [], failNextEnter: false, enterNoop: false };
   const keyboard = {
     async press(key: string) {
       if (key === 'Control+a') {
@@ -33,6 +35,7 @@ function fakePage(initialCompose: string) {
           state.failNextEnter = false;
           throw new Error('simulação: Enter falhou após digitar (abort anterior)');
         }
+        if (state.enterNoop) return; // Enter não registra — campo não esvazia
         if (state.composeText.trim()) {
           state.sent.push(state.composeText);
           state.composeText = '';
@@ -123,5 +126,15 @@ describe('sendMessage — limpeza do campo de composição (decreto owner)', () 
       expect.objectContaining({ chars: 'primeira tentativa'.length }),
       expect.stringContaining('resíduo'),
     );
+  });
+
+  it('REGRESSÃO (falso sent ao vivo): Enter não registra → FALHA explícita, rascunho limpo, nada enviado', async () => {
+    const warn = vi.fn();
+    const { state, page } = fakePage('');
+    state.enterNoop = true; // ambos os Enters não pegam
+    const t = makeTransport(page, warn);
+    await expect(t.sendMessage('chat-x', 'mensagem que não vai')).rejects.toThrow('envio NÃO confirmado');
+    expect(state.sent).toEqual([]); // nada enviado — nunca 'sent' falso
+    expect(state.composeText).toBe(''); // rascunho limpo pra não poluir o próximo
   });
 });
