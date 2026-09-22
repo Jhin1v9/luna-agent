@@ -183,3 +183,38 @@ pnpm typecheck    # tsc --noEmit
 ```
 
 Ver `AGENTS.md` para as regras do projeto.
+
+## Operação (Luna v1)
+
+**Serviços (pm2):** `luna-orchestrator` (:3100), `luna-whatsplay` (Chrome
+dedicado WhatsApp), `luna-worker` (jobs, classifier, auto-heal, admin
+Telegram), `luna-watchdog` (saúde + self-test 6h + backup diário),
+`luna-pingline` (prova de auto-evolução).
+
+```bash
+pm2 list                      # estado dos serviços
+pm2 logs luna-orchestrator    # logs (mesmo padrão pros outros)
+pm2 restart all --update-env  # aplica .env novo
+pnpm migrate                  # migrações pendentes
+pnpm test                     # 197 testes (unit + integração Postgres real)
+pnpm --filter worker exec tsx src/tools-run-evals.ts   # golden conversations com LLM real (sob demanda)
+pnpm --filter worker exec tsx src/tools-run-evals.ts --mock  # evals CI, zero token
+pnpm --filter worker exec tsx src/replay.ts <event_id>      # replay §29 dry-run
+bash scripts/backup-db.sh     # backup sob demanda (watchdog faz diário)
+```
+
+**Ações manuais do owner (uma vez):**
+1. `pm2 startup` (terminal admin) — sobreviver reboot da máquina.
+2. pm2 como serviço Windows ou wrapper hidden — sumir com as janelas de CMD
+   (procedimento no ADR-028).
+3. Chip dedicado WhatsApp — compra; remove a limitação do badge de não-lida.
+4. Hardware de voz (docs/hardware-voz.md) — VB-Cable x2 + VoiceMeeter,
+   checkpoints 1-3; o software da voz já está pronto.
+5. Se a quota Kimi estourar: nada a fazer — o fallback pro Gemini é
+   automático (sem GEMINI_API_KEY válida, falha explícita em log).
+6. `AUTOHEAL_LLM_PATCH=true` no .env se quiser auto-reparo com diagnóstico
+   por IA (ADR-031; OFF por default).
+
+**Telegram:** grupo "Nexo Digital" ligado (@lunanexobot) — cascata de
+escalação, alertas de watchdog/send-safety/auto-reparo e **chat admin** (o
+time pergunta, a Luna responde com dados reais).
