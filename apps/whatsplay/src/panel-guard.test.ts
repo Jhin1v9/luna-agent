@@ -91,4 +91,29 @@ describe('PanelGuard — nunca mais de 1 chat aberto (decreto owner)', () => {
     expect(await g.closeWithRetry()).toBe(false);
     expect(tries).toBe(3);
   });
+
+  it('REGRESSÃO (rascunho no chat errado ao vivo): ciclo concorrente ESPERA o ciclo ativo — nunca fecha o painel no meio do trabalho', async () => {
+    const state: { open: string | null; closeWorks: boolean } = { open: null, closeWorks: true };
+    const g = makeGuard(state);
+    const ordem: string[] = [];
+    const ciclo1 = (async () => {
+      await g.beginCycle('sendMessage');
+      state.open = '🏆Production - 2026🙏🏻';
+      ordem.push('send:abriu');
+      await new Promise((r) => setTimeout(r, 300));
+      ordem.push('send:digitou');
+      await g.endCycle('sendMessage');
+      ordem.push('send:fechou');
+    })();
+    await new Promise((r) => setTimeout(r, 50));
+    const ciclo2 = (async () => {
+      await g.beginCycle('sweep');
+      ordem.push('sweep:entrou');
+      await g.endCycle('sweep');
+    })();
+    await Promise.all([ciclo1, ciclo2]);
+    expect(ordem).toEqual(['send:abriu', 'send:digitou', 'send:fechou', 'sweep:entrou']);
+    expect(state.open).toBeNull();
+    expect(warns).toEqual([]); // sweep não tratou o painel legítimo como "fora de ciclo"
+  });
 });
