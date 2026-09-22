@@ -66,6 +66,11 @@ const envSchema = z.object({
   NEXO_API_BASE_URL: z.string().url().default('https://vps.nexo-digital.app'),
   NEXO_API_USERNAME: z.string().optional(),
   NEXO_API_PASSWORD: z.string().optional(),
+
+  // ── F7/BLOCO 4 — auto-heal com diagnóstico por IA (ADR-031). OFF por
+  // default: com ON, serviço próprio DOWN sem plano → FAST diagnostica e
+  // propõe patch → executa dentro do runHeal (gate de testes + LKG + rollback).
+  AUTOHEAL_LLM_PATCH: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   // Reaper: locks 'running' travados há mais que isso voltam para a fila.
   LOCK_REAPER_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   // Anti-ban (ADR-004): espera humana antes de entregar a resposta no

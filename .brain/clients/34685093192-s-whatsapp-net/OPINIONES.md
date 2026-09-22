@@ -78,3 +78,79 @@ Conversa descontraída: cliente satisfeito com a prévia dos emails, combinada a
 }
 ```
 
+## 2026-09-22 — Luna
+
+Conversa descontraída e positiva: prévia dos emails de resposta aprovada, alinhada formatação final e implantação. Luna respondeu bem ao tom informal, ofereceu registrar a solicitação e se retirou com elegância quando o papo ficou pessoal.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "suporte_tecnico",
+  "product": "Emails de resposta automática do cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Formatar e implantar os emails de resposta do cliente (planejado para amanhã); registrar contexto da solicitação.",
+  "quality_score": 5,
+  "summary": "Conversa descontraída e positiva: prévia dos emails de resposta aprovada, alinhada formatação final e implantação. Luna respondeu bem ao tom informal, ofereceu registrar a solicitação e se retirou com elegância quando o papo ficou pessoal.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-09-22 — Luna
+
+Nonoke aprovou a prévia dos emails de resposta ao cliente; falta formatar e implantar. Conversa migrou para assuntos pessoais (oportunidade de emprego, papo com o mozão) e a Luna conduziu bem, se retirando do papo pessoal e oferecendo ajuda da Nexo.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "suporte_tecnico",
+  "product": "emails de resposta ao cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Formatar e implantar os emails de resposta ao cliente hoje ou amanhã, conforme alinhado com Nonoke.",
+  "quality_score": 5,
+  "summary": "Nonoke aprovou a prévia dos emails de resposta ao cliente; falta formatar e implantar. Conversa migrou para assuntos pessoais (oportunidade de emprego, papo com o mozão) e a Luna conduziu bem, se retirando do papo pessoal e oferecendo ajuda da Nexo.",
+  "client_signal": "elogio"
+}
+```
+
+## 2026-09-22 — Luna
+
+Conversa predominantemente informal e pessoal. Do ponto de vista de negócio: Nonoke aprovou a prévia dos emails e combinou formatação final e implantação para hoje ou amanhã. Luna respondeu bem com bom humor e proposta de registrar a solicitação. No restante da conversa, apenas trocas casuais de bom dia e papo pessoal entre cliente e parceiro(a).
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "suporte_tecnico",
+  "product": "emails automáticos do cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Cliente mencionou que hoje ou amanhã fará formatação final e implantação dos emails; registrar contexto para acompanhamento da entrega.",
+  "quality_score": 4,
+  "summary": "Conversa predominantemente informal e pessoal. Do ponto de vista de negócio: Nonoke aprovou a prévia dos emails e combinou formatação final e implantação para hoje ou amanhã. Luna respondeu bem com bom humor e proposta de registrar a solicitação. No restante da conversa, apenas trocas casuais de bom dia e papo pessoal entre cliente e parceiro(a).",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-09-22 — Luna
+
+Cliente aprovou a prévia dos emails de resposta e combinou dar o formato final e implantar hoje ou amanhã. Resto da conversa foi papo pessoal descontraído; Luna manteve tom amigável e ofereceu registrar a pendência.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "conteudo",
+  "product": "emails de resposta do cliente",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Cliente aprovou a prévia dos emails; falta dar formato final e implantar (hoje ou amanhã). Registrar pendência de formatação + implantação para execução.",
+  "quality_score": 4,
+  "summary": "Cliente aprovou a prévia dos emails de resposta e combinou dar o formato final e implantar hoje ou amanhã. Resto da conversa foi papo pessoal descontraído; Luna manteve tom amigável e ofereceu registrar a pendência.",
+  "client_signal": "elogio"
+}
+```
+

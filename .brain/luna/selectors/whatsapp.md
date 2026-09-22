@@ -88,3 +88,9 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - Lista: `#pane-side` + `cell-frame-container` (chat-list virtualizada — só
   rows visíveis existem no DOM; sweep abre por nome direto)
 - Estado de sessão: heurística em `apps/whatsplay/src/state.ts` (LOGGED vence QR)
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: #side [role='textbox'][data-tab='3'], div[contenteditable='true'][data-tab='3']
+- fallback visual: screenshot + DOM no incidente

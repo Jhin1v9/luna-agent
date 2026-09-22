@@ -40,6 +40,9 @@ export interface AutoHealDeps {
   restartService: (service: string) => Promise<void>;
   healthCheck: (service: string) => Promise<boolean>;
   telegram?: HealDeps['telegram'];
+  /** Diagnóstico por IA (ADR-031): adapter + flag, opcionais. */
+  diagnoseAdapter?: import('@luna/agent').KimiLiveAdapter;
+  llmPatchEnabled?: boolean;
 }
 
 /** Estado em memória: ciclos consecutivos DOWN por serviço. */
@@ -96,6 +99,22 @@ export async function autoHealTick(deps: AutoHealDeps, streaks: DownStreaks): Pr
       if (streak === DOWN_CYCLES_BEFORE_HEAL) {
         deps.log.error({ service, streak }, 'auto-heal: DOWN sem plano de heal registrado — diagnóstico assistido pendente (ADR-029)');
         result.pending.push(service);
+        if (deps.diagnoseAdapter && deps.llmPatchEnabled) {
+          const { diagnoseAndHeal } = await import('./diagnose.js');
+          const dx = await diagnoseAndHeal(
+            {
+              pool: deps.pool, log: deps.log, adapter: deps.diagnoseAdapter, exec: deps.exec,
+              restartService: deps.restartService, healthCheck: deps.healthCheck,
+              telegram: deps.telegram, enabled: true,
+            },
+            service,
+          );
+          if (dx.healed) {
+            result.healed.push(service);
+            result.pending = result.pending.filter((s) => s !== service);
+            streaks.count(service, false);
+          }
+        }
       }
     }
   }
