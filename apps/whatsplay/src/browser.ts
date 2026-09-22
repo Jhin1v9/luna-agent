@@ -290,6 +290,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   async readConversation(chatId: string, limit = 20): Promise<ConversationMessage[]> {
     const page = this.requirePage();
     const guard = this.panelGuard;
+    if (!(await this.isPageHealthy())) await this.ensurePageHealthy();
     await guard?.beginCycle('readConversation'); // painel DEVE estar na lista
     try {
       // NUNCA ler o painel sem conferir o chat: openChat verifica o título.
@@ -313,6 +314,10 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   async sendMessage(chatId: string, text: string, opts?: { inputSelector?: string }): Promise<string> {
     const page = this.requirePage();
     const guard = this.panelGuard;
+    // Página no fallback noscript/splash? Recupera AGORA em vez de falhar o
+    // envio (evidência ao vivo 2026-09-22: entregas falhando durante
+    // episódios de noscript que o health loop só pegava no próximo tick).
+    if (!(await this.isPageHealthy())) await this.ensurePageHealthy();
     await guard?.beginCycle('sendMessage');
     try {
       // Idem: sem verificação, o texto iria para o chat ERRADO (bug de
@@ -598,8 +603,12 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
 
     // 2) fallback: BUSCA (funciona mesmo com a chat fora da viewport)
+    // :visible é obrigatório: o #side tem clones OCULTOS de textbox e o
+    // .first() pegava um clone — click silenciosamente não ia (timeout
+    // engolido pelo catch) e a digitação ia pra lugar nenhum (evidência
+    // repair-*.png 11:16: busca vazia com página saudável).
     const search = page
-      .locator('#side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]')
+      .locator('#side [data-testid="chat-list-search"]:visible, #side [role="textbox"]:visible, #side div[contenteditable="true"]:visible')
       .first();
     if ((await search.count()) > 0) {
       await search.click({ timeout: 3_000 }).catch(() => {});
