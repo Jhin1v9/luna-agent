@@ -60,10 +60,15 @@ const ROUND_PROMPT = (objective: string, context: string, rounds: Round[], last:
         '(direta, sem mencionar rondas nem ferramentas). Se de fato não for possível concluir, escreva ' +
         '"NÃO RESOLVIDO: <motivo>".'
       : 'EXECUTE a tarefa agora (não peça confirmação, não peça contexto — o objetivo acima é completo). ' +
-        'Responda com o que você EXECTOU e DESCOBRIU nesta ronda (fatos + evidências), e o que falta na próxima.',
+        'Responda com o que você EXECUTOU e DESCOBRIU nesta ronda (fatos + evidências), e o que falta na próxima. ' +
+        'SE A TAREFA JÁ ESTÁ RESOLVIDA COM EVIDÊNCIA, não gaste a próxima ronda: termine a resposta com a linha ' +
+        '"CONCLUSAO_PRONTA:" seguida da RESPOSTA FINAL para o cliente (direta, sem mencionar rondas nem ferramentas).',
   ]
     .filter(Boolean)
     .join('\n\n');
+
+/** Early conclusion: marcador do live brain quando resolveu antes do budget. */
+const CONCLUSION_MARKER = 'CONCLUSAO_PRONTA:';
 
 export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
   const { pool, live, log, telegram } = deps;
@@ -173,6 +178,28 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
       const unresolved = /NÃO RESOLVIDO/i.test(finding);
       if (!last && unresolved) {
         await escalateWithSummary(payload, rounds, 'live brain declarou não-resolvido antes do budget');
+        return;
+      }
+      // EARLY CONCLUSION (owner: "sempre vai demorar?"): o live brain pode
+      // resolver antes do budget — marcador CONCLUSAO_PRONTA encerra na hora,
+      // sem esperar as rondas restantes nem o relógio.
+      if (!last && finding.includes(CONCLUSION_MARKER)) {
+        const finalText = finding.split(CONCLUSION_MARKER).slice(1).join(CONCLUSION_MARKER).trim();
+        const messageId = await deliverReply(payload, finalText || finding);
+        await publish('router.investigation.completed', payload, {
+          outcome: 'answered_early',
+          rounds: rounds.length,
+          reply_message_id: messageId,
+        });
+        await recordAudit(pool, {
+          actor: 'live_investigation',
+          action: 'router.investigation.completed',
+          tool: 'investigate_job',
+          correlation_id: payload.correlation_id ?? null,
+          result: 'success',
+          metadata: { rounds: rounds.length, early: true, reply_message_id: messageId },
+        });
+        log.info({ job: job.id, rounds: rounds.length, messageId }, 'investigate: concluído CEDO (marcador do live brain)');
         return;
       }
       if (last && unresolved) {

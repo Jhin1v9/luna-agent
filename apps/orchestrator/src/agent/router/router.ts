@@ -76,8 +76,15 @@ export async function runFastRoute(deps: RouterDeps, input: {
   prompt: string;
   sessionKey: string;
   allowLiveHandoff: boolean;
+  /** Config da route (§4, routes.json) — budget de rondas e timeout da
+   *  investigação. Defaults só se a route não trouxer. */
+  investigationBudget?: number;
+  investigationTimeoutMs?: number;
 }): Promise<RouterDecision> {
-  const { event, prompt, sessionKey, allowLiveHandoff } = input;
+  const { event, prompt, sessionKey } = input;
+  const allowLiveHandoff = input.allowLiveHandoff;
+  const budget = input.investigationBudget ?? 3;
+  const timeoutMs = input.investigationTimeoutMs ?? 600_000;
   const clientText = (event.payload as { text?: string }).text ?? '';
 
   // §8.1 — pedido explícito de humano: escalación imediata, ZERO tentativas de IA.
@@ -117,8 +124,6 @@ export async function runFastRoute(deps: RouterDeps, input: {
 
   // §5.1 — HANDOFF_LIVE: máx 1 por evento. Como é a 1ª e única via, ok.
   if (output.type === 'HANDOFF_LIVE' && allowLiveHandoff && HANDOFF_MAX_PER_EVENT === 1) {
-    const budget = Number(process.env.INVESTIGATE_BUDGET_ROUNDS ?? 3);
-    const timeoutMs = Number(process.env.INVESTIGATE_TIMEOUT_MS ?? 600_000);
     await publishEvent(deps.pool, {
       event_type: 'router.handoff.live',
       source: 'model_router',
@@ -201,6 +206,8 @@ export async function selectRoute(deps: RouterDeps, event: EventEnvelope): Promi
   allowLiveHandoff: boolean;
   timeoutMs: number;
   contextPack: string;
+  investigationBudget: number;
+  investigationTimeoutMs: number;
 }> {
   const config = deps.config ?? loadRouterConfig();
   const { route, defaulted } = routeFor(config, event.event_type);
@@ -218,5 +225,7 @@ export async function selectRoute(deps: RouterDeps, event: EventEnvelope): Promi
     allowLiveHandoff: route.allow_live_handoff,
     timeoutMs: route.timeout_ms,
     contextPack: Array.isArray(route.context_pack) ? route.context_pack[0] : route.context_pack,
+    investigationBudget: route.investigation_budget,
+    investigationTimeoutMs: route.investigation_timeout_ms,
   };
 }

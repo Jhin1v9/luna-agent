@@ -203,6 +203,24 @@ pnpm --filter worker exec tsx src/replay.ts <event_id>      # replay §29 dry-ru
 bash scripts/backup-db.sh     # backup sob demanda (watchdog faz diário)
 ```
 
+**HANDOFF_LIVE — investigação do Cérebro Vivo (owner tuning):**
+quando o FAST não tem dado/ferramenta, o HANDOFF vira um job `investigate`
+que roda o `kimi` CLI local (com ferramentas nativas) e responde no MESMO
+thread. Os 10 min NÃO são fixos: `investigation_timeout_ms` é só o TETO de
+parede, e o live brain pode concluir na 1ª ronda (early-return via marcador
+`CONCLUSAO_PRONTA`). Prova real: investigação simples entregou em **39s**.
+Tudo é config da route — `apps/orchestrator/config/routes.json`, zero código:
+
+```jsonc
+// investigação simples (ex.: "quantos arquivos tem X"):
+"investigation_budget": 1, "investigation_timeout_ms": 120000
+// padrão atual (3 rondas, teto 10 min):
+"investigation_budget": 3, "investigation_timeout_ms": 600000
+```
+Mudou o arquivo → `pm2 restart luna-orchestrator luna-worker` (commit autor
+Luna, config versionada). Budget esgotado/timeout → ESCALATE_HUMAN com
+resumo das rondas (§6).
+
 **Ações manuais do owner (uma vez):**
 1. `pm2 startup` (terminal admin) — sobreviver reboot da máquina.
 2. pm2 como serviço Windows ou wrapper hidden — sumir com as janelas de CMD

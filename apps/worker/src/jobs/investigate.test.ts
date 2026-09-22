@@ -91,7 +91,7 @@ describe('investigate (HANDOFF_LIVE real, P2)', () => {
     expect(live.calls).toHaveLength(2);
     expect(live.calls[0]!.session_key).toBe('investigate:job-1');
     // 1ª ronda NÃO pede resposta final; última pede
-    expect(live.calls[0]!.prompt).not.toContain('RESPOSTA FINAL');
+    expect(live.calls[0]!.prompt).not.toContain('ÚLTIMA RONDA');
     expect(live.calls[1]!.prompt).toContain('RESPOSTA FINAL');
 
     const msg = cap.inserts.find((i) => i.sql.startsWith('INSERT INTO messages'));
@@ -104,6 +104,20 @@ describe('investigate (HANDOFF_LIVE real, P2)', () => {
     const types = roundEvents.map((i) => (i.params[1] as string) ?? '');
     expect(types).toContain('router.investigation.round');
     expect(types).toContain('router.investigation.completed');
+  });
+
+  it('EARLY CONCLUSION (owner): live brain resolve na 1ª ronda → entrega na hora, sem gastar o budget', async () => {
+    const { pool, cap } = stubPool();
+    const live = fakeLive(['achei: quota 82%. Fim.\nCONCLUSAO_PRONTA: Cota em 82%, tudo saudável.']);
+    const h = createInvestigateHandler({ pool, live: live as never, log });
+    await h(job({ payload: { ...(job().payload as object), budget: 3 } }), { recordActivity: async () => {} });
+    expect(live.calls).toHaveLength(1); // NÃO rodou as rondas 2 e 3
+    const msg = cap.inserts.find((i) => i.sql.startsWith('INSERT INTO messages'));
+    expect((msg!.params[1] as string)).toBe('Cota em 82%, tudo saudável.');
+    const completed = cap.inserts.find(
+      (i) => i.sql.startsWith('INSERT INTO events') && String(i.params[1]).includes('investigation.completed'),
+    );
+    expect(JSON.stringify(completed?.params[9] ?? '')).toContain('answered_early');
   });
 
   it('live brain declara NÃO RESOLVIDO antes do budget → ESCALATE com resumo das rondas', async () => {

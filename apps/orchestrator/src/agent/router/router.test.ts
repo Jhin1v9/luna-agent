@@ -168,7 +168,7 @@ describe('guardas de bucle (§5.1)', () => {
     expect(d.answerText).not.toContain('verificar deploy'); // espera, não o resultado
   });
 
-  it('HANDOFF_LIVE (P2): enfileira job investigate idempotente com budget/timeout da config', async () => {
+  it('HANDOFF_LIVE (P2): enfileira job investigate com budget/timeout da ROUTE (§4, zero hardcode)', async () => {
     const adapter = fakeAdapter([JSON.stringify({ type: 'HANDOFF_LIVE', objective: 'ver logs', context_summary: 'ctx' })]);
     const inserts: Array<{ sql: string; params: unknown[] }> = [];
     const pool = {
@@ -185,7 +185,14 @@ describe('guardas de bucle (§5.1)', () => {
     } as never;
     const d = await runFastRoute(
       { pool, adapter: adapter as never, log },
-      { event: fakeEvent(), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: true },
+      {
+        event: fakeEvent(),
+        prompt: 'p',
+        sessionKey: 'conv-1',
+        allowLiveHandoff: true,
+        investigationBudget: 2, // veio da route (routes.json investigation_budget)
+        investigationTimeoutMs: 120_000, // investigation_timeout_ms
+      },
     );
     expect(d.handoff).toBe(true);
     const jobInsert = inserts.find((i) => i.sql.startsWith('INSERT INTO jobs'));
@@ -194,8 +201,8 @@ describe('guardas de bucle (§5.1)', () => {
     expect(jobInsert!.params[0]).toBe('investigate');
     const payload = jobInsert!.params[1] as { objective: string; budget: number; timeout_ms: number; conversation_id: string };
     expect(payload.objective).toBe('ver logs');
-    expect(payload.budget).toBeGreaterThanOrEqual(1);
-    expect(payload.timeout_ms).toBeGreaterThanOrEqual(60_000);
+    expect(payload.budget).toBe(2); // da route, não hardcode
+    expect(payload.timeout_ms).toBe(120_000);
     expect(payload.conversation_id).toBeTruthy();
     expect(jobInsert!.params[5]).toMatch(/^investigate:/); // idempotente por evento
     expect(jobInsert!.params[4]).toBe(1); // max_attempts: rondas são o retry

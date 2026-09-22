@@ -273,7 +273,16 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
 
     const decision = await runFastRoute(
       { pool: eventPool, adapter, log },
-      { event, prompt, sessionKey: conversationId, allowLiveHandoff: route.allowLiveHandoff },
+      {
+        event,
+        prompt,
+        sessionKey: conversationId,
+        allowLiveHandoff: route.allowLiveHandoff,
+        // Config da route (§4, routes.json) — investigation_budget /
+        // investigation_timeout_ms, zero hardcode.
+        investigationBudget: route.investigationBudget,
+        investigationTimeoutMs: route.investigationTimeoutMs,
+      },
     );
 
     // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
