@@ -1,52 +1,62 @@
 # Guia de hardware — Voz da Luna (F6, §26)
 
-> Software 100% pronto (voice/ no whatsplay). Esta parte é **ação manual do
-> owner** — mixagem duplex não tem como validar sem o hardware instalado.
-> Siga na ordem; cada checkpoint tem como conferir.
+> Software 100% pronto (voice/ no whatsplay). Status verificado automaticamente
+> pela Luna em 2026-09-22 (pós-reboot do owner). Siga a ordem; cada checkpoint
+> tem como conferir.
 
-## Status automático (2026-09-22, verificado pela Luna)
+## Status real (2026-09-22, inventário completo)
 
-- ✅ **VoiceMeeter instalado** — porém a edição é **STANDARD** (1 VAIO, 1 bus
-  virtual B1). A mixagem duplex do §2 precisa de **BANANA** (AUX input + B2).
-  Instalação atual saudável: drivers VAIO OK, dispositivos de som reais intactos.
-- ⚠️ **Cabos**: nenhum VB-Cable instalado (sem "CABLE-A/B Output" no Painel de
-  Som). Existe UM instalador bundled em
-  `C:\Program Files (x86)\VB\Voicemeeter\VBCABLE_Setup_x64.exe` (instala 1 cabo
-  "CABLE" genérico). O guia precisa de DOIS.
-- ⛔ **Bloqueio**: instalação de driver exige **UAC (admin)** — a Luna roda sem
-  elevação e não vai forçar isso. Checklist exato abaixo.
-- 🔎 Instaladores baixados pelo owner: varredura completa do perfil
-  (Downloads/Desktop/Documents/AppData, profundidade 3) — **nenhum
-  instalador de Banana ou VB-Cable encontrado**. O "já baixei" provavelmente
-  se refere ao VoiceMeeter Standard (que já estava instalado). Os downloads
-  oficiais são email-gated (passo 1 do checklist).
+- **Driver de áudio**: UM único device (`ROOT\MEDIA\0000`, serviço
+  `VBVoicemeeterVAIOMME`, OK) — o driver **multi-porta VAIO 8 da VB-Audio**
+  (loopback habilitado no registry: `HKLM\SOFTWARE\VB-Audio\MultiCable`).
+  **Não há duplicatas/ghosts** — os "8× Speakers (VB-Audio Voicemeeter VAIO)"
+  do Get-PnpDevice são os 8 endpoints reais do driver com nome-cache genérico;
+  os apps veem os nomes certos (abaixo).
+- **Topologia real** (enumerada ao vivo via Chromium no Chrome dedicado):
+  - *Playback (entradas virtuais do mixer)*: `Voicemeeter Input` (VAIO),
+    `Voicemeeter AUX Input`, `Voicemeeter VAIO3 Input`, `Voicemeeter In 1..5`.
+  - *Recording (taps de bus)*: `Voicemeeter Out A1..A5` (buses físicos),
+    `Voicemeeter Out B1..B3` (buses virtuais).
+- **Mixer instalado**: VoiceMeeter **Standard 1.1.3.0** — só endereça o VAIO
+  (1 entrada virtual, 1 bus). **O duplex precisa de BANANA (ou Potato)** pra
+  rotear AUX/VAIO3/In1-5 → B1/B2. Como o driver já é o da família VAIO8,
+  instalar o Banana **não deve pedir reboot** (driver já presente) — conferir.
+- **VoiceMeeter Standard está rodando** (a Luna iniciou, oculto, sem alterar
+  nada — A1 não configurado, som do PC intocado).
+- Dispositivos reais intactos: FxSound Speakers (default de saída), Speakers
+  High Definition Audio, Steam Streaming, mic real.
 
-### Checklist manual do owner (UAC + reboot)
+## Checklist do owner (ordem)
 
-1. **VoiceMeeter Banana**: baixar em <https://shop.vb-audio.com> ( Banana é
-   donationware — download grátis; o site pede email pra gerar o link). Se já
-   baixou, o instalador é tipo `VoicemeeterBananaSetup.exe` — executar como
-   admin. Instala POR CIMA do Standard (mesma pasta).
-2. **VB-Cable A+B**: <https://vb-audio.com/Cable/> (também email-gated; pack
-   "CABLE A+B"). Instalar como admin. Alternativa imediata: rodar o
-   `VBCABLE_Setup_x64.exe` bundled (dá 1 cabo genérico "CABLE" — dá pra começar
-   o Checkpoint 2 com ele + o VAIO do Banana, usando só 1 cabo: veja §2-nota).
-3. **REBOOT quando o instalador pedir** (driver de áudio só ativa no boot).
-   O som do PC volta normal após o reboot — os drivers VB-Audio convivem com
-   o som real (verificado: dispositivos reais intactos ao lado do VAIO).
-4. Após o reboot, a Luna configura o roteamento do §2 automaticamente se
-   possível (registry/Remote) ou guia o owner nos cliques.
+1. **Instalar VoiceMeeter BANANA** por cima do Standard (download email-gated
+   em <https://shop.vb-audio.com> — Banana é donationware, instala grátis).
+   Driver de áudio já é o da família certa → se o instalador perguntar sobre
+   reboot, pode **não precisar**; se pedir, reboot.
+2. Abrir o Banana. Ele verá as 8 portas. Configuração da mixagem duplex:
+   - **Hardware Input 1** = microfone real (opcional, pra você falar).
+   - **Virtual Input (VAIO)** = "Voicemeeter Input" — aqui o Chrome do
+     WhatsPlay (WhatsApp) manda a voz de Abner.
+   - **AUX Input** = "Voicemeeter AUX Input" — aqui o Chrome do ChatGPT manda
+     a voz do Operador.
+   - **A1** = seus fones (monitor — você ouve tudo).
+   - **B1** = "Voicemeeter Out B1" (VAIO out) — voz de Abner → micro do
+     Chrome do ChatGPT.
+   - **B2** = "Voicemeeter Out B2" (AUX out) — voz do Operador → micro da
+     chamada WhatsApp (WhatsPlay).
+3. **No Chrome do WhatsPlay (WhatsApp)**: microfone = `Voicemeeter Out B2`.
+   (Em chamada: ⋮ → Definições → dispositivo de áudio.)
+4. **No Chrome do ChatGPT**: microfone = `Voicemeeter Out B1`.
+5. **Checkpoint 2**: ligue numa chamada de teste entre os dois chips — os
+   medidores do Banana: AUX sobe com a voz de Abner, VAIO sobe com a voz do
+   Operador, B1/B2 com as saídas.
+6. **Checkpoint 3 (ponta a ponta)**: chamada real — o software do whatsplay
+   atende sozinho e aciona o VoiceBridge (§3 do guia original abaixo).
 
-### §2-nota — versão mínima com 1 cabo (só pra testar antes do pack A+B)
+> Sem Banana instalado, o Standard consegue no máximo 1 perna do duplex
+> (VAIO→B1). Os "cabos" VB-Cable viraram desnecessários — o driver VAIO8 já é
+> a fiação completa.
 
-Com Banana + 1 cabo "CABLE" + VAIO dá pra fazer o duplex usando VAIO como um
-dos lados: Hardware In 1 = mic real; VAIO = voz do ChatGPT (Virtual Input);
-AUX = CABLE Output (voz de Abner do WhatsApp); B1 (VAIO out) = CABLE Input
-(voz ChatGPT → chamada WhatsApp); B2 (AUX out) = alto-falante do Chrome do
-ChatGPT... ou seja, 1 cabo resolve se o WhatsPlay usar o VAIO como microfone.
-Menos limpo que A+B, mas valida o Checkpoint 2.
-
-## 0. Inventário necessário
+## 0. Inventário necessário (histórico)
 
 - 2× **VB-Cable** (VB-Audio, gratuito) — cabos virtuais de áudio.
 - **VoiceMeeter Banana** (gratuito) — mesa de mixagem virtual.
