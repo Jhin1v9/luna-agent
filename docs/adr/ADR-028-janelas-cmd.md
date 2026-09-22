@@ -21,10 +21,22 @@
    git (NULs) + wire da escalação F5 reaplicado limpo; bug `make_interval(mins => text)`
    no tick corrigido (cast ::int). Sistema estável: heartbeats frescos, zero FATAL.
 2. `restart_delay: 4000` no ecosystem limita a frequência de qualquer loop futuro.
-3. **Mitigação das janelas (pendente de instalação one-time do owner/admin)**: rodar o
-   pm2 daemon como serviço Windows (`pm2-windows-service` ou NSSM) ou iniciar o daemon
-   via wrapper hidden (VBS/PowerShell -WindowStyle Hidden) — assim os filhos fork não
-   herdam console visível. Até lá: reiniciar o pm2 de um prompt já minimizado.
+3. **SOLUÇÃO DEFINITIVA (2026-09-22, segunda rodada)** — o boot era via
+   `pm2-windows-startup` (Run key → `invisible.vbs` → `pm2_resurrect.cmd`) e o
+   VBS já escondia o .cmd. As janelas eram os PROCESSOS FORK: o pm2 7.0.3
+   spawna filhos com `detached: true` + `windowsHide: true`, mas no Windows
+   `detached` (CREATE_NEW_CONSOLE) ignora o windowsHide — console VISÍVEL a
+   cada app/restart (validado: `pm2 restart` num daemon vivo gerou 8 janelas
+   node; durante o resurrect do boot, 5).
+   **Patch local** em `God/ForkMode.js` (global npm, backup `.bak`):
+   `detached: process.platform === 'win32' ? false : true` — sem detached, o
+   filho herda o console (escondido) do daemon. Revalidado com varredura de
+   janelas (Get-Process MainWindowHandle) durante `pm2 kill` + resurrect
+   completo: **zero janelas node/cmd**, 5/5 online. Repetir o patch após
+   upgrade do pm2 global (é fora do repo de propósito: ferramenta da máquina).
+   Adicional: pós-reboot, subir Docker Desktop + `docker start luna-postgres`
+   antes dos daemons sobem — hoje é manual do owner (Docker Desktop não está
+   no autostart da máquina).
 
 ## Lição operacional
 

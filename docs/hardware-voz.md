@@ -4,7 +4,46 @@
 > pela Luna em 2026-09-22 (pós-reboot do owner). Siga a ordem; cada checkpoint
 > tem como conferir.
 
-## Status real (2026-09-22, inventário completo)
+## Status real (2026-09-22, pós-reboot com Banana — inventário final)
+
+- **Banana INSTALADO** (`voicemeeterpro.exe` / `voicemeeterpro_x64.exe`,
+  uninstall = `voicemeeterprosetup.exe`) e **rodando oculto** (a Luna iniciou
+  via PowerShell `-WindowStyle Hidden`). Driver: o mesmo VAIO8 único
+  (`ROOT\MEDIA\0000`, OK).
+- **TESTE DE LOOPBACK AUTOMATIZADO** (tom 523Hz em cada um dos 8 playbacks,
+  energia medida em cada um dos 8 recordings via AnalyserNode num Chrome
+  headless temporário, permissões concedidas): **matriz 8×8 toda vazia** —
+  nenhum playback chega a nenhum recording sozinho. Conclusão: os pares NÃO
+  são cabos standalone; o sinal só flui com o MIXER roteando (strips → buses).
+  A configuração do roteamento é a etapa que falta (abaixo).
+- Dispositivos reais intactos (FxSound = default de saída, HD Audio, Steam).
+
+## Roteamento a aplicar no Banana (GUI — 5 min do owner)
+
+O app está rodando oculto: clique no ícone da bandeja do VoiceMeeter (ou rode
+`voicemeeterpro_x64.exe` de novo) pra abrir a janela.
+
+1. **STRIP "Voicemeeter VAIO" (Virtual Input)**: ligue **B1** (botão B1 em
+   baixo do strip). → tudo que o WhatsPlay tocar no VAIO sai em
+   `Voicemeeter Out B1`.
+2. **STRIP "Voicemeeter AUX" (Virtual Input)**: ligue **B2**. → voz do
+   ChatGPT sai em `Voicemeeter Out B2`.
+3. **BUS A1 (Hardware out, botão A1 no topo à direita)**: selecione seus
+   fones/altos-falantes reais no dropdown A1 (monitor: você ouve VAIO e AUX).
+4. **Opcional, mesmo strip AUX**: ligue A1 também se quiser ouvir o Operador
+   (geralmente já soa pelo passo 3).
+5. Salve: Menu → Save Settings (pra voltar assim no próximo boot).
+
+Depois os dois Chromes (2 dropdowns cada, dentro da página):
+- **Chrome do WhatsPlay (WhatsApp)**: microfone = `Voicemeeter Out B2`.
+- **Chrome do ChatGPT**: microfone = `Voicemeeter Out B1`; alto-falante =
+  `Voicemeeter AUX Input`.
+- **Chrome do WhatsPlay**: alto-falante = `Voicemeeter Input` (VAIO).
+
+**Checkpoint 2** (após o passo 5): a Luna pode repetir o teste de loopback
+automático — a matriz deve mostrar VAIO→B1 e AUX→B2. É só pedir.
+
+## (arquivo histórico) Inventário necessário
 
 - **Driver de áudio**: UM único device (`ROOT\MEDIA\0000`, serviço
   `VBVoicemeeterVAIOMME`, OK) — o driver **multi-porta VAIO 8 da VB-Audio**
