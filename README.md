@@ -65,9 +65,9 @@ cola = tabela `jobs` + worker.
 > → DB + Brain (OPINIONES + sinapses `.brain/luna/synapses/YYYY-MM.md`
 > assinadas) + memory_index; `@luna/brain` real; seed dev (Jess/onadance,
 > NEXO Internal). Migração 007. **144 testes verdes.**
-> Telegram: token OK (@lunanexobot), chat_id pendente (getUpdates em
-> polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
-> id); alertas seguem fail-closed em log até lá.
+> **TELEGRAM VIVO ✅** (2026-09-22) — chat_id do grupo Nexo Digital recuperado
+> do runbook do luna-kernel; alerta de sistema entregue; cascata + chat admin
+> ativos.
 >
 > **Rodada F8 + varredura ✅ (2026-09-22)** — DLQ redrive automático (§7.7:
 > falhas transientes como quota 403 voltam pra fila sozinhas; 5+ eventos reais
