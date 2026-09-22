@@ -63,8 +63,62 @@ describe('F6 voz — sistema a três (§26)', () => {
     fs.unlinkSync('/tmp/fake-audio.ogg');
   });
 
-  it('auto-atender: chamada atendida em <15s → onAnswered (VoiceBridge)', async () => {
+  it('JANELA DO HUMANO: owner atende/clica durante os 15s → sistema NÃO age (zero accept, zero msg)', async () => {
+    let rings = 0;
+    let accepted = false;
+    const sent: string[] = [];
+    const r = await handleIncomingCall({
+      detector: {
+        hasIncoming: async () => {
+          rings++;
+          return rings <= 2; // tocou 2 polls, aí o humano atendeu
+        },
+        accept: async () => {
+          accepted = true;
+          return true;
+        },
+        decline: async () => {},
+      },
+      isCallerAllowed: async () => true,
+      callerChatId: 'Pai',
+      sendText: async (_c, t) => {
+        sent.push(t);
+      },
+      onAnswered: async () => {},
+      timeoutMs: 3_000,
+    });
+    expect(r).toBe('none');
+    expect(accepted).toBe(false);
+    expect(sent).toEqual([]);
+  });
+
+  it('15s sem ação + caller NO ESCOPO → msg de fallback + recusa (§26, decreto owner; autoAnswerOnTimeout default false)', async () => {
+    const sent: string[] = [];
+    let declined = false;
+    const r = await handleIncomingCall({
+      detector: {
+        hasIncoming: async () => true,
+        accept: async () => false,
+        decline: async () => {
+          declined = true;
+        },
+      },
+      isCallerAllowed: async () => true,
+      callerChatId: '34685093192@s.whatsapp.net',
+      sendText: async (_c, t) => {
+        sent.push(t);
+      },
+      onAnswered: async () => {},
+      timeoutMs: 2_500,
+    });
+    expect(r).toBe('fallback');
+    expect(sent).toEqual([FALLBACK_CALL_TEXT]);
+    expect(declined).toBe(true);
+  });
+
+  it('15s sem ação + autoAnswerOnTimeout=true → atende sozinho (VoiceBridge)', async () => {
     let answered = false;
+    let bridged = false;
     const r = await handleIncomingCall({
       detector: {
         hasIncoming: async () => true,
@@ -77,31 +131,15 @@ describe('F6 voz — sistema a três (§26)', () => {
       isCallerAllowed: async () => true,
       callerChatId: 'Pai',
       sendText: async () => {},
-      onAnswered: async () => {},
-      timeoutMs: 5_000,
+      onAnswered: async () => {
+        bridged = true;
+      },
+      autoAnswerOnTimeout: true,
+      timeoutMs: 2_500,
     });
     expect(r).toBe('answered');
     expect(answered).toBe(true);
-  });
-
-  it('fallback 15s: caller NO ESCOPO recebe a msg padrão (§26)', async () => {
-    const sent: string[] = [];
-    const r = await handleIncomingCall({
-      detector: {
-        hasIncoming: async () => true,
-        accept: async () => false, // ninguém atende
-        decline: async () => {},
-      },
-      isCallerAllowed: async () => true,
-      callerChatId: '34685093192@s.whatsapp.net',
-      sendText: async (_c, t) => {
-        sent.push(t);
-      },
-      onAnswered: async () => {},
-      timeoutMs: 10, // simula os 15s
-    });
-    expect(r).toBe('fallback');
-    expect(sent).toEqual([FALLBACK_CALL_TEXT]);
+    expect(bridged).toBe(true);
   });
 
   it('fallback: caller FORA do escopo → decline, ZERO mensagem (decreto owner)', async () => {

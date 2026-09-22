@@ -47,23 +47,37 @@ export interface AutoAnswerDeps {
   sendText: (chatId: string, text: string) => Promise<void>;
   onAnswered: () => Promise<void>;
   timeoutMs?: number;
+  /** Fim da janela (~15s): true = atende sozinho (VoiceBridge); false/default
+   *  = msg de fallback (§26, decreto owner). */
+  autoAnswerOnTimeout?: boolean;
   now?: () => number;
 }
 
-/** Um ciclo: se tocando, espera até timeoutMs e decide atender ou fallback. */
+/** Um ciclo: se tocando, espera até timeoutMs e decide atender ou fallback.
+ *  JANELA DO HUMANO PRIMEIRO (decreto owner, headed): enquanto o popup
+ *  toca, o sistema SÓ OBSERVA — se o owner atender/recusar (hasIncoming
+ *  vira false), sai sem agir. Só no FIM da janela (~15s, §26) age: caller
+ *  no escopo → atende sozinho (VoiceBridge); fora de escopo → msg fallback. */
 export async function handleIncomingCall(deps: AutoAnswerDeps): Promise<'answered' | 'fallback' | 'none'> {
   if (!(await deps.detector.hasIncoming())) return 'none';
   const deadline = (deps.now?.() ?? Date.now()) + (deps.timeoutMs ?? 15_000);
   while ((deps.now?.() ?? Date.now()) < deadline) {
-    if (await deps.detector.accept()) {
-      await deps.onAnswered(); // liga o VoiceBridge (guia hardware)
-      return 'answered';
-    }
+    if (!(await deps.detector.hasIncoming())) return 'none'; // humano atendeu/declinou
     await new Promise((r) => setTimeout(r, 1_000));
   }
-  // timeout ~15s (§26): fallback automático, SÓ se o caller estiver no escopo.
+  // fim da janela: ninguém agiu — o sistema age (§26). Default = fallback msg
+  // (decreto owner). Quando a ponte de voz estiver validada de ponta a ponta,
+  // autoAnswerOnTimeout=true vira atendimento automático (VoiceBridge).
   if (await deps.isCallerAllowed(deps.callerChatId)) {
+    if (deps.autoAnswerOnTimeout) {
+      if (await deps.detector.accept()) {
+        await deps.onAnswered();
+        return 'answered';
+      }
+      return 'none';
+    }
     await deps.sendText(deps.callerChatId, FALLBACK_CALL_TEXT);
+    await deps.detector.decline();
     return 'fallback';
   }
   await deps.detector.decline();
