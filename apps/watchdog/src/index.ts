@@ -170,8 +170,7 @@ async function main(): Promise<void> {
   const backup = () => {
     execFile('bash', ['scripts/backup-db.sh'], { cwd: ROOT, timeout: 300_000, env: { ...process.env, MSYS_NO_PATHCONV: '1' } }, (err, stdout) => {
       if (err) log.error({ err }, 'backup: FALHOU (falha explícita registrada)');
-      else log.info({ out: stdout.trim().split('
-').pop() }, 'backup: ok (§30)');
+      else log.info({ out: stdout.trim().split('\n').pop() }, 'backup: ok (§30)');
     });
   };
   backup();
