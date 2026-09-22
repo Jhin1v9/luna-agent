@@ -62,18 +62,34 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       }
       return; // sem chat autorizado: idle explícito (fail-closed)
     }
-    const res = await fetchImpl(`${base}/getUpdates?offset=${offset}&timeout=20`).catch(() => null);
+    const res = await fetchImpl(`${base}/getUpdates?offset=${offset}&timeout=20`).catch((err) => {
+      // Falha de rede/antigo silencioso: diagnóstico ao vivo 2026-09-22
+      // (silêncio total do admin) — drop silencioso virou log.
+      deps.log.warn({ err: String(err).slice(0, 200) }, 'admin telegram: getUpdates falhou (rede)');
+      return null;
+    });
     if (!res) return;
-    const data = (await res.json().catch(() => null)) as { ok: boolean; result: unknown[] } | null;
-    if (!data?.ok) return;
+    const data = (await res.json().catch(() => null)) as { ok: boolean; result: unknown[]; description?: string } | null;
+    if (!data?.ok) {
+      deps.log.warn({ status: res.status, desc: data?.description ?? null }, 'admin telegram: getUpdates rejeitado');
+      return;
+    }
     for (const raw of data.result) {
       const parsed = updateSchema.safeParse(raw);
-      if (!parsed.success) continue;
+      if (!parsed.success) {
+        deps.log.warn({ update_id: (raw as { update_id?: number }).update_id }, 'admin telegram: update fora do schema (ignorado)');
+        continue;
+      }
       const u = parsed.data;
       offset = Math.max(offset, u.update_id + 1);
-      if (String(u.message.chat.id) !== deps.allowedChatId) continue; // fora do chat autorizado: ignora
+      if (String(u.message.chat.id) !== deps.allowedChatId) {
+        deps.log.info({ chat: u.message.chat.id, esperado: deps.allowedChatId }, 'admin telegram: update de chat não autorizado (ignorado)');
+        continue;
+      }
       const text = (u.message.text ?? '').trim();
       if (!text) continue;
+
+      deps.log.info({ from: u.message.from?.first_name ?? '?', text: text.slice(0, 80) }, 'admin telegram: pergunta recebida');
 
       const correlation = `corr_admin_${Date.now()}`;
       const pack = await deps.buildAdminPack();

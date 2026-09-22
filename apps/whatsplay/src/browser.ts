@@ -279,7 +279,20 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         throw new Error(`não consegui abrir o chat '${chatId}' — envio ABORTADO para não ir pro chat errado`);
       }
       // Seletor do campo: override vem do auto-reparo (§14); default = SELECTORS.
-      const inputSelector = opts?.inputSelector ?? SELECTORS.inputBox;
+      // SEGURANÇA (bug ao vivo 2026-09-22): o FAST do auto-reparo sugere
+      // seletores da LISTA/resultado de busca (#pane-side …) — clicáveis, mas
+      // NÃO são o campo de composição; aplicados aqui travavam o envio até
+      // esgotar as 3 tentativas. Só aceita override que exista DENTRO de
+      // #main (o painel da conversa, onde fica o campo de digitação).
+      let inputSelector: string = SELECTORS.inputBox;
+      if (opts?.inputSelector) {
+        const inMain = await page
+          .locator(`#main ${opts.inputSelector}`)
+          .first()
+          .count()
+          .catch(() => 0);
+        if (inMain > 0) inputSelector = opts.inputSelector;
+      }
       await page.click(inputSelector);
       // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
       await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
