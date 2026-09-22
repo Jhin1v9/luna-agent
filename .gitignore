@@ -11,3 +11,6 @@ coverage/
 
 # logs locais dos daemons (Start-Process detached)
 logs-*.log
+
+# Backups locais (Postgres dumps do watchdog §30 — gerados 1x/dia)
+backups/*.dump

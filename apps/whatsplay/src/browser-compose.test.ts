@@ -70,8 +70,9 @@ function fakePage(initialCompose: string) {
       }
       // leitura de comprimento do campo (composeBoxTextLen)
       if (script.includes("textContent || ''")) return state.composeText.trim().length;
-      // OPEN_CHAT_TITLE_SCRIPT → nenhum chat aberto (closeCurrentChat ok)
-      if (script.includes('conversation-info-header')) return null;
+      // OPEN_CHAT_TITLE_SCRIPT → painel do chat-x aberto (o transport agora
+      // exige painel aberto antes de digitar)
+      if (script.includes('conversation-info-header')) return 'chat-x';
       return undefined;
     },
   };

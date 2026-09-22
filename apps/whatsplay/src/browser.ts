@@ -352,6 +352,12 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         );
       }
       await page.waitForTimeout(150);
+      // Invariante: o painel tem que estar aberto NA HORA de digitar — se
+      // fechou (sweep/guard/reload), aborta ANTES de escrever (senão o
+      // texto vira rascunho em whatever chat estiver aberto).
+      if ((await this.currentOpenChatTitle()) === null) {
+        throw new Error('painel fechou antes da digitação — envio ABORTADO pra não virar rascunho no chat errado');
+      }
       // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
       await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
       await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
@@ -611,25 +617,34 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       .locator('#side [data-testid="chat-list-search"]:visible, #side [role="textbox"]:visible, #side div[contenteditable="true"]:visible')
       .first();
     if ((await search.count()) > 0) {
+      // INVARIANTE: NUNCA digitar com painel aberto — se um chat abriu no
+      // meio do caminho, os chars caem no campo DELE e viram rascunho no
+      // chat errado (evidência ao vivo 2026-09-22: resposta do owner
+      // espalhada como rascunhos '31' no Tú e 'ai' no grupo).
+      const noPanel = async (): Promise<boolean> => (await this.currentOpenChatTitle()) === null;
       await search.click({ timeout: 3_000 }).catch(() => {});
-      // Limpa termo residual ANTES de digitar — por TECLADO (execCommand no
-      // contenteditable do WA Web não limpa de verdade; bug ao vivo
-      // 2026-09-22, 3ª evidência repair-*.png — termo residual poluía a busca).
       await page.keyboard.press('Control+a').catch(() => {});
       await page.keyboard.press('Backspace').catch(() => {});
       await page.waitForTimeout(300);
-      // Digitação em blocos com re-foco (evidência ao vivo, repair-*.png
-      // 09:52): o WA Web RE-RENDERIZA o contenteditable no meio da digitação
-      // e o restante dos chars cai fora — "346850931" na busca e "92" virou
-      // rascunho no chat do Tú. Blocos de 3 com re-click + conferência do
-      // termo completo; se truncou, limpa e falha cedo (o retry recomeça
-      // do zero em vez de clicar em resultado errado).
-      for (let i = 0; i < searchKey.length; i += 3) {
-        await search.click({ timeout: 1_000 }).catch(() => {});
-        await page.keyboard.type(searchKey.slice(i, i + 3), { delay: 70 });
-        await page.waitForTimeout(120);
+      // Digita o termo INTEIRO de uma vez; o WA pode re-renderizar o campo
+      // e truncar — a conferência pega, limpa e REPETE mais devagar. Sem
+      // re-click por bloco (o re-click abria resultados no meio da digitação).
+      let typed: string | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (!(await noPanel())) {
+          await page.keyboard.press('Escape').catch(() => {});
+          await page.waitForTimeout(400);
+          await search.click({ timeout: 1_500 }).catch(() => {});
+        }
+        await page.keyboard.type(searchKey, { delay: attempt === 0 ? 40 : 90 });
+        await page.waitForTimeout(600);
+        typed = await this.searchFieldValue(page);
+        if (typed === searchKey) break;
+        this.config.log?.warn({ tentativa: attempt + 1, obtido: typed }, 'busca truncada pelo WA — limpando e tentando mais devagar');
+        await page.keyboard.press('Control+a').catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.waitForTimeout(400);
       }
-      const typed = await this.searchFieldValue(page);
       if (typed !== null && typed !== searchKey) {
         this.config.log?.warn({ esperado: searchKey, obtido: typed }, 'busca truncada pelo WA — limpando pra retry');
         await page.keyboard.press('Control+a').catch(() => {});
