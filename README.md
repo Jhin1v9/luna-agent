@@ -69,6 +69,18 @@ cola = tabela `jobs` + worker.
 > polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
 > id); alertas seguem fail-closed em log até lá.
 >
+> **Rodada F8 + varredura ✅ (2026-09-22)** — DLQ redrive automático (§7.7:
+> falhas transientes como quota 403 voltam pra fila sozinhas; 5+ eventos reais
+> do owner recuperáveis), auto-gatilho do heal (ADR-030: DOWN persistente com
+> plano registrado dispara runHeal; sem plano = diagnóstico assistido, nunca
+> palpite), **F8 hardening**: 15 golden conversations reais com evals (score
+> 93/100 ao vivo — baseline anti-regressão de prompt), replay §29 validado
+> (dry-run de evento real), failure injection formalizada (LLM
+> timeout/down/tool-500), backup/restore TESTADOS (dump + restore num
+> scratch: 24 clientes/99 msgs/schema 008) + backup diário no watchdog.
+> **173 testes verdes. 5 serviços online, backup agendado rodando.**
+> Telegram chat_id ainda pendente (poll autocontido ativo).
+>
 > **F5 + F7 ✅ (2026-09-22)** — F5 escalação avançada: SLA real (CRÍTICA 5min/
 > ALTA 10min → follow-up de degrau, uma vez), coordenação consciente
 > (humano responde → HUMAN_HANDLING + handled_by; humano extra → status, jamás
