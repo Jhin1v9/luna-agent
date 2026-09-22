@@ -2,6 +2,7 @@ import type { KimiAdapterConfig, KimiLiveAdapter, KimiAdapterMode } from './type
 import { MockKimiAdapter } from './mock.js';
 import { KimiWebAdapter } from './kimi-web.js';
 import { KimiApiAdapter } from './kimi-api.js';
+import { KimiCliAdapter } from './kimi-cli.js';
 import { GeminiAdapter } from './gemini.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
@@ -12,6 +13,8 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
       return new KimiWebAdapter(config);
     case 'kimi-api':
       return new KimiApiAdapter(config);
+    case 'kimi-cli':
+      return new KimiCliAdapter(config);
     case 'gemini':
       return new GeminiAdapter(config);
   }
@@ -48,6 +51,8 @@ export type {
 export { MockKimiAdapter } from './mock.js';
 export { KimiWebAdapter } from './kimi-web.js';
 export { KimiApiAdapter, KimiApiError, KimiApiMissingKey, assertKimiApiKey } from './kimi-api.js';
+export { KimiCliAdapter } from './kimi-cli.js';
+export type { CliSpawn, CliSpawned, KimiCliAdapterDeps } from './kimi-cli.js';
 export { GeminiAdapter } from './gemini.js';
 export { FallbackAdapter } from './fallback.js';
 export { probeVisionSupport } from './vision-probe.js';
