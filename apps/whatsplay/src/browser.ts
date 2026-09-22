@@ -375,27 +375,35 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       .first();
     if ((await search.count()) > 0) {
       await search.click({ timeout: 3_000 }).catch(() => {});
-      // Limpa termo residual antes de digitar (senão concatena e os
-      // resultados não casam — bug ao vivo 2026-09-22, 2ª evidência).
-      await page.evaluate(`(() => {
-        const b = document.querySelector('#side [data-testid="chat-list-search"]') ||
-                  document.querySelector('#side [role="textbox"]') ||
-                  document.querySelector('#side div[contenteditable="true"]');
-        if (b) { b.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }
-      })`).catch(() => {});
+      // Limpa termo residual ANTES de digitar — por TECLADO (execCommand no
+      // contenteditable do WA Web não limpa de verdade; bug ao vivo
+      // 2026-09-22, 3ª evidência repair-*.png — termo residual poluía a busca).
+      await page.keyboard.press('Control+a').catch(() => {});
+      await page.keyboard.press('Backspace').catch(() => {});
+      await page.waitForTimeout(300);
       await page.keyboard.type(searchKey, { delay: 40 });
       await page.waitForTimeout(900);
-      // Na view de busca o title do resultado CASA com o exato — usa o mesmo
-      // locator da row (first() genérico clicava no elemento errado e o
-      // painel nunca abria; evidência repair-*.png 06:50 e 06:56).
+      // Na view de busca o DOM muda: o resultado é role="listitem" (não "row")
+      // e pode não ter data-testid="cell-frame-container" — cobre os três
+      // formatos + casamento por prefixo (título com emoji varia no DOM).
+      const partial = nameOrId.replace(/"/g, '\\"').slice(0, 12);
       const result = page
-        .locator(`#pane-side [data-testid="cell-frame-container"]:has([title="${key}"]), #pane-side [role="row"]:has([title="${key}"])`)
+        .locator(
+          `#pane-side [data-testid="cell-frame-container"]:has([title="${key}"]), ` +
+          `#pane-side [role="row"]:has([title="${key}"]), ` +
+          `#pane-side [role="listitem"] [title*="${partial}"]`,
+        )
         .first();
       await result.click({ timeout: 4_000 }).catch(() => {});
       await page.waitForTimeout(1_500);
       if (!(await matches())) {
         // retry: o WA Web às vezes precisa de um segundo clique/tempo maior
         await result.click({ timeout: 3_000 }).catch(() => {});
+        await page.waitForTimeout(2_000);
+      }
+      if (!(await matches())) {
+        // último recurso: Enter abre o primeiro resultado da busca no WA Web
+        await page.keyboard.press('Enter').catch(() => {});
         await page.waitForTimeout(2_000);
       }
       // limpa a busca DE VERDADE (selectAll+delete) — Escape sozinho deixava
