@@ -375,11 +375,29 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       .first();
     if ((await search.count()) > 0) {
       await search.click({ timeout: 3_000 }).catch(() => {});
+      // Limpa termo residual antes de digitar (senão concatena e os
+      // resultados não casam — bug ao vivo 2026-09-22, 2ª evidência).
+      await page.evaluate(`(() => {
+        const b = document.querySelector('#side [data-testid="chat-list-search"]') ||
+                  document.querySelector('#side [role="textbox"]') ||
+                  document.querySelector('#side div[contenteditable="true"]');
+        if (b) { b.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }
+      })`).catch(() => {});
       await page.keyboard.type(searchKey, { delay: 40 });
       await page.waitForTimeout(900);
-      const firstResult = page.locator('#pane-side [role="row"], #pane-side [data-testid="cell-frame-container"]').first();
-      await firstResult.click({ timeout: 4_000 }).catch(() => {});
-      await page.waitForTimeout(700);
+      // Na view de busca o title do resultado CASA com o exato — usa o mesmo
+      // locator da row (first() genérico clicava no elemento errado e o
+      // painel nunca abria; evidência repair-*.png 06:50 e 06:56).
+      const result = page
+        .locator(`#pane-side [data-testid="cell-frame-container"]:has([title="${key}"]), #pane-side [role="row"]:has([title="${key}"])`)
+        .first();
+      await result.click({ timeout: 4_000 }).catch(() => {});
+      await page.waitForTimeout(1_500);
+      if (!(await matches())) {
+        // retry: o WA Web às vezes precisa de um segundo clique/tempo maior
+        await result.click({ timeout: 3_000 }).catch(() => {});
+        await page.waitForTimeout(2_000);
+      }
       // limpa a busca DE VERDADE (selectAll+delete) — Escape sozinho deixava
       // o termo no campo e poluía o ciclo seguinte (bug ao vivo 2026-09-22).
       await page
