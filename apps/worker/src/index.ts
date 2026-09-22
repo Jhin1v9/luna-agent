@@ -1,6 +1,6 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection, reapStaleLocks, writeHeartbeat } from '@luna/database';
+import { getPool, closePool, checkConnection, reapStaleLocks, writeHeartbeat, readHeartbeats } from '@luna/database';
 import { JobRunner } from './jobs/poller.js';
 
 // F1.2 — worker real: polla a tabela `jobs` (FOR UPDATE SKIP LOCKED) e executa
@@ -79,11 +79,48 @@ async function main(): Promise<void> {
   // interna, como o reaper), a cada 60s.
   const { runEscalationTick } = await import('./jobs/escalation-tick.js');
   const escalationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
+  // Auto-gatilho do heal (ADR-030): DOWN persistente em componente próprio com
+  // plano registrado dispara runHeal. exec real: git via execFile, pm2 via cmd.
+  const { autoHealTick, DownStreaks } = await import('./selfheal/trigger.js');
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execFileP = promisify(execFile);
+  const healExec = async (cmd: string, args: string[]) => {
+    try {
+      const { stdout } = await execFileP(cmd, args, { cwd: 'C:/Users/Abner/Documents/Luna cto/luna-agent', timeout: 180_000 });
+      return { code: 0, stdout };
+    } catch (err) {
+      const e = err as { code?: number; stdout?: string; message?: string };
+      return { code: e.code ?? 1, stdout: `${e.stdout ?? ''}
+${e.message ?? ''}` };
+    }
+  };
+  const downStreaks = new DownStreaks();
   const escTick = async () => {
     try {
       await runEscalationTick({ pool, log, telegram: escalationTelegram });
+      await autoHealTick(
+        {
+          pool, log, telegram: escalationTelegram, exec: healExec,
+          restartService: async (s) => {
+            await healExec('cmd.exe', ['/c', 'pm2', 'restart', `luna-${s}`]);
+          },
+          healthCheck: async (s) => {
+            if (s === 'orchestrator') {
+              try {
+                const r = await fetch(`http://${config.HOST}:${config.PORT}/health`, { signal: AbortSignal.timeout(3_000) });
+                return r.ok;
+              } catch { return false; }
+            }
+            const hb = await readHeartbeats(pool).catch(() => [] as never as Awaited<ReturnType<typeof readHeartbeats>>);
+            const row = hb.find((r) => r.service === s);
+            return !!row && Date.now() - new Date(row.seen_at).getTime() < 45_000;
+          },
+        },
+        downStreaks,
+      );
     } catch (err) {
-      log.error({ err }, 'escalation tick falhou');
+      log.error({ err }, 'escalation/autoheal tick falhou');
     }
   };
   await escTick();
