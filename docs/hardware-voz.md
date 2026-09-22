@@ -90,6 +90,28 @@ chamada real (a voz do owner voltando pra ele), desligar B2 no strip VAIO
    resposta do Operador (AUX→Out 6) entra na chamada. Eco = clicar B2 off no
    strip VAIO.
 
+### Checkpoint 3 — PRIMEIRA CHAMADA REAL (2026-09-22 23:35, ~1 min) ✅
+
+**Wiring improvisado do owner** (AUX→B2 morto na época): ChatGPT Voz **mic = `microfone luna` (B2)** e **saída = `luna fone` (VAIO)**; WhatsApp mic = `microfone luna` (B2). Registro no Zap: "Llamada — 1 minuto — 23:35" (bubble voip, saída).
+
+**Conversa** (transcrições lidas no chrome-voice): o Pai respondeu educado ("Tudo bem. Prazer falar com você"), entendeu o teste ("A gente tá fazendo um teste aqui da chamada da Luna pro meu telefone"), aprovou ("Bem bacana", "Perfeito. Muito bem") e se despediu ("Tchau"). O Operador seguiu o prompt §26 (se apresentou como a voz da Luna, se despediu no fim após a instrução de despedida). Artefatos de transcrição gaga do Operador ("Como e tão a coi a?") = STT do **auto-eco** (a voz dele re-entrando pelo mic B2).
+
+**Mapa de loops do wiring improvisado** (por que o eco):
+```
+voz do Pai → WhatsApp spk (VAIO) → B2 → ChatGPT mic ✅
+                          └──→ B2 → WhatsApp mic → Pai ouve a si mesmo ⚠️ ECO
+voz do Operador → ChatGPT spk (VAIO) → B2 → WhatsApp mic ✅
+                                    └──→ B2 → ChatGPT mic → auto-eco ⚠️
+```
+Funciona pros dois sentidos, com eco pros dois lados.
+
+**Circuito LIMPO (checklist — falta só o rename do AUX)**:
+1. Owner: renomear o playback AUX (detecção automática por tom + medidor do Banana) → nome único.
+2. Chrome-voice: saída do ChatGPT = `VM In 2 (AUX-ChatGPT)` (flag `--audio-output-device` — funciona com nome único).
+3. Banana: confirmar strip AUX → B2 (o owner vê o medidor).
+4. Picks finais: WhatsApp mic = `microfone luna` (B2 — voz do Operador); ChatGPT mic = Out 7/"luna fone" B1 (voz do Pai, sem eco).
+5. Resultado: voz do Pai → VAIO→B1 → ChatGPT mic (limpo); voz do Operador → AUX→B2 → WhatsApp mic (limpo). Zero eco.
+
 ## (arquivo histórico) Inventário necessário
 
 - **Driver de áudio**: UM único device (`ROOT\MEDIA\0000`, serviço
