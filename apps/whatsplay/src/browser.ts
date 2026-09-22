@@ -62,6 +62,8 @@ async function evalWithArg(page: Page, script: string, arg: unknown): Promise<un
 }
 
 export class WhatsAppWebTransport implements WhatsAppTransport {
+  /** Guarda de painel (decreto owner) — setada pelo daemon após o launch. */
+  panelGuard: import('./panel-guard.js').PanelGuard | null = null;
   private ctx: BrowserContext | null = null;
   private page: Page | null = null;
   private lastHeartbeatAt = new Date();
@@ -193,34 +195,54 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   async readConversation(chatId: string, limit = 20): Promise<ConversationMessage[]> {
     const page = this.requirePage();
-    // NUNCA ler o painel sem conferir o chat: openChat verifica o título.
-    // Falhou → retorna vazio (o sweep tenta de novo no próximo ciclo).
-    if (!(await this.openChat(chatId))) return [];
-    const messages = (await evalWithArg(page, READ_CONVERSATION_SCRIPT, {
-      sel: SELECTORS,
-      lim: limit,
-    })) as ConversationMessage[];
-    await this.closeCurrentChat(); // decreto: não deixar chat aberto
-    return messages.filter((m) => m.text);
+    const guard = this.panelGuard;
+    await guard?.beginCycle('readConversation'); // painel DEVE estar na lista
+    try {
+      // NUNCA ler o painel sem conferir o chat: openChat verifica o título.
+      // Falhou → retorna vazio (o sweep tenta de novo no próximo ciclo).
+      if (!(await this.openChat(chatId))) return [];
+      const messages = (await evalWithArg(page, READ_CONVERSATION_SCRIPT, {
+        sel: SELECTORS,
+        lim: limit,
+      })) as ConversationMessage[];
+      return messages.filter((m) => m.text);
+    } finally {
+      try {
+        await this.closeCurrentChat(); // decreto: nunca deixar aberto
+        await guard?.endCycle('readConversation');
+      } catch {
+        /* PanelStuckError já reportou via onStuck */
+      }
+    }
   }
 
   async sendMessage(chatId: string, text: string, opts?: { inputSelector?: string }): Promise<string> {
     const page = this.requirePage();
-    // Idem: sem verificação, o texto iria para o chat ERRADO (bug de
-    // roteamento 2026-09-21). Falha explícita > envio no destino errado.
-    if (!(await this.openChat(chatId))) {
-      throw new Error(`não consegui abrir o chat '${chatId}' — envio ABORTADO para não ir pro chat errado`);
+    const guard = this.panelGuard;
+    await guard?.beginCycle('sendMessage');
+    try {
+      // Idem: sem verificação, o texto iria para o chat ERRADO (bug de
+      // roteamento 2026-09-21). Falha explícita > envio no destino errado.
+      if (!(await this.openChat(chatId))) {
+        throw new Error(`não consegui abrir o chat '${chatId}' — envio ABORTADO para não ir pro chat errado`);
+      }
+      // Seletor do campo: override vem do auto-reparo (§14); default = SELECTORS.
+      const inputSelector = opts?.inputSelector ?? SELECTORS.inputBox;
+      await page.click(inputSelector);
+      // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
+      await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
+      await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
+      await page.keyboard.press('Enter');
+      this.lastHeartbeatAt = new Date();
+      return `sent:${chatId}:${Date.now()}`;
+    } finally {
+      try {
+        await this.closeCurrentChat(); // decreto: nunca deixar aberto
+        await guard?.endCycle('sendMessage');
+      } catch {
+        /* PanelStuckError já reportou via onStuck */
+      }
     }
-    // Seletor do campo: override vem do auto-reparo (§14); default = SELECTORS.
-    const inputSelector = opts?.inputSelector ?? SELECTORS.inputBox;
-    await page.click(inputSelector);
-    // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
-    await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
-    await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
-    await page.keyboard.press('Enter');
-    this.lastHeartbeatAt = new Date();
-    await this.closeCurrentChat(); // decreto: não deixar chat aberto
-    return `sent:${chatId}:${Date.now()}`;
   }
 
   /**
@@ -262,20 +284,29 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
    * já processado. Chip dedicado (§36 pendente do owner) remove a
    * necessidade.
    */
-  async closeCurrentChat(): Promise<void> {
+  /**
+   * Decreto owner (2026-09-22): fechamento VERIFICÁVEL. Retorna true só se o
+   * painel voltou pra lista de chats (título some). Retry: Escape → wordmark.
+   */
+  async closeCurrentChat(): Promise<boolean> {
     const page = this.requirePage();
     await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(400);
-    if ((await this.currentOpenChatTitle()) !== null) {
-      // fallback: clicar no wordmark/header da lista (deseleta o painel)
-      await page
-        .evaluate(`(() => {
-          const el = document.querySelector('#side [data-testid="wa-wordmark"]') || document.querySelector('#side header');
-          if (el) el.click();
-        })()`)
-        .catch(() => {});
-      await page.waitForTimeout(400);
-    }
+    if ((await this.currentOpenChatTitle()) === null) return true;
+    // fallback: clicar no wordmark/header da lista (deseleta o painel)
+    await page
+      .evaluate(`(() => {
+        const el = document.querySelector('#side [data-testid="wa-wordmark"]') || document.querySelector('#side header');
+        if (el) el.click();
+      })()`)
+      .catch(() => {});
+    await page.waitForTimeout(400);
+    return (await this.currentOpenChatTitle()) === null;
+  }
+
+  /** Título do chat aberto agora (null = lista). Read-only, não altera estado. */
+  async peekOpenChat(): Promise<string | null> {
+    return this.currentOpenChatTitle();
   }
 
   /**

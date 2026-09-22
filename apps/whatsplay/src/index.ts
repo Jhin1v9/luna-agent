@@ -63,6 +63,41 @@ async function main(): Promise<void> {
   });
 
   await transport.launch();
+
+  // Guarda de painel (decreto owner): serialização dura — antes de qualquer
+  // ciclo (ler/responder), painel DEVE estar na lista. Sobra de ciclo/
+  // relaunch restaurado → fecha com warn. Travado → visibilidade total
+  // (log + audit + Telegram) e reinício do serviço (pm2 ressobe; exit 1).
+  const { PanelGuard, PanelStuckError } = await import('./panel-guard.js');
+  const stuckAlerts = new Set<string>();
+  transport.panelGuard = new PanelGuard({
+    peek: () => transport.peekOpenChat(),
+    close: () => transport.closeCurrentChat(),
+    log,
+    onStuck: async (chatTitle, context) => {
+      const key = chatTitle;
+      if (stuckAlerts.has(key)) return; // alerta 1x por chat travado
+      stuckAlerts.add(key);
+      log.error({ chat: chatTitle, context }, 'watchdog: estado de painel inconsistente — reiniciando whatsplay');
+      const { recordAudit } = await import('@luna/database');
+      await recordAudit(pool, {
+        actor: 'whatsplay', action: 'panel.stuck_restart', tool: 'panel_guard',
+        result: 'failed', metadata: { chat: chatTitle, context },
+      }).catch(() => {});
+      try {
+        await sendTeamMessage(
+          `🪟 Painel do WhatsPlay travado (chat '${chatTitle}' não fecha) — reiniciando o serviço. Aviso do decreto anti-notificação-perdida.`,
+          telegramConfig,
+        );
+      } catch {
+        log.error('panel guard: alerta Telegram falhou (falha explícita registrada)');
+      }
+      // Reinício do serviço (decreto): pm2 ressobe o processo limpo.
+      setTimeout(() => process.exit(1), 1_500);
+    },
+  });
+  void PanelStuckError;
+
   const initialState = await transport.detectSessionState();
   log.info({ session_state: initialState }, 'sessão WhatsApp detectada');
   if (initialState !== 'LOGGED_IN') {

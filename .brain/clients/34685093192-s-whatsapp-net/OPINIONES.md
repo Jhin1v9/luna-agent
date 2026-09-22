@@ -154,3 +154,41 @@ Cliente aprovou a prévia dos emails de resposta e combinou dar o formato final 
 }
 ```
 
+## 2026-09-22 — Luna
+
+Conversa informal e descontraída. Luna acompanhou a aprovação da prévia dos emails de resposta, registrou que falta formatação final + implantação, e se despediu com empatia durante o papo pessoal, sempre oferecendo ajuda da Nexo.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "conteudo",
+  "product": "Emails de atendimento ao cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Aguardar formatação final e implantação dos emails de resposta; verificar se foi executada e se cliente está recebendo as respostas corretas.",
+  "quality_score": 5,
+  "summary": "Conversa informal e descontraída. Luna acompanhou a aprovação da prévia dos emails de resposta, registrou que falta formatação final + implantação, e se despediu com empatia durante o papo pessoal, sempre oferecendo ajuda da Nexo.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-09-22 — Luna
+
+Nonoke aprovou a prévia dos emails de resposta e combinou dar formato final e implantar em breve. Conversa bem descontraída e positiva, com Luna pontuando o alinhamento e oferecendo registrar o que falta.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "templates de email / automação de respostas",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Executar formatação final e implantação dos emails (hoje ou amanhã) e confirmar com Nonoke; Ana acompanha o recebimento das respostas pelo cliente.",
+  "quality_score": 5,
+  "summary": "Nonoke aprovou a prévia dos emails de resposta e combinou dar formato final e implantar em breve. Conversa bem descontraída e positiva, com Luna pontuando o alinhamento e oferecendo registrar o que falta.",
+  "client_signal": "pedido"
+}
+```
+
