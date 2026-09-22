@@ -795,12 +795,12 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       // header do chat. Candidatos em ordem, com log de qual foi usado.
       const candidates: Array<{ name: string; sel: string }> = obs.infoPanelOpen
         ? [
-            { name: 'botão Llamar do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label*="llamar" i], [data-testid="contact_info_panel"] [aria-label*="chamada de voz" i], [data-testid="contact_info_panel"] [aria-label*="voice call" i]' },
-            { name: 'botão do header do chat', sel: '#main header [aria-label*="llamar" i], #main header [aria-label*="chamada de voz" i], #main header [aria-label*="voice call" i]' },
+            { name: 'botão Llamar do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label="Llamada"], [data-testid="contact_info_panel"] [aria-label="Chamada"], [data-testid="contact_info_panel"] [aria-label="Voice call"], [data-testid="contact_info_panel"] [data-testid="ic-voice-call"], [data-testid="contact_info_panel"] [title*="Llamar"]' },
+            { name: 'botão do header do chat', sel: '#main header [aria-label="Llamada"], #main header [aria-label="Chamada"], #main header [aria-label="Voice call"], #main header [data-testid="ic-voice-call"], #main header [title*="Llamar"]' },
           ]
         : [
-            { name: 'botão do header do chat', sel: '#main header [aria-label*="llamar" i], #main header [aria-label*="chamada de voz" i], #main header [aria-label*="voice call" i]' },
-            { name: 'botão do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label*="llamar" i], [data-testid="contact_info_panel"] [aria-label*="chamada de voz" i], [data-testid="contact_info_panel"] [aria-label*="voice call" i]' },
+            { name: 'botão do header do chat', sel: '#main header [aria-label="Llamada"], #main header [aria-label="Chamada"], #main header [aria-label="Voice call"], #main header [data-testid="ic-voice-call"], #main header [title*="Llamar"]' },
+            { name: 'botão do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label="Llamada"], [data-testid="contact_info_panel"] [aria-label="Chamada"], [data-testid="contact_info_panel"] [aria-label="Voice call"]' },
           ];
 
       let clicked = false;
@@ -860,7 +860,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       return;
     }
     const endSel =
-      '[data-testid="call-end"], [aria-label*="encerrar" i], [aria-label*="end call" i], [aria-label*="finalizar chamada" i]';
+      '[data-testid="call-end"], button[aria-label="Finalizar"], button[aria-label="Encerrar"], ' +
+      '[aria-label*="encerrar" i], [aria-label*="end call" i], [aria-label*="finalizar" i], ' +
+      '[aria-label*="colgar" i], [aria-label*="terminar llamada" i], [data-testid*="end-call" i]';
     const ok = await page
       .locator(endSel)
       .first()
