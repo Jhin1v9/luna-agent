@@ -703,6 +703,171 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   }
 
   /**
+   * OBSERVAÇÃO PRÉVIA (decreto owner: "o agente tem que olhar a tela, entender
+   * onde tá, e só então agir, narrando"). Captura o estado do painel: lista,
+   * chat (com título), painel de info do contato aberto (botões Llamar/Video),
+   * ou UI de chamada. Toda ação de voz começa aqui.
+   */
+  async observePanel(): Promise<{ state: string; title: string | null; infoPanelOpen: boolean }> {
+    const page = this.requirePage();
+    const raw = (await page
+      .evaluate(`(() => {
+        const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
+        const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
+        const title = titleEl && visible(titleEl) ? (titleEl.textContent || '').trim() : null;
+        const infoPanel = document.querySelector('[data-testid="contact_info_panel"]') ||
+                          document.querySelector('div[role="complementary"]');
+        const infoPanelOpen = !!(infoPanel && visible(infoPanel));
+        const callUi = !!Array.from(document.querySelectorAll('[data-testid]')).find((e) =>
+          /call|chamada/i.test(e.getAttribute('data-testid') || '') && visible(e));
+        let state = 'desconhecido';
+        if (callUi) state = 'chamada';
+        else if (infoPanelOpen) state = 'info-contato';
+        else if (title) state = 'chat';
+        else state = 'lista';
+        return { state, title, infoPanelOpen };
+      })()`)
+      .catch(() => null)) as { state: string; title: string | null; infoPanelOpen: boolean } | null;
+    return raw ?? { state: 'desconhecido', title: null, infoPanelOpen: false };
+  }
+
+  private describeObservation(obs: { state: string; title: string | null; infoPanelOpen: boolean }): string {
+    const onde =
+      obs.state === 'chamada'
+        ? 'UI de CHAMADA aberta'
+        : obs.state === 'info-contato'
+          ? `painel de INFO do contato ${obs.title ? `'${obs.title}'` : ''} aberto (Llamar/Video visíveis)`
+          : obs.state === 'chat'
+            ? `chat '${obs.title}' aberto`
+            : obs.state === 'lista'
+              ? 'lista de chats (nenhum painel aberto)'
+              : 'estado ilegível';
+    return onde;
+  }
+
+  /**
+   * LIGAÇÃO CONSCIENTE (decreto owner): observa → decide → age → verifica,
+   * narrando cada passo no log. NUNCA vagueia: se já está no chat do contato,
+   * não sai; se o painel de info está aberto, usa o botão de lá. Nunca busca
+   * por número quando o contato se resolve por nome.
+   */
+  async placeVoiceCall(contact: string): Promise<void> {
+    const page = this.requirePage();
+    const guard = this.panelGuard;
+    if (!(await this.isPageHealthy())) await this.ensurePageHealthy();
+    await guard?.beginCycle('placeVoiceCall');
+    try {
+      const say = (msg: string, extra?: object): void => {
+        this.config.log?.info(extra ?? {}, `voice-call: ${msg}`);
+      };
+      const core = (s: string): string =>
+        s
+          .replace(/[^\p{L}\p{N} ]/gu, '')
+          .replace(/\s+/g, ' ')
+          .toLowerCase();
+
+      let obs = await this.observePanel();
+      say(`observo a tela → ${this.describeObservation(obs)}`);
+
+      if (!(obs.title && core(obs.title) === core(contact))) {
+        say(`não estou no chat de '${contact}' — navegando (openChat por nome)`);
+        if (!(await this.openChat(contact))) {
+          throw new Error(`não consegui abrir o chat '${contact}' — ABORTO, nada foi clicado`);
+        }
+        obs = await this.observePanel();
+        say(`pós-navegação → ${this.describeObservation(obs)}`);
+        if (!(obs.title && core(obs.title) === core(contact))) {
+          throw new Error(`painel aberto não bate com '${contact}' (vi '${obs.title ?? 'sem título'}') — ABORTO`);
+        }
+      } else {
+        say(`já estou no chat de '${contact}' — fico aqui, sem sair vagueando`);
+      }
+
+      // Botão de LIGAR: painel de info (se aberto) tem prioridade; senão o
+      // header do chat. Candidatos em ordem, com log de qual foi usado.
+      const candidates: Array<{ name: string; sel: string }> = obs.infoPanelOpen
+        ? [
+            { name: 'botão Llamar do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label*="llamar" i], [data-testid="contact_info_panel"] [aria-label*="chamada de voz" i], [data-testid="contact_info_panel"] [aria-label*="voice call" i]' },
+            { name: 'botão do header do chat', sel: '#main header [aria-label*="llamar" i], #main header [aria-label*="chamada de voz" i], #main header [aria-label*="voice call" i]' },
+          ]
+        : [
+            { name: 'botão do header do chat', sel: '#main header [aria-label*="llamar" i], #main header [aria-label*="chamada de voz" i], #main header [aria-label*="voice call" i]' },
+            { name: 'botão do PAINEL DE INFO', sel: '[data-testid="contact_info_panel"] [aria-label*="llamar" i], [data-testid="contact_info_panel"] [aria-label*="chamada de voz" i], [data-testid="contact_info_panel"] [aria-label*="voice call" i]' },
+          ];
+
+      let clicked = false;
+      for (const cand of candidates) {
+        const loc = page.locator(cand.sel).first();
+        const ok = await loc.click({ timeout: 3_000 }).then(() => true).catch(() => false);
+        if (ok) {
+          say(`clico em ${cand.name}`);
+          clicked = true;
+          break;
+        }
+        say(`${cand.name} não apareceu em 3s — tento o próximo`);
+      }
+      if (!clicked) throw new Error(`nenhum botão de ligar encontrado para '${contact}' — ABORTO`);
+
+      await page.waitForTimeout(2_000);
+      const after = await this.observePanel();
+      say(`pós-clique → ${this.describeObservation(after)}`);
+      if (after.state === 'chamada') {
+        say(`UI de chamada aberta — ${contact} está sendo chamado(a)`);
+        return;
+      }
+      // verificação best-effort: re-tenta uma vez antes de falhar
+      say('UI de chamada não confirmada — uma última tentativa');
+      await page.locator(candidates[0]!.sel).first().click({ timeout: 2_000 }).catch(() => {});
+      await page.waitForTimeout(2_000);
+      const retry = await this.observePanel();
+      say(`retry → ${this.describeObservation(retry)}`);
+      if (retry.state !== 'chamada') {
+        throw new Error(`cliquei em ligar mas a UI de chamada não abriu (estado: ${retry.state}) — falha explícita`);
+      }
+    } finally {
+      // SEM closeCurrentChat aqui: a UI de chamada é o estado desejado —
+      // fechar o painel mataria a ligação. Só liberamos o ciclo do guard.
+      try {
+        await guard?.endCycle('placeVoiceCall');
+      } catch {
+        /* PanelStuckError já reportou via onStuck */
+      }
+    }
+  }
+
+  /**
+   * ENCERRA a chamada atual (decreto owner): observa, acha o botão de
+   * encerrar, clica e VERIFICA que voltou pro chat normal. Narrado.
+   */
+  async endCall(): Promise<void> {
+    const page = this.requirePage();
+    const guard = this.panelGuard;
+    const say = (msg: string): void => {
+      this.config.log?.info({}, `voice-call: ${msg}`);
+    };
+    const obs = await this.observePanel();
+    say(`observo a tela → ${this.describeObservation(obs)}`);
+    if (obs.state !== 'chamada') {
+      say('não vejo UI de chamada — nada a encerrar');
+      return;
+    }
+    const endSel =
+      '[data-testid="call-end"], [aria-label*="encerrar" i], [aria-label*="end call" i], [aria-label*="finalizar chamada" i]';
+    const ok = await page
+      .locator(endSel)
+      .first()
+      .click({ timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ok) throw new Error('botão de encerrar não encontrado — não consegui desligar');
+    say('cliquei em encerrar');
+    await page.waitForTimeout(1_500);
+    const after = await this.observePanel();
+    say(`pós-encerrar → ${this.describeObservation(after)}`);
+    if (after.state === 'chamada') throw new Error('cliquei em encerrar mas a chamada continua — falha explícita');
+  }
+
+  /**
    * jid: clica no PRIMEIRO resultado da busca por número com retry de espera
    * crescente (bug ao vivo 2026-09-22, decreto owner: "colocou o número certo
    * mas não clicou, simplesmente apagou"). O clique antigo era único e com o
