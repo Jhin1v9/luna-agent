@@ -640,7 +640,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.waitForTimeout(600);
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
-        this.config.log?.warn({ tentativa: attempt + 1, obtido: typed }, 'busca truncada pelo WA — limpando e tentando mais devagar');
+        this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca truncada pelo WA — limpando e tentando mais devagar');
         await page.keyboard.press('Control+a').catch(() => {});
         await page.keyboard.press('Backspace').catch(() => {});
         await page.waitForTimeout(400);
