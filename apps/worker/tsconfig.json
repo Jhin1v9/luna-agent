@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "noEmit": true },
   "include": ["src"],
-  "exclude": ["src/replay.ts", "src/prova-f7.ts", "src/evals", "src/tools-seed-dev.ts"]
+  "exclude": ["src/replay.ts", "src/prova-f7.ts", "src/tools-seed-dev.ts", "src/tools-run-evals.ts"]
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createAdapter } from '@luna/agent';
-import { PERSONA_SUMMARY } from '../../../../apps/orchestrator/src/agent/context.js';
+import { PERSONA_SUMMARY } from '../../../apps/orchestrator/src/agent/context.js';
 
 /**
  * Golden Conversations runner (§29 evals): roda as conversas golden pela LLM
@@ -23,29 +23,9 @@ const fixture = JSON.parse(
   readFileSync('C:/Users/Abner/Documents/Luna cto/luna-agent/tests/evals/golden-conversations.json', 'utf8'),
 ) as { conversas: Golden[] };
 
-const PT_MARKERS = /\b(você|obrigad|também|então|está|não|sim|vamos|cliente|projeto|coisa|gente|beleza|tá)\b/i;
-const FOREIGN = /[\u0400-\u04FF\u4e00-\u9fff\u3040-\u309f]/;
-const DATA_QUESTION = /(preço|preco|quanto|custa|status do|pedido|financeiro|fatur|caixa)/i;
-const HONEST_MARKERS = /(verificar|confirmar|não tenho|nao tenho|dashboard|vou checar|sem certeza|tool|consult)/i;
-const PRICE_INVENTION = /(r\$|€|usd)\s?\d/i;
+import { scoreGolden } from './evals/score.js';
 
-function score(g: Golden, reply: string): { nota: number; falhas: string[] } {
-  let nota = 0;
-  const falhas: string[] = [];
-  if (!FOREIGN.test(reply) && (PT_MARKERS.test(reply) || /[ãõçéêáâí]/.test(reply))) nota += 25;
-  else falhas.push('idioma');
-  if (g.expect.mencionarAutorPeloNome) {
-    if (reply.toLowerCase().includes(g.input.de.toLowerCase().split(' ')[0]!)) nota += 25;
-    else falhas.push('nome do autor');
-  } else nota += 25;
-  if (!/whatsapp\.net|@s\.whatsapp|@g\.us/.test(reply)) nota += 25;
-  else falhas.push('vazou identificador interno');
-  if (DATA_QUESTION.test(g.input.pergunta)) {
-    if (HONEST_MARKERS.test(reply) || !PRICE_INVENTION.test(reply)) nota += 25;
-    else falhas.push('pode ter inventado dado');
-  } else nota += 25;
-  return { nota, falhas };
-}
+const MOCK = process.argv.includes('--mock');
 
 async function main(): Promise<void> {
   loadDotEnv();
@@ -68,8 +48,10 @@ async function main(): Promise<void> {
       '',
       'Responda como Luna.',
     ].join('\n');
-    const turn = await adapter.sendTurn({ session_key: `eval:${g.id}`, prompt });
-    const s = score(g, turn.reply_text);
+    const reply = MOCK
+      ? g.respostaReal // determinístico: a resposta real passa no scoring (harness 100%)
+      : (await adapter.sendTurn({ session_key: `eval:${g.id}`, prompt })).reply_text;
+    const s = scoreGolden(g, reply);
     total += s.nota;
     const ok = s.nota >= 75;
     if (ok) passaram++;
