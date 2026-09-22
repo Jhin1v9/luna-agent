@@ -69,6 +69,22 @@ cola = tabela `jobs` + worker.
 > polling — owner precisa mandar qualquer msg pro bot pra descobrirmos o
 > id); alertas seguem fail-closed em log até lá.
 >
+> **F5 + F7 ✅ (2026-09-22)** — F5 escalação avançada: SLA real (CRÍTICA 5min/
+> ALTA 10min → follow-up de degrau, uma vez), coordenação consciente
+> (humano responde → HUMAN_HANDLING + handled_by; humano extra → status, jamás
+> re-escalação; humano some 15min + cliente ativo → cascata retoma com
+> contexto), Luna silenciada em HUMAN_HANDLING no caminho real do WhatsApp.
+> F7 auto-evolução (ADR-029): pipeline runHeal com gate duplo (typecheck+
+> testes), commit autor Luna, merge main, restart, health retry, LKG, rollback
+> automático, máx 3 tentativas, whitelist de componentes próprios (cliente
+> VEDADO, migrations proibidas), incidentes viram learnings no Brain. PROVA AO
+> VIVO: bug plantado no pingline → detectado → reparo commitado (fb32cbd) →
+> testes verdes → health verde, com audit + sinapse + activity. Estabilização
+> ADR-028: crash loop (Docker fora + arquivo corrompido) resolvido; janelas de
+> CMD = fork mode visível + loop (pm2 como serviço Windows = pendente).
+> **161 testes verdes. 5 serviços pm2 online.** Telegram chat_id ainda
+> pendente (poll autocontido rearmado — owner manda msg pro @lunanexobot).
+>
 > **Tools da VPS Nexo ligadas ✅** — catálogo oficial em
 > `docs/tools/nexo-api-catalog.md` (mapeado ao vivo do bundle do dashboard
 > pro: base `/dashboard/api/`, Bearer via login). **12 tools de LEITURA** no
