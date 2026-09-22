@@ -44,7 +44,9 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
   // segurava o getUpdates ~100% do tempo e o admin morria em silêncio.
   // Poll curto + guarda de reentrância: cada gap do outro consumidor é
   // nosso; quando vencemos, os updates acumulados chegam de uma vez.
-  const pollMs = deps.pollIntervalMs ?? 4_000;
+  // Cadência 1,2s com jitter: corrida apertada — a cada queda do pipe do
+  // intruso a gente pega dentro de ~1s e segura 25s por poll.
+  const pollMs = deps.pollIntervalMs ?? 1_200;
   let offset = 0;
   let timer: NodeJS.Timeout | null = null;
   let bootLogged = false;
@@ -182,7 +184,9 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       await restoreOffset();
       timer = setInterval(() => {
         pollOnce().catch((err) => deps.log.error({ err }, 'admin telegram: poll falhou'));
-      }, pollMs);
+        // jitter evita lockstep com o consumidor externo (corridas em fase
+        // deixam um dos dois ganhar sempre)
+      }, pollMs + Math.floor(Math.random() * 400));
       timer.unref();
       deps.log.info({ chat: deps.allowedChatId ?? 'AGUARDANDO_CHAT_ID' }, 'admin telegram: loop ativo (F4 mínimo)');
     },
