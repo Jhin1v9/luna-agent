@@ -6,7 +6,7 @@ import type { WhatsAppTransport } from './transport.js';
 const log = pino({ level: 'silent' });
 
 /** Pool stub: responde o SELECT da mensagem e grava os UPDATE/INSERT. */
-function stubPool(target: { address: string | null; contact_name: string | null }) {
+function stubPool(target: { address: string | null; contact_name: string | null }, body = 'corpo da resposta') {
   const audits: Array<{ action: string; result: string; metadata: Record<string, unknown> }> = [];
   const updates: Array<{ state: string; error?: string }> = [];
   const pool = {
@@ -17,7 +17,7 @@ function stubPool(target: { address: string | null; contact_name: string | null 
           rows: [
             {
               id: params![0],
-              body: 'corpo da resposta',
+              body,
               address: target.address,
               contact_name: target.contact_name,
               correlation_id: 'corr-test',
@@ -57,9 +57,9 @@ function fakeTransport(sent: string[]): WhatsAppTransport {
   };
 }
 
-function makeDeps(target: { address: string | null; contact_name: string | null }, allowlist: string[], enforce: boolean) {
+function makeDeps(target: { address: string | null; contact_name: string | null }, allowlist: string[], enforce: boolean, body?: string) {
   const sent: string[] = [];
-  const { pool, audits, updates } = stubPool(target);
+  const { pool, audits, updates } = stubPool(target, body);
   const listener = createOutboundListener({
     pool,
     transport: fakeTransport(sent),
@@ -114,5 +114,30 @@ describe('GUARDRAIL outbound allowlist (decreto do owner, ADR-020)', () => {
     const { listener, sent } = makeDeps({ address: 'Papai', contact_name: 'Papai' }, ['Pai'], true);
     await listener.deliverOne('m6');
     expect(sent).toHaveLength(0);
+  });
+});
+
+describe('REGRESSÃO: envelope ANSWER cru não chega ao transporte (bug ao vivo 2026-09-22)', () => {
+  it('body com envelope quebrado (newline literal) → transporte recebe só o texto', async () => {
+    const broken = '{"type":"ANSWER","text":"Opa, segura aí 😄\n\nTudo certo 👊"}';
+    const { listener, sent } = makeDeps({ address: 'Pai', contact_name: 'Pai' }, ['Pai'], true, broken);
+    await listener.deliverOne('m7');
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toBe('Pai:Opa, segura aí 😄\n\nTudo certo 👊');
+  });
+
+  it('body com envelope estrito válido → também é desembrulhado na entrega', async () => {
+    const strict = '{"type":"ANSWER","text":"só o texto"}';
+    const { listener, sent } = makeDeps({ address: 'Pai', contact_name: 'Pai' }, ['Pai'], true, strict);
+    await listener.deliverOne('m8');
+    expect(sent[0]).toBe('Pai:só o texto');
+  });
+
+  it('body de tool/JSON não-ANSWER não é extraído (não é envelope de resposta)', async () => {
+    const tool = '{"type":"TOOL_CALL","tool":"x","args":{}}';
+    const { listener, sent } = makeDeps({ address: 'Pai', contact_name: 'Pai' }, ['Pai'], true, tool);
+    await listener.deliverOne('m9');
+    // não-ANSWER: passa pelo sanitize como está (defesa é só p/ envelope ANSWER)
+    expect(sent[0]).toContain('TOOL_CALL');
   });
 });

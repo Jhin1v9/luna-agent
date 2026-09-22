@@ -74,8 +74,52 @@ describe('saídas estruturadas (§5)', () => {
     expect(deg.degraded).toBe(true);
   });
 
-  it('pedido explícito de humano (§8.1): zero tentativas de IA', async () => {
-    const adapter = fakeAdapter([]); // se fosse chamado, replies vazio estouraria
+  it('REGRESSÃO (bug ao vivo 2026-09-22): ANSWER com newline literal dentro do JSON → texto puro, sem envelope', () => {
+    // O FAST emitiu o JSON com quebra de linha REAL dentro da string "text"
+    // (JSON estrito inválido). Antes do fix, o envelope inteiro ia pro body.
+    const broken = '{"type":"ANSWER","text":"Opa, segura aí 😄\n\nResposta direta: não 👊"}';
+    const parsed = parseStructured(broken);
+    expect(parsed.output.type).toBe('ANSWER');
+    const text = parsed.output.type === 'ANSWER' ? parsed.output.text : '';
+    expect(text).toBe('Opa, segura aí 😄\n\nResposta direta: não 👊');
+    expect(text).not.toContain('{"type"'); // envelope não vaza no texto
+  });
+
+  it('REGRESSÃO: caminho completo runFastRoute com ANSWER quebrado → answerText puro', async () => {
+    const broken = '{"type":"ANSWER","text":"Oi Jhin!\n\nTudo certo por aqui 🙌"}';
+    const d = await runFastRoute(
+      { pool: stubPool, adapter: fakeAdapter([broken]) as never, log },
+      { event: fakeEvent(), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: true },
+    );
+    expect(d.output.type).toBe('ANSWER');
+    expect(d.answerText).toBe('Oi Jhin!\n\nTudo certo por aqui 🙌');
+    expect(d.answerText).not.toContain('{"type"');
+  });
+
+  it('REGRESSÃO: HANDOFF_LIVE sem live-handoff disponível → cortesia §6, nunca JSON cru', async () => {
+    const adapter = fakeAdapter([JSON.stringify({ type: 'HANDOFF_LIVE', objective: 'ver logs', context_summary: '' })]);
+    const d = await runFastRoute(
+      { pool: stubPool, adapter: adapter as never, log },
+      { event: fakeEvent(), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: false },
+    );
+    expect(d.handoff).toBe(false);
+    expect(d.answerText.length).toBeGreaterThan(0);
+    expect(d.answerText).not.toContain('{"type"');
+    expect(d.answerText).not.toContain('ver logs');
+  });
+
+  it('REGRESSÃO: ESCALATE do FAST → mensagem de cortesia §8, sem JSON', async () => {
+    const adapter = fakeAdapter([JSON.stringify({ type: 'ESCALATE_HUMAN', reason: 'preço', priority: 'ALTA', summary: 's' })]);
+    const d = await runFastRoute(
+      { pool: stubPool, adapter: adapter as never, log },
+      { event: fakeEvent(), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: false },
+    );
+    expect(d.escalate).toBe(true);
+    expect(d.answerText).toContain('chamei o time');
+    expect(d.answerText).not.toContain('{"type"');
+  });
+
+  it('pedido explícito de humano (§8.1): zero tentativas de IA', async () => {    const adapter = fakeAdapter([]); // se fosse chamado, replies vazio estouraria
     const d = await runFastRoute(
       { pool: stubPool, adapter: adapter as never, log },
       { event: fakeEvent({ payload: { text: 'me liga por favor', conversation_id: 'conv-1' } }), prompt: 'p', sessionKey: 'conv-1', allowLiveHandoff: true },

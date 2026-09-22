@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { KimiLiveAdapter } from '@luna/agent';
+import { extractAnswerEnvelopeText } from '@luna/shared';
 import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
@@ -187,9 +188,14 @@ export function createOutboundListener(deps: OutboundDeps) {
         const wait = base + Math.floor(Math.random() * 1_000);
         deps.log.info({ message_id: messageId, wait_ms: wait }, 'espera humana antes de enviar');
         await new Promise((r) => setTimeout(r, wait));
+        // Defesa em profundidade na fronteira de entrega (bug ao vivo
+        // 2026-09-22): se o body no banco estiver com o envelope ANSWER
+        // cru ({"type":"ANSWER","text":"..."}), desembrulha antes de
+        // sanitizar — a fila envenenada se autocura no reenvio.
+        const raw = extractAnswerEnvelopeText(row.body) ?? row.body;
         return transport.sendMessage(
           target,
-          sanitizeOutboundText(row.body),
+          sanitizeOutboundText(raw),
           opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
         );
       };

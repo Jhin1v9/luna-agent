@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { extractAnswerEnvelopeText } from '@luna/shared';
 
 /**
  * Saídas estruturadas do FAST (contrato §5) — todo turno devolve um objeto
@@ -59,6 +60,11 @@ export function parseStructured(raw: string): { output: StructuredOutput; degrad
     const parsed = structuredOutputSchema.parse(JSON.parse(candidate));
     return { output: parsed, degraded: candidate !== raw.trim() };
   } catch {
+    // JSON estrito quebrou (bug ao vivo: newline literal dentro de "text").
+    // Antes de degradar pro texto cru, tenta salvar o envelope ANSWER — senão
+    // o cliente receberia o JSON literal no canal.
+    const salvaged = extractAnswerEnvelopeText(raw);
+    if (salvaged !== null) return { output: { type: 'ANSWER', text: salvaged }, degraded: true };
     return { output: { type: 'ANSWER', text: raw.trim() }, degraded: true };
   }
 }

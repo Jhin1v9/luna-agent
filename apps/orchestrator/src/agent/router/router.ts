@@ -155,7 +155,15 @@ export async function runFastRoute(deps: RouterDeps, input: {
   }
 
   // ANSWER (ou degradação de parse → ANSWER com o texto cru).
-  const text = output.type === 'ANSWER' ? output.text : trace.turn.reply_text;
+  // HANDOFF sem live-handoff disponível também cai aqui: §6/§8 — o cliente
+  // recebe a MENSAGEM DE CORTESIA de espera, nunca o JSON do structured
+  // output (bug ao vivo 2026-09-22: envelope ia literal pro canal).
+  const text =
+    output.type === 'ANSWER'
+      ? output.text
+      : output.type === 'HANDOFF_LIVE'
+        ? 'Deixa eu verificar isso direitinho — já te falo aqui mesmo, tá?'
+        : trace.turn.reply_text;
   return {
     answerText: text,
     turn: trace.turn,
