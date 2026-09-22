@@ -14,6 +14,11 @@
 
 set -u
 
+# O watchdog herda MSYS_NO_PATHCONV=1 (para o backup-db) — com isso o Git
+# Bash NÃO converte //E em /E e o robocopy não reconhece as flags. Aqui
+# precisamos da conversão padrão de paths do MSYS.
+unset MSYS_NO_PATHCONV MSYS_NO_PATH_CONV
+
 SRC="${WHATSAPP_PROFILE_DIR:-$HOME/.luna/chrome-whatsapp}"
 DEST_ROOT="${WHATSAPP_BACKUP_ROOT:-$HOME/.luna/backups}"
 KEEP=5
