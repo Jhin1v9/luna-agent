@@ -84,9 +84,10 @@ export async function runHeal(deps: HealDeps, input: HealInput): Promise<{ heale
       await exec('git', ['-C', root, 'checkout', '-b', branch]);
       await input.applyFix();
       // typecheck + testes do componente (gate duro: sem verde, não sobe)
-      const tc = await exec('pnpm', ['--filter', input.service === 'pingline' ? '@luna/events' : input.service, 'exec', 'tsc', '--noEmit']);
+      // pnpm é .cmd no Windows: via cmd /c (spawn direto = ENOENT)
+      const tc = await exec('cmd.exe', ['/c', 'pnpm', '--filter', input.service === 'pingline' ? '@luna/events' : input.service, 'exec', 'tsc', '--noEmit']);
       if (tc.code !== 0) throw new Error(`typecheck falhou:\n${tc.stdout.slice(0, 400)}`);
-      const test = await exec('pnpm', ['--filter', input.service === 'pingline' ? '@luna/events' : input.service, 'test']);
+      const test = await exec('cmd.exe', ['/c', 'pnpm', '--filter', input.service === 'pingline' ? '@luna/events' : input.service, 'test']);
       if (test.code !== 0) throw new Error(`testes falharam:\n${test.stdout.slice(0, 400)}`);
 
       await exec('git', ['-C', root, 'add', '-A']);
