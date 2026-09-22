@@ -3,7 +3,7 @@ import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
 import { getPool, closePool, checkConnection, recordActivity, writeHeartbeat } from '@luna/database';
 import { migrate } from '@luna/database/migrate';
-import { createAdapter, assertProductionAdapter, probeVisionSupport } from '@luna/agent';
+import { createAdapter, assertProductionAdapter, probeVisionSupport, FallbackAdapter } from '@luna/agent';
 import { EventBus } from './events/bus.js';
 import { createMessageHandler } from './agent/handler.js';
 import { createSimulateHandler } from './test/simulate.js';
@@ -22,16 +22,27 @@ const log = createLogger({ name: 'orchestrator' });
 // provider é só trocar o .env. Decreto: modelo mais barato, nunca 2.7/K3.
 const isGeminiMode = config.KIMI_ADAPTER_MODE === 'gemini';
 const llmIsGemini = config.LLM_PROVIDER === 'gemini';
-const adapter = createAdapter({
-  mode: config.KIMI_ADAPTER_MODE,
-  webUrl: config.KIMI_WEB_URL,
-  webToken: config.KIMI_WEB_TOKEN,
-  // LLM_* manda (contrato §9). Exceção: modo gemini com LLM_PROVIDER=kimi
-  // (dev local) usa os defaults GEMINI_* — senão mandaríamos kimi-k2.6 pro Google.
-  apiKey: isGeminiMode && !llmIsGemini ? config.GEMINI_API_KEY : config.LLM_API_KEY,
-  apiBaseUrl: isGeminiMode && !llmIsGemini ? config.GEMINI_BASE_URL : config.LLM_BASE_URL,
-  apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
-});
+// Fallback (fechamento): Kimi primária; quota 403/429 cai pro Gemini grátis
+// (só com key válida — validação lazy). usage_entries registra provider REAL.
+const adapter =
+  config.KIMI_ADAPTER_MODE === 'kimi-api'
+    ? new FallbackAdapter({
+        mode: 'kimi-api',
+        apiKey: config.LLM_API_KEY,
+        apiBaseUrl: config.LLM_BASE_URL,
+        apiModel: config.LLM_MODEL,
+        fallbackApiKey: config.GEMINI_API_KEY,
+        fallbackBaseUrl: config.GEMINI_BASE_URL,
+        fallbackModel: config.GEMINI_MODEL,
+      })
+    : createAdapter({
+        mode: config.KIMI_ADAPTER_MODE,
+        webUrl: config.KIMI_WEB_URL,
+        webToken: config.KIMI_WEB_TOKEN,
+        apiKey: isGeminiMode && !llmIsGemini ? config.GEMINI_API_KEY : config.LLM_API_KEY,
+        apiBaseUrl: isGeminiMode && !llmIsGemini ? config.GEMINI_BASE_URL : config.LLM_BASE_URL,
+        apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
+      });
 // Handler de simulação (só montado fora de produção; precisa do pool/bus do main).
 let simulateHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
 let workspaceHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;

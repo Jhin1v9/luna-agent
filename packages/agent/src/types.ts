@@ -30,6 +30,10 @@ export interface KimiAdapterConfig {
   apiModel?: string;
   apiTimeoutMs?: number;
   apiTemperature?: number;
+  /** Fallback (reserva) — Gemini quando a key existir; quota da primária cai pra cá. */
+  fallbackApiKey?: string;
+  fallbackBaseUrl?: string;
+  fallbackModel?: string;
 }
 
 /** Um turno de conversa: prompt montado (persona + contexto) + mensagem do cliente. */
@@ -48,8 +52,10 @@ export interface TurnResult {
   duration_ms: number;
   /** Uso de tokens quando o backend informa (Kimi API). Vira usage_entries (§23). */
   usage?: { input_tokens: number; output_tokens: number };
-  /** Modelo real que respondeu (usage_entries.model — §9 do contrato). */
+  /** Modelo real que respondeu (usage_entries.provider — §9 do contrato). */
   model?: string;
+  /** Provider real que respondeu quando há fallback (kimi-api | gemini-api). */
+  provider?: string;
 }
 
 export interface SessionInfo {

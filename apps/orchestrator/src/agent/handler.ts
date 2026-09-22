@@ -310,7 +310,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         [
           event.client_id,
           event.event_id,
-          adapter.mode,
+          decision.turn.provider ?? adapter.mode,
           decision.turn.model ?? adapter.mode,
           decision.turn.usage.input_tokens,
           decision.turn.usage.output_tokens,
