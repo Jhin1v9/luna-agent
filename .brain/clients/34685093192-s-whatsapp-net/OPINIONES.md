@@ -249,3 +249,41 @@ Conversa informal e descontraída entre equipe/cliente: aprovação da prévia d
 }
 ```
 
+## 2026-09-22 — Luna
+
+Conversa informal com Nonoke; prévia dos emails de resposta foi aprovada e ficou combinado formatar e implantar hoje ou amanhã. Luna demonstrou empatia, se desvencilhou bem dos papos pessoais e manteve registro do pendente.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "conteudo",
+  "product": "Emails de resposta do cliente",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Finalizar formatação dos emails e implantar amanhã, conforme combinado com Nonoke",
+  "quality_score": 4,
+  "summary": "Conversa informal com Nonoke; prévia dos emails de resposta foi aprovada e ficou combinado formatar e implantar hoje ou amanhã. Luna demonstrou empatia, se desvencilhou bem dos papos pessoais e manteve registro do pendente.",
+  "client_signal": "elogio"
+}
+```
+
+## 2026-09-22 — Luna
+
+Cliente aprovou a prévia dos emails de resposta automática e combinou formatação final e implantação para hoje ou amanhã. Conversa seguiu com descontração pessoal; Luna manteve bom humor, alinhou o próximo passo e soube se recolher do papo pessoal, reafirmando disponibilidade para assuntos da Nexo.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "conteudo",
+  "product": "emails de resposta do cliente",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Finalizar formatação dos emails aprovados e implantar na ferramenta de atendimento (previsão: amanhã).",
+  "quality_score": 4,
+  "summary": "Cliente aprovou a prévia dos emails de resposta automática e combinou formatação final e implantação para hoje ou amanhã. Conversa seguiu com descontração pessoal; Luna manteve bom humor, alinhou o próximo passo e soube se recolher do papo pessoal, reafirmando disponibilidade para assuntos da Nexo.",
+  "client_signal": "nenhum"
+}
+```
+

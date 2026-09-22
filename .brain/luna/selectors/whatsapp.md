@@ -166,3 +166,9 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - seletor antigo: (seletor anterior falhou)
 - seletor novo: div[contenteditable="true"][data-tab="3"]
 - fallback visual: screenshot + DOM no incidente
+
+### 2026-09-22 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: [data-testid="chat-list-search"]
+- fallback visual: screenshot + DOM no incidente
