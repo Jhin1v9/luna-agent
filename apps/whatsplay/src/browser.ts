@@ -324,6 +324,25 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     const page = this.requirePage();
     // jid/número (decreto: identificar o contato PELO NÚMERO): a busca é o
     // caminho — título do chat não casa com número, e número é único.
+    // Normaliza estado: busca residual de ciclo anterior deixa a lista filtrada
+    // e quebra o clique na row (bug ao vivo 2026-09-22 — evidência repair-*).
+    await page
+      .evaluate(`(() => {
+        const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
+                    document.querySelector('#side [role="textbox"]') ||
+                    document.querySelector('#side div[contenteditable="true"]');
+        if (box && (box.textContent || '').trim()) {
+          box.focus();
+          document.execCommand('selectAll');
+          document.execCommand('delete');
+        }
+        const x = document.querySelector('#side [data-testid="search-back"], #side button[aria-label*="cerrar" i], #side button[aria-label*="close" i]');
+        if (x) x.click();
+      })`)
+      .catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(500);
+
     const isJid = nameOrId.includes('@');
     const searchKey = isJid ? nameOrId.split('@')[0] : nameOrId;
     const key = nameOrId.replace(/"/g, '\\"');
@@ -361,12 +380,18 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       const firstResult = page.locator('#pane-side [role="row"], #pane-side [data-testid="cell-frame-container"]').first();
       await firstResult.click({ timeout: 4_000 }).catch(() => {});
       await page.waitForTimeout(700);
-      if (await matches()) {
-        // limpa a busca pra não poluir a UI da sessão
-        await page.keyboard.press('Escape').catch(() => {});
-        return true;
-      }
+      // limpa a busca DE VERDADE (selectAll+delete) — Escape sozinho deixava
+      // o termo no campo e poluía o ciclo seguinte (bug ao vivo 2026-09-22).
+      await page
+        .evaluate(`(() => {
+          const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
+                      document.querySelector('#side [role="textbox"]') ||
+                      document.querySelector('#side div[contenteditable="true"]');
+          if (box) { box.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }
+        })`)
+        .catch(() => {});
       await page.keyboard.press('Escape').catch(() => {});
+      if (await matches()) return true;
     }
     return false;
   }
