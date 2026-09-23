@@ -731,20 +731,19 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
         const dump = await page
           .evaluate(`(() => {
-            const out = [];
-            for (const b of document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]')) {
-              const r = b.getBoundingClientRect();
-              const s = getComputedStyle(b);
-              out.push({
-                tag: b.tagName, type: b.type || null,
-                aria: (b.getAttribute('aria-label') || '').slice(0, 24),
-                testid: b.getAttribute('data-testid'),
+            const els = document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]');
+            const out = { count: els.length, items: [] };
+            for (let i = 0; i < els.length && i < 5; i++) {
+              const b = els[i];
+              let rectStr = 'no-rect';
+              try { const r = b.getBoundingClientRect(); rectStr = [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(','); } catch (e) { rectStr = 'rect-erro'; }
+              out.items.push({
+                i, tag: b.tagName,
                 val: (b.value !== undefined ? b.value : b.textContent || '').slice(0, 30),
-                rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
-                disp: s.display, vis: s.visibility,
+                rect: rectStr,
               });
             }
-            return JSON.stringify(out, null, 1);
+            return JSON.stringify(out);
           })`)
           .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
         try {
