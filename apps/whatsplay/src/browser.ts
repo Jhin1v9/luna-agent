@@ -962,6 +962,29 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.waitForTimeout(1_200);
         if (await matches()) return true;
         this.config.log?.warn({ tentativa: attempt + 1 }, 'openChat jid: 1º resultado clicado mas o painel não bateu com o número');
+        // diagnóstico: WA 2026 pode ter trocado os testids do header — dump do
+        // que existe de fato no #main pra atualizar os seletores.
+        if (attempt === waits.length - 1) {
+          const hdrDump = await evalWithArg(
+            page,
+            `(_) => {
+              const cands = [];
+              for (const el of document.querySelectorAll('#main header, [data-testid*="conversation" i], [data-testid*="header" i], [data-testid*="pane" i]')) {
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) continue;
+                cands.push({
+                  testid: el.getAttribute('data-testid'),
+                  tag: el.tagName,
+                  txt: (el.textContent || '').replace(/\\s+/g, ' ').slice(0, 80),
+                });
+                if (cands.length > 8) break;
+              }
+              return JSON.stringify(cands);
+            }`,
+            null,
+          ).catch(() => '[]');
+          this.config.log?.warn({ hdrDump, shot: (await this.captureEvidence('openchat-jid-header')).screenshotPath }, 'openChat jid: dump do header real');
+        }
       } catch (err) {
         this.config.log?.warn(
           { tentativa: attempt + 1, err: String(err).slice(0, 140) },
