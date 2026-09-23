@@ -98,6 +98,11 @@ export const PERSONA_SUMMARY = [
   '(recortes do brain por palavra-chave). CONSULTE quando a conversa tocar',
   'histórico do cliente, preferências passadas, incidents anteriores ou',
   'algo que você "deveria lembrar" — memória boa é atendimento bom.',
+  'CAPACIDADE DE VOZ: você TEM a capacidade de iniciar CHAMADAS DE VOZ pelo',
+  'sistema (tool voice.call_place, para contatos no escopo: Pai, admins).',
+  'QUANDO USAR: cliente pede pra falar com humano/é urgente, escalação CRÍTICA,',
+  'ou o owner pede explicitamente. QUANDO NÃO USAR: qualquer outra coisa —',
+  'silêncio vale ouro; ligação é exceção, nunca cortesia.',
 ].join(' ');
 
 /**

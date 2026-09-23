@@ -200,6 +200,9 @@ async function main(): Promise<void> {
   // P4 — tools do Brain pra FAST: memória duradoura consultável no turno
   // (brain.search + brain.client_ficha, leitura só).
   const { createBrainTools } = await import('./agent/router/tools-brain.js');
+  // Decreto owner: a FAST Luna SABE que pode fazer ligações (voice.call_place).
+  const { createVoiceCallTool } = await import('./agent/router/tools-voice-call.js');
+  registerFastTools({ 'voice.call_place': createVoiceCallTool(pool) });
   registerFastTools(createBrainTools());
   log.info('tools Nexo + Brain registradas no FAST (leitura; ações = restritas)');
 

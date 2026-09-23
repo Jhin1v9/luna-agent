@@ -168,6 +168,17 @@ async function main(): Promise<void> {
   });
   const listenClient = await outbound.start();
 
+  // Chamadas de voz (decreto owner: a FAST Luna pode fazer ligações):
+  // pg_notify('voice_call_requests') → pré-voo + placeVoiceCall + conductora.
+  const { createCallExecutor } = await import('./voice/call-executor.js');
+  const callExecutor = createCallExecutor({ pool, transport, log });
+  const callListen = await pool.connect();
+  await callListen.query("LISTEN voice_call_requests");
+  callListen.on('notification', (n) => {
+    if (n.payload) callExecutor(n.payload).catch((err) => log.error({ err }, 'voice.call: executor falhou'));
+  });
+  log.info('ouvindo NOTIFY voice_call_requests (chamadas de voz)');
+
   const telegram =
     telegramConfig.botToken && telegramConfig.teamChatId
       ? (text: string) => sendTeamMessage(text, telegramConfig)
@@ -214,6 +225,7 @@ async function main(): Promise<void> {
     clearInterval(wdTimer);
     watcher.stop();
     listenClient.release();
+    callListen.release();
     transport
       .close()
       .catch(() => {})

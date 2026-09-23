@@ -57,6 +57,9 @@ async function main(): Promise<void> {
     },
   );
   const { createInvestigateHandler } = await import('./jobs/investigate.js');
+  // Chamada de voz (decreto owner): o job só publica o evento — quem liga é o daemon do whatsplay.
+  const { createVoiceCallHandler } = await import('./jobs/voice-call.js');
+  runner.register('voice.call', createVoiceCallHandler({ pool, log }));
   const investigationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
   runner.register('investigate', createInvestigateHandler({ pool, live: liveAdapter, log, telegram: investigationTelegram }));
   // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
