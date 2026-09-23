@@ -1065,8 +1065,13 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const ev = await this.captureEvidence('citacao-botao-ctx-nao-achado');
         throw new Error(`citação: botão de contexto (icon-down-context) da mensagem não ficou visível após hover (row: ${rowSel}). Evidência: ${ev.screenshotPath}`);
       }
-      await ctxBtn.click({ force: true }).catch(async () => {
-        await ctxBtn.evaluate((b) => (b as HTMLElement).click());
+      // Clique no chevron: EVALUATE primeiro (prova ao vivo 2x 2026-09-23),
+      // imune a re-render/shift de coordenada — o force-click por coordenada
+      // do daemon caiu NO ELEMENTO ERRADO quando o painel re-renderizou com
+      // mensagem nova no meio da ação (menu abriu na msg das 22:14, evidência
+      // citacao-menu-nao-abriu 21-35-16). Force vira fallback.
+      await ctxBtn.evaluate((b) => (b as HTMLElement).click()).catch(async () => {
+        await ctxBtn.click({ force: true });
       });
       await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
       // 3. Confirmar que o menu abriu. ⚠️ Ao vivo 2026-09-23: o CONTAINER do
@@ -1091,21 +1096,26 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.waitForTimeout(200 + Math.floor(Math.random() * 150));
       await page.keyboard.press('Enter');
       await page.waitForTimeout(400);
-      // 4. A citação TEM que estar anexada — senão falha (nunca envia órfã).
-      //    (mantido como rede de segurança do atalho de teclado: se o foco
-      //    não caiu no menu e a seta rolou o painel, o Enter não anexa nada
-      //    e isso é pego aqui, antes de qualquer envio.)
+      // 4. A citação TEM que estar anexada E referenciar A MENSAGEM CERTA —
+      //    senão falha (nunca envia órfã nem cita a msg errada). O check exige
+      //    que o texto do preview contenha a query: pega o caso "menu abriu
+      //    ancorado em outra mensagem" antes de qualquer envio.
       const preview = await page
         .evaluate(`(() => {
-          const p = document.querySelectorAll(${JSON.stringify(SELECTORS.replyPreview)});
-          for (const el of p) if (el.offsetParent !== null || el.getClientRects().length > 0) return true;
+          const els = document.querySelectorAll(${JSON.stringify(SELECTORS.replyPreview)});
+          const q = ${JSON.stringify(query.toLowerCase().slice(0, 20))}; // probe curto: o preview trunca texto longo
+          for (const el of els) {
+            const vis = el.offsetParent !== null || el.getClientRects().length > 0;
+            if (!vis) continue;
+            if (((el.textContent || '').toLowerCase()).includes(q)) return true;
+          }
           return false;
         })()`)
         .then((r) => r === true)
         .catch(() => false);
       if (!preview) {
         const ev = await this.captureEvidence('citacao-preview-nao-anexado');
-        throw new Error(`citação: cliquei em Responder mas o preview não anexou (seletor: ${SELECTORS.replyPreview}) — NÃO enviei pra não mandar sem citação. Evidência: ${ev.screenshotPath}`);
+        throw new Error(`citação: preview não anexou OU não referencia "${query}" (seletor: ${SELECTORS.replyPreview}) — NÃO enviei pra não citar a mensagem errada. Evidência: ${ev.screenshotPath}`);
       }
       // 5. Digita e envia com confirmação real (mesmo contrato do sendMessage).
       await this.composeTypeAndSend(page, SELECTORS.inputBox, text, chatId);

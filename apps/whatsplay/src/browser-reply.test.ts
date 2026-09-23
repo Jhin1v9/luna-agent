@@ -32,6 +32,10 @@ function fakeLocator(state: FakeState, log: (s: string) => void) {
     locator() {
       return self;
     },
+    async evaluate(fn: unknown) {
+      if (typeof fn === 'function') (fn as (b: unknown) => void)({});
+      return undefined;
+    },
     async waitFor() {
       return undefined; // todo seletor "fica visível" no fake
     },
@@ -86,9 +90,10 @@ function fakePage(state: FakeState) {
       // rola o header — sem essa ordem o fake devolve boolean pro título)
       if (script.includes('conversation-info-header')) return 'chat-x'; // painel aberto
       if (script.includes('scrollIntoView') && script.includes('msg-container')) return state.msgInPanel;
-      if (script.includes("textContent || ''")) return state.composeText.trim().length;
-      // verificação do preview de citação anexado
+      // verificação do preview de citação anexado — ANTES do check genérico
+      // de composeText ('quoted' + 'textContent' coexistem no script do preview)
       if (script.includes('reply-preview') || script.includes('quoted')) return state.previewAttached;
+      if (script.includes("textContent || ''")) return state.composeText.trim().length;
       return undefined;
     },
   };
