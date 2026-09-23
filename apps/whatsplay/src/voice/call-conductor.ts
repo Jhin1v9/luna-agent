@@ -74,10 +74,37 @@ const DECIDE_PROMPT = (brief: CallBriefConductor, history: string, turno: Conduc
     'Responda APENAS um JSON: {"action":"say","text":"o que o Operador deve falar"} ou',
     '{"action":"act","name":"nome_da_acao","detail":"detalhe"} ou {"action":"hold"}.',
     'say: curto, natural, PT-BR, na personalidade da Luna — o Operador fala NA HORA.',
-    'act: só quando uma ação real é pedida/necessária.',
+    'act: SÓ quando a fala mais recente do owner contém uma ORDEM DIRETA e explícita pra você',
+    '(manda/liga/faz/escreve/envia/pode/quero que). Na dúvida: NUNCA aja — responda com',
+    '{"action":"say","text":"quer que eu <ação>?"} perguntando antes, ou {"action":"hold"}.',
     'hold: quando não há o que responder.',
   ].filter(Boolean)
     .join('\n\n');
+
+/**
+ * GUARDA DE ORDEM EXPLÍCITA (decreto owner: "nd de mandar mensagem sem
+ * permissão, no adivinar, no intentar hacer algo sola"): `act` só vale se o
+ * turno atual contém uma ordem direta (e a guarda DEVOLVE a ordem citada pro
+ * audit). Sem ordem → vira pergunta ao owner via Operador ("quer que eu X?").
+ */
+const ORDER_RE =
+  /\b(manda|mandar|liga|ligar|faz|fazer|escreve|escrever|envia|enviar|envie|posta|postar|executa|executar|cria|criar|deleta|apaga|atualiza|corre|roda|roda|responde|peça|pede|quero que|pode fazer|me ajuda)\b/i;
+
+export function guardAction(
+  decision: Decision,
+  turno: ConductorTurn,
+): { decision: Decision; ordemCitada?: string } {
+  if (decision.kind !== 'act') return { decision };
+  const ordem = turno.text.match(ORDER_RE);
+  if (ordem) return { decision, ordemCitada: ordem[0] };
+  // sem ordem direta no turno: vira pergunta (nunca ação)
+  return {
+    decision: {
+      kind: 'say',
+      text: `Quer que eu ${decision.name.replace(/_/g, ' ')} agora? Só faço se você mandar.`,
+    },
+  };
+}
 
 export function parseDecision(raw: string): Decision {
   const m = raw.match(/\{[\s\S]*\}/);
@@ -150,17 +177,24 @@ export class CallConductor {
               this.say(`Kimi Live falhou no turno (${String(err).slice(0, 120)}) — Operador segue com o que tem`, { failures: this.failures });
               return { kind: 'hold' } as Decision;
             });
-            if (decision.kind === 'say') {
-              this.say(`digita pro Operador: "${decision.text.slice(0, 100)}"`);
-              await this.deps.operator.sendText(tab, decision.text);
-              await this.audit('conductor.say', { text: decision.text.slice(0, 150), turno: turno.text.slice(0, 100) });
-            } else if (decision.kind === 'act') {
-              this.say(`ação: ${decision.name} — ${decision.detail.slice(0, 100)}`);
+            // GUARDA DE ORDEM EXPLÍCITA (decreto owner): act sem ordem direta
+            // no turno vira pergunta — nunca ação por conta própria.
+            const guarded = guardAction(decision, turno);
+            if (guarded.decision.kind === 'say' && decision.kind === 'act') {
+              this.say(`SEM ORDEM EXPLÍCITA — act '${decision.name}' virou pergunta ao owner`);
+            }
+            const final = guarded.decision;
+            if (final.kind === 'say') {
+              this.say(`digita pro Operador: "${final.text.slice(0, 100)}"`);
+              await this.deps.operator.sendText(tab, final.text);
+              await this.audit('conductor.say', { text: final.text.slice(0, 150), turno: turno.text.slice(0, 100) });
+            } else if (final.kind === 'act') {
+              this.say(`ação: ${final.name} — ${final.detail.slice(0, 100)} (ordem: "${guarded.ordemCitada}")`);
               let evidence = 'sem executor';
               if (this.deps.executeAction) {
-                evidence = await this.deps.executeAction(decision.name, decision.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
+                evidence = await this.deps.executeAction(final.name, final.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
               }
-              await this.audit('conductor.act', { name: decision.name, evidence });
+              await this.audit('conductor.act', { name: final.name, evidence, ordem_citada: guarded.ordemCitada ?? null, turno: turno.text.slice(0, 100) });
               // ação também vira fala quando couber
               if (evidence && evidence !== 'sem executor') {
                 await this.deps.operator.sendText(tab, evidence).catch(() => {});

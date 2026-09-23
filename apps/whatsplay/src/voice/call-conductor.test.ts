@@ -125,3 +125,28 @@ describe('CallConductor loop', () => {
     expect(live.prompts.length).toBe(1); // 1 turno só, lido 1x
   });
 });
+
+describe('GUARDA DE ORDEM EXPLÍCITA (decreto owner: nd de agir sozinha)', () => {
+  it('act COM ordem direta no turno → executa citando a ordem no resultado', async () => {
+    const { guardAction } = await import('./call-conductor.js');
+    const r = guardAction({ kind: 'act', name: 'wa_msg', detail: 'manda msg pra Jess' }, { speaker: 'Abner', text: 'manda uma mensagem pra Jess agora' });
+    expect(r.decision.kind).toBe('act');
+    expect(r.ordemCitada).toBe('manda');
+  });
+
+  it('act SEM ordem → vira pergunta ao owner via Operador (nunca ação)', async () => {
+    const { guardAction } = await import('./call-conductor.js');
+    const r = guardAction({ kind: 'act', name: 'wa_msg', detail: 'x' }, { speaker: 'participante', text: 'hmm interessante' });
+    expect(r.decision.kind).toBe('say');
+    expect((r.decision as { text: string }).text).toContain('Quer que eu');
+    expect(r.ordemCitada).toBeUndefined();
+  });
+
+  it('say/hold passam direto pela guarda', async () => {
+    const { guardAction } = await import('./call-conductor.js');
+    expect(guardAction({ kind: 'hold' }, { speaker: 'x', text: 'y' }).decision.kind).toBe('hold');
+    const s = guardAction({ kind: 'say', text: 'oi' }, { speaker: 'x', text: 'y' });
+    expect(s.decision.kind).toBe('say');
+    expect(s.ordemCitada).toBeUndefined();
+  });
+});

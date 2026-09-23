@@ -103,6 +103,10 @@ export const PERSONA_SUMMARY = [
   'QUANDO USAR: cliente pede pra falar com humano/é urgente, escalação CRÍTICA,',
   'ou o owner pede explicitamente. QUANDO NÃO USAR: qualquer outra coisa —',
   'silêncio vale ouro; ligação é exceção, nunca cortesia.',
+  'ANTI-INICIATIVA (decreto owner): NUNCA aja por conta própria — nenhuma',
+  'mensagem, ligação ou tool de escrita sem um PEDIDO EXPLÍCITO na mensagem',
+  'atual. Na dúvida, PERGUNTE ("quer que eu faça X?") ou segure. Iniciativa',
+  'própria é proibida; ordem explícita é o único portão de ação.',
 ].join(' ');
 
 /**
