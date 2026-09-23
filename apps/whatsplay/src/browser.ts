@@ -712,9 +712,8 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
         this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca não bateu após insertText — limpando e repetindo');
-        // diagnóstico: dump de TODOS os candidatos (mesmo os que casaram) —
-        // evidência 22:37 mostra o termo VISÍVEL no campo mas a leitura voltou
-        // vazia: há um clone visível com value '' à frente do input real.
+        // diagnóstico: dump de TODOS os candidatos — escrito em ARQUIVO (o
+        // objeto no log some na serialização do pino, evidência 22:41).
         const dump = await page
           .evaluate(`(() => {
             const out = [];
@@ -730,10 +729,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
                 disp: s.display, vis: s.visibility,
               });
             }
-            return JSON.stringify(out);
+            return JSON.stringify(out, null, 1);
           })`)
-          .catch(() => '[]');
-        this.config.log?.warn({ dump }, 'openChat: leitura não bateu — dump dos candidatos');
+          .catch((e) => JSON.stringify({ erro: String(e).slice(0, 200) }));
+        try {
+          mkdirSync(this.config.evidenceDir, { recursive: true });
+          const dumpPath = join(this.config.evidenceDir, `openchat-busca-dump-${Date.now()}.json`);
+          writeFileSync(dumpPath, String(dump), 'utf8');
+          this.config.log?.warn({ dumpPath }, 'openChat: leitura não bateu — dump dos candidatos em arquivo');
+        } catch {
+          this.config.log?.warn({}, 'openChat: leitura não bateu (falhou até gravar o dump)');
+        }
         // evidência visual pro diagnóstico (print → LLM averigua onde clicar)
         const ev = await this.captureEvidence(`openchat-busca-t${attempt + 1}`).catch(() => null);
         if (ev) this.config.log?.debug({ shot: ev.screenshotPath }, 'evidência da busca truncada capturada');
