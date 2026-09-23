@@ -443,9 +443,27 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             return val.trim();
           }
         }
-        return null;
+        // DIAGNÓSTICO: nenhum casou — despeja os candidatos reais do #side
+        const dump = [];
+        for (const b of document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]')) {
+          const r = b.getBoundingClientRect();
+          const s = getComputedStyle(b);
+          dump.push({
+            tag: b.tagName, type: b.type || null,
+            aria: b.getAttribute('aria-label'),
+            testid: b.getAttribute('data-testid'),
+            val: (b.value !== undefined ? b.value : b.textContent || '').slice(0, 30),
+            rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+            vis: s.display + '/' + s.visibility, cls: (b.className || '').toString().slice(0, 40),
+          });
+        }
+        return 'DIAG:' + JSON.stringify(dump);
       })`)
       .catch(() => null);
+    if (typeof v === 'string' && v.startsWith('DIAG:')) {
+      this.config.log?.warn({ dump: v.slice(5) }, 'searchFieldValue: nenhum seletor casou — dump real do #side');
+      return null;
+    }
     return typeof v === 'string' ? v : null;
   }
 
