@@ -914,3 +914,22 @@ Cliente esclareceu que 'a de 10' era mal-entendido. Tarefa real: substituir imag
 }
 ```
 
+## 2026-09-23 — Luna
+
+Cliente esclareceu a demanda sobre a troca do slider por um vídeo vertical no site onadance.com e elogiou a clareza e bom humor no atendimento da Luna.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 5,
+  "summary": "Cliente esclareceu a demanda sobre a troca do slider por um vídeo vertical no site onadance.com e elogiou a clareza e bom humor no atendimento da Luna.",
+  "client_signal": "elogio"
+}
+```
+
