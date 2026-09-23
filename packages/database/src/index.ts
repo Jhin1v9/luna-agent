@@ -61,3 +61,5 @@ export { buildAdminFullPack } from './admin-pack.js';
 export type { AdminPack } from './admin-pack.js';
 export { insertKimiWorkEvent, listPendingKimiWorkEvents, markKimiWorkEvent } from './kimiwork.js';
 export type { KimiWorkEventInput, KimiWorkEventRow } from './kimiwork.js';
+export { buildContactContext, formatContactContextText, resolveContactFacts } from './context-builder.js';
+export type { ContactContext, ContactFacts, MessageFact } from './context-builder.js';

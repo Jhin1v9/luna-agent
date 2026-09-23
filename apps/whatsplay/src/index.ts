@@ -194,9 +194,20 @@ async function main(): Promise<void> {
       const now = Date.now();
       if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca
       lastIncomingRingAt = now;
+      // Contexto de quem liga (decreto owner): identidade + última conversa +
+      // histórico — o Kimi Work recebe a pessoa JÁ CONTEXTUALIZADA e monta o
+      // prompt do Operador no ChatGPT com isso.
+      let contexto: string | null = null;
+      try {
+        const { buildContactContext, formatContactContextText } = await import('@luna/database');
+        const ctx = await buildContactContext(pool, { name: incoming.caller });
+        contexto = formatContactContextText(ctx);
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 120) }, 'kimiwork inbox: context builder falhou (segue sem contexto)');
+      }
       await insertKimiWorkEvent(pool, {
         kind: 'call.incoming',
-        payload: { caller: incoming.caller },
+        payload: { caller: incoming.caller, contexto },
         idempotencyKey: `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`,
       });
       log.info({ caller: incoming.caller }, 'kimiwork inbox: chamada recebida enfileirada');
