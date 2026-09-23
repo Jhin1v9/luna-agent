@@ -7,7 +7,7 @@ import type { Pool, PoolClient } from 'pg';
 
 export type Sql = Pick<Pool | PoolClient, 'query'>;
 
-export type AuditResult = 'success' | 'failed';
+export type AuditResult = 'success' | 'failed' | 'degraded';
 
 export interface AuditEntry {
   actor: string;

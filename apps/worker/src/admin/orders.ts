@@ -23,14 +23,31 @@ export interface AdminClassification {
 const IMPERATIVE_RE =
   /^(reinicia|reinicie|desliga|desligue|execute|executa|executar|roda|rode|rodar|cria|crie|criar|corrige|corrija|corrigir|conserta|conserte|implementa|implemente|implementar|adiciona|adicione|adicionar|remove|remova|remover|atualiza|atualize|atualizar|instala|instale|instalar|deploy|commitea|commit|sobe|suba|subir|lista|liste|listar|mostra|mostre|mostrar|gera|gere|gerar|verifica|verifique|verificar|conta|conte|contar|monitora|monitore|limpa|limpe|parar|pare|liga|ligue|abre|abra|fecha|feche|testa|teste|valida|valide)\b/i;
 
+/**
+ * Smalltalk/cumprimento — NUNCA é ordem. Sem isso, "oi" caía no caminho do
+ * live brain (evidência 2026-09-23: "@luna oi" classificado como ORDEM com
+ * o kimi-cli sem quota = falha dura numa saudação). Saudação é pergunta —
+ * o FAST (com fallback Gemini) responde de graça.
+ *
+ * Casamento INTEIRO (anchored ^$) de propósito: "olá, reinicia o worker" NÃO
+ * casa aqui — cai no veredito default 'order' pelo imperativo. \b não serve:
+ * quebra com acento final ("olá" — 'á' não é \w em JS sem /u).
+ */
+const SMALLTALK_RE =
+  /^(o[ií]+|ol[aá]+|hey+|eai|e a[ií]+|opa|bom dia|boa tarde|boa noite|tudo bem|tudo bom|como vai|como está|como esta|valeu|vlw|obrigad[oa]+|brigad[oa]+|thanks?|ok|okay|blz|beleza|perfeito|show|legal)[\s!.,;)]*$/i;
+
 /** Destrutivo/irreversível: sempre exige confirmação inline (quando ligada). */
 export const DESTRUCTIVE_RE =
   /reinicia|reinicie|restart|desliga|desligue|shutdown|formata|formate|deleta|delete|apaga|apague|drop\b|truncate|migrat|reseta|reset|taskkill|kill\b|reseta|limpa tudo|apaga tudo/i;
 
 export function classifyAdminMessage(text: string): AdminClassification {
   const trimmed = text.trim();
-  const interrogative = trimmed.endsWith('?') && !IMPERATIVE_RE.test(trimmed);
-  const kind: AdminMessageKind = interrogative ? 'question' : 'order';
+  const imperative = IMPERATIVE_RE.test(trimmed);
+  const interrogative = trimmed.endsWith('?') && !imperative;
+  // Smalltalk manda no veredito: cumprimento/saudação é pergunta mesmo sem
+  // '?'. EXCEÇÃO: verbo imperativo na msg = ordem (ex.: "olá, reinicia o worker").
+  const kind: AdminMessageKind =
+    !imperative && (interrogative || SMALLTALK_RE.test(trimmed)) ? 'question' : 'order';
   return { kind, destructive: DESTRUCTIVE_RE.test(trimmed) };
 }
 
@@ -61,6 +78,8 @@ export interface OrderRunnerDeps {
   timeoutMs: number;
   /** Exige confirmação inline para destrutivas. Default true (ADR-035). */
   confirmDestructive: boolean;
+  /** Prompt já composto pelo roteador LLM (P4) — regras duras já anexadas. */
+  composedPrompt?: string;
   now?: () => number;
 }
 
@@ -75,7 +94,7 @@ export async function runAdminOrder(
 ): Promise<{ text: string }> {
   const turn = await deps.live.sendTurn({
     session_key: input.sessionKey,
-    prompt: ORDER_PROMPT(input.order, input.adminName),
+    prompt: deps.composedPrompt ?? ORDER_PROMPT(input.order, input.adminName),
   });
   return { text: turn.reply_text };
 }

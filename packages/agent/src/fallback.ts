@@ -73,19 +73,31 @@ export class FallbackAdapter implements KimiLiveAdapter {
           `quota da Kimi esgotada e reserva Gemini ${this.fallback ? 'com key inválida' : 'sem GEMINI_API_KEY'} — ${msg}`,
         );
       }
-      try {
-        const r = await this.fallback.sendTurn(request);
-        // Sem fallback silencioso: hook vira log explícito +
-        // evento router.provider.unavailable no orchestrator.
-        this.hooks.onFallback?.({ from: 'kimi-api', to: 'gemini-api', reason: msg });
-        return { ...r, provider: 'gemini-api' };
-      } catch (err2) {
-        const msg2 = err2 instanceof Error ? err2.message : String(err2);
-        if (/401|400|403/i.test(msg2)) {
-          this.fallbackBroken = true; // key inválida: não insiste
+      // Reserva: UMA tentativa normal; em erro TRANSITÓRIO (timeout/rede/5xx —
+      // ex.: self-test das 16:07 com timeout de 60s no Gemini) repete 1x.
+      // Quota/auth da reserva: falha na hora, key inválida marca quebrada.
+      const TRANSIENT_RE = /timeout|inacessível|rede\/DNS|econnreset|etimedout|socket|HTTP 5\d\d/i;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await this.fallback.sendTurn(request);
+          // Sem fallback silencioso: hook vira log explícito +
+          // evento router.provider.unavailable no orchestrator.
+          this.hooks.onFallback?.({ from: 'kimi-api', to: 'gemini-api', reason: msg });
+          return { ...r, provider: 'gemini-api' };
+        } catch (err2) {
+          lastErr = err2;
+          const msg2 = err2 instanceof Error ? err2.message : String(err2);
+          if (/401|400|403/i.test(msg2)) {
+            this.fallbackBroken = true; // key inválida: não insiste
+            break;
+          }
+          if (QUOTA_RE.test(msg2)) break; // 429/quota da reserva: não repete
+          if (!TRANSIENT_RE.test(msg2)) break; // erro de cliente/parse: não-transiente
         }
-        throw new Error(`fallback Gemini falhou após quota da Kimi: ${msg2} (original: ${msg})`);
       }
+      const lastMsg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+      throw new Error(`fallback Gemini falhou após quota da Kimi: ${lastMsg} (original: ${msg})`);
     }
   }
 

@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { recordActivity, recordAudit, readHeartbeats } from '@luna/database';
 import { classifyAdminMessage } from './orders.js';
+import { delegateAdminMessage } from './delegate.js';
 import { z } from 'zod';
 
 /**
@@ -210,25 +211,54 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
         continue;
       }
 
-      // ── P3: classificar pergunta vs ordem ──
-      const classification = classifyAdminMessage(text);
-      if (classification.kind === 'order' && deps.live) {
-        if (classification.destructive && deps.confirmDestructive !== false) {
+      // ── P4: roteamento por LLM (delegate.ts) — o FAST decide RESPONDER/ORDEM
+      // e já compõe o prompt do live brain; regex (classifyAdminMessage) é
+      // rede de segurança quando o FAST está malformado/indisponível. ──
+      const pack = await deps.buildAdminPack();
+      const delegation = await delegateAdminMessage(
+        { adapter: deps.adapter, log: deps.log },
+        { text, adminName, packSections: pack.sections, sessionKey: 'admin:telegram:router' },
+      );
+      if (delegation.kind === 'order' && deps.live) {
+        // Guardrail determinístico por cima: destrutivo exige confirmação
+        // inline INDEPENDENTE de quem classificou (LLM não desliga segurança).
+        const destructive = classifyAdminMessage(text).destructive;
+        if (destructive && deps.confirmDestructive !== false) {
           pendingConfirm.set(chatKey, { order: text, adminName, expiresAt: Date.now() + 5 * 60_000 });
-          deps.log.warn({ order: text.slice(0, 100), from: fromId }, 'admin telegram: ordem DESTRUTIVA — aguardando confirmação inline');
+          deps.log.warn({ order: text.slice(0, 100), from: fromId, decidedBy: delegation.decidedBy }, 'admin telegram: ordem DESTRUTIVA — aguardando confirmação inline');
           await reply(
             chatKey,
             `⚠️ Isso parece DESTRUTIVO/irreversível:\n"${text.slice(0, 200)}"\n\nConfirma? Responda "sim" em até 5 min (qualquer outra coisa cancela).`,
           );
           continue;
         }
-        await executeOrder(chatKey, text, adminName, fromId);
+        await executeOrder(chatKey, text, adminName, fromId, delegation.content || undefined, delegation.decidedBy);
         continue;
       }
 
-      // PERGUNTA (fluxo F4 existente): FAST responde com dados reais.
+      // PERGUNTA decidida pelo LLM: resposta pronta veio no próprio turno —
+      // entrega direto, sem segundo chamada.
+      if (delegation.kind === 'question' && delegation.decidedBy === 'llm' && delegation.content) {
+        await reply(String(u.message.chat.id), delegation.content.slice(0, 3900));
+        const correlation = `corr_admin_${Date.now()}`;
+        await recordAudit(deps.pool, {
+          actor: 'admin-telegram',
+          action: 'admin.question.answered',
+          tool: 'router_llm',
+          correlation_id: correlation,
+          result: 'success',
+          metadata: { question: text.slice(0, 120), decidedBy: 'llm' },
+        }).catch(() => {});
+        await recordActivity(deps.pool, {
+          kind: 'action',
+          summary: `Chat admin: respondi "${text.slice(0, 60)}" (roteador LLM).`,
+          correlation_id: correlation,
+        }).catch(() => {});
+        continue;
+      }
+
+      // PERGUNTA (regex/fallback): FAST responde com dados reais (fluxo F4).
       const correlation = `corr_admin_${Date.now()}`;
-      const pack = await deps.buildAdminPack();
       const prompt = [
         'Você é a Luna no CHAT ADMIN (§25): o time pergunta, você responde com os dados reais abaixo.',
         'Direta, técnica, parceira de time. Nada de placeholders: se o dado não está abaixo, diz que não tem.',
@@ -259,17 +289,28 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
     }
   }
 
-  /** P3: executa uma ordem no live brain e responde com evidência. */
-  async function executeOrder(chatId: string, order: string, adminName: string, fromId: string | null): Promise<void> {
+  /** P3/P4: executa uma ordem no live brain e responde com evidência.
+   *  composedPrompt (roteador LLM): prompt já otimizado pelo FAST — as regras
+   *  duras são anexadas por cima (segurança não é delegada ao LLM). */
+  async function executeOrder(
+    chatId: string,
+    order: string,
+    adminName: string,
+    fromId: string | null,
+    composedPrompt?: string,
+    decidedBy?: 'llm' | 'regex',
+  ): Promise<void> {
     const correlation = `corr_admin_order_${Date.now()}`;
     const started = Date.now();
     try {
       const { runAdminOrder } = await import('./orders.js');
+      const { HARD_RULES_FOOTER } = await import('./delegate.js');
       const { text } = await runAdminOrder(
         {
           live: deps.live!,
           timeoutMs: deps.orderTimeoutMs ?? 300_000,
           confirmDestructive: deps.confirmDestructive ?? true,
+          composedPrompt: composedPrompt ? `${composedPrompt}${HARD_RULES_FOOTER}` : undefined,
         },
         { order, adminName, sessionKey: `admin:user:${fromId ?? 'unknown'}` },
       );
@@ -281,7 +322,7 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
         correlation_id: correlation,
         duration_ms: Date.now() - started,
         result: 'success',
-        metadata: { order: order.slice(0, 200), from_id: fromId },
+        metadata: { order: order.slice(0, 200), from_id: fromId, decidedBy: decidedBy ?? 'regex' },
       }).catch(() => {});
       await recordActivity(deps.pool, {
         kind: 'action',
@@ -291,17 +332,36 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       deps.log.info({ order: order.slice(0, 80) }, 'admin telegram: ordem executada');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await reply(chatId, `❌ Falhei ao executar: ${msg.slice(0, 500)}`);
+      // MODO DEGRADADO (ADR-039): quota do live brain esgotada ≠ bug — é
+      // estado operacional conhecido. Resposta honesta do que segue de pé,
+      // nunca finge sucesso nem cospe stack cru pro time.
+      const QUOTA_DEAD_RE = /quota|403|usage limit|rate.?limit|insufficient/i;
+      if (QUOTA_DEAD_RE.test(msg)) {
+        await reply(
+          chatId,
+          [
+            '⚡ MODO DEGRADADO — o cérebro vivo (kimi-cli) está SEM QUOTA (HTTP 403, limite semanal da conta Kimi).',
+            'A ordem NÃO foi executada: só o live brain executa comandos — o FAST não executa nada por decreto.',
+            '',
+            'Segue no ar: perguntas aqui no chat admin (FAST com reserva Gemini) e respostas a clientes no WhatsApp.',
+            'Pra voltar as ordens: (1) esperar o reset semanal da quota Kimi (automático, zero ação), ou',
+            '(2) logar o Pi na NVIDIA NIM: build.nvidia.com → Generate API Key → terminal `pi` → /login → NVIDIA NIM → colar nvapi-…,',
+            '    depois LIVE_BRAIN_PROVIDER=pi + pm2 restart luna-worker.',
+          ].join('\n'),
+        );
+      } else {
+        await reply(chatId, `❌ Falhei ao executar: ${msg.slice(0, 500)}`);
+      }
       await recordAudit(deps.pool, {
         actor: 'admin-telegram',
         action: 'admin.order.executed',
         tool: 'kimi_cli',
         correlation_id: correlation,
         duration_ms: Date.now() - started,
-        result: 'failed',
+        result: QUOTA_DEAD_RE.test(msg) ? 'degraded' : 'failed',
         metadata: { order: order.slice(0, 200), from_id: fromId, error: msg.slice(0, 300) },
       }).catch(() => {});
-      deps.log.error({ err: msg }, 'admin telegram: ordem falhou');
+      deps.log.error({ err: msg, degraded: QUOTA_DEAD_RE.test(msg) }, 'admin telegram: ordem falhou');
     }
   }
 

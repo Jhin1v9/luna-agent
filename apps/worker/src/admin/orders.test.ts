@@ -22,6 +22,21 @@ describe('classifyAdminMessage (P3 — pergunta vs ordem, determinístico)', () 
     expect(classifyAdminMessage('quanto custa o site').kind).toBe('order');
   });
 
+  it('smalltalk/cumprimento → question MESMO sem "?" (bug real 2026-09-23: "@luna oi" virou ordem e explodiu no kimi-cli sem quota)', () => {
+    expect(classifyAdminMessage('oi').kind).toBe('question');
+    expect(classifyAdminMessage('olá').kind).toBe('question');
+    expect(classifyAdminMessage('bom dia').kind).toBe('question');
+    expect(classifyAdminMessage('boa noite!').kind).toBe('question');
+    expect(classifyAdminMessage('tudo bem?').kind).toBe('question');
+    expect(classifyAdminMessage('valeu').kind).toBe('question');
+    expect(classifyAdminMessage('obrigado').kind).toBe('question');
+  });
+
+  it('cumprimento COM imperativo continua ordem ("olá, reinicia o worker")', () => {
+    expect(classifyAdminMessage('olá, reinicia o worker').kind).toBe('order');
+    expect(classifyAdminMessage('bom dia, lista os serviços').kind).toBe('order');
+  });
+
   it('destrutivas são detectadas para confirmação inline', () => {
     expect(classifyAdminMessage('Reinicia o PC').destructive).toBe(true);
     expect(classifyAdminMessage('Desliga a máquina').destructive).toBe(true);

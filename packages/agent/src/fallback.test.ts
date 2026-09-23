@@ -135,6 +135,37 @@ describe('FallbackAdapter (ADR-039 — Kimi primária → Gemini na quota)', () 
     await expect(a.sendTurn({ session_key: 's7', prompt: 'oi' })).rejects.toThrow(/sem GEMINI_API_KEY/);
   });
 
+  it('reserva com timeout TRANSITÓRIO repete 1x e pode recuperar (self-test 16:07)', async () => {
+    let geminiCalls = 0;
+    const a = new FallbackAdapter(CONFIG, async (url) => {
+      if (url.startsWith('https://kimi.test')) {
+        return jsonResponse({ error: { message: 'quota exceeded' } }, 403);
+      }
+      geminiCalls++;
+      if (geminiCalls === 1) {
+        return new Response('upstream timeout', { status: 504 });
+      }
+      return jsonResponse(okBody('gemini recuperou no retry'));
+    });
+    const r = await a.sendTurn({ session_key: 's9', prompt: 'oi' });
+    expect(r.provider).toBe('gemini-api');
+    expect(r.reply_text).toBe('gemini recuperou no retry');
+    expect(geminiCalls).toBe(2); // 1 falha transitória + 1 retry
+  });
+
+  it('reserva com timeout persistente (2x) falha explícito após o retry', async () => {
+    let geminiCalls = 0;
+    const a = new FallbackAdapter(CONFIG, async (url) => {
+      if (url.startsWith('https://kimi.test')) {
+        return jsonResponse({ error: { message: 'quota exceeded' } }, 403);
+      }
+      geminiCalls++;
+      return new Response('upstream timeout', { status: 504 });
+    });
+    await expect(a.sendTurn({ session_key: 's10', prompt: 'oi' })).rejects.toThrow(/504/);
+    expect(geminiCalls).toBe(2); // nunca mais que 1 retry
+  });
+
   it('reserva usa GEMINI_BASE_URL/GEMINI_MODEL do env quando config não traz', async () => {
     process.env.GEMINI_API_KEY = 'gemini-env-key';
     process.env.GEMINI_BASE_URL = 'https://gemini.env.test/openai/';
