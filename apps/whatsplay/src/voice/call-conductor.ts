@@ -18,6 +18,15 @@ import type { Page } from 'playwright-core';
  *
  * Robustez (decreto): loop travando ou Kimi caindo NÃO derruba a chamada —
  * o Operador segue com o que tem, a falha é explícita em log + alerta.
+ *
+ * LIMITAÇÃO CONHECIDA (2ª chamada ao vivo, 2026-09-23): o cursor lê o thread
+ * de TEXTO `[data-message-author-role]`, mas no ChatGPT VOICE mode a fala do
+ * interlocutor NÃO vira mensagem no thread — a transcrição vive na UI de voz
+ * (legenda/caption ao vivo), outro DOM. Na 2ª chamada a conductora leu o
+ * thread de texto (que só tinha o pré-voo) e re-respondeu o planejamento —
+ * o Pai OUVIU o plano, mas a conductora não ouviu o Pai. PRÓXIMO PASSO:
+ * probe do DOM do voice mode durante chamada ativa (aria-live/captions) e
+ * trocar a fonte do readNewTurns.
  */
 
 export interface ConductorTurn {
