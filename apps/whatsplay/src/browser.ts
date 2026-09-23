@@ -712,6 +712,28 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
         this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca não bateu após insertText — limpando e repetindo');
+        // diagnóstico: dump de TODOS os candidatos (mesmo os que casaram) —
+        // evidência 22:37 mostra o termo VISÍVEL no campo mas a leitura voltou
+        // vazia: há um clone visível com value '' à frente do input real.
+        const dump = await page
+          .evaluate(`(() => {
+            const out = [];
+            for (const b of document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]')) {
+              const r = b.getBoundingClientRect();
+              const s = getComputedStyle(b);
+              out.push({
+                tag: b.tagName, type: b.type || null,
+                aria: (b.getAttribute('aria-label') || '').slice(0, 24),
+                testid: b.getAttribute('data-testid'),
+                val: (b.value !== undefined ? b.value : b.textContent || '').slice(0, 30),
+                rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+                disp: s.display, vis: s.visibility,
+              });
+            }
+            return JSON.stringify(out);
+          })`)
+          .catch(() => '[]');
+        this.config.log?.warn({ dump }, 'openChat: leitura não bateu — dump dos candidatos');
         // evidência visual pro diagnóstico (print → LLM averigua onde clicar)
         const ev = await this.captureEvidence(`openchat-busca-t${attempt + 1}`).catch(() => null);
         if (ev) this.config.log?.debug({ shot: ev.screenshotPath }, 'evidência da busca truncada capturada');
