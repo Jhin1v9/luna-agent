@@ -42,14 +42,20 @@ export const SELECTORS = {
     '#main [data-testid="search-input"] input, #main [data-testid="search-input"], #main input[placeholder*="Search" i], #main input[placeholder*="Pesquisar" i], #main input[placeholder*="Buscar" i]',
   /** 🆕 LUPA: marcações de texto que casaram com a busca (resultados). */
   searchHighlight: '.matched-text, span[class*="highlight" i], [data-testid="search-message-highlight"]',
-  /** 🆕 CITAÇÃO (mention.respond v2): botão de contexto que aparece no hover da mensagem. */
+  /** 🆕 CITAÇÃO (mention.respond v2): botão de contexto que aparece no hover da mensagem.
+   *  Ao vivo 2026-09-23 (WA 2026, wds-design-system): o testid REAL é
+   *  icon-down-context (div[role=button], aria "Menú contextual del mensaje").
+   *  Os testids antigos (msg-options etc.) foram removidos nesta versão. */
   msgContextButton:
-    '[data-testid="msg-options"], [data-testid="chevron-down"], span[data-testid="down-context"], [data-testid="message-context-button"]',
+    '[data-testid="icon-down-context"], [data-testid="msg-options"], [data-testid="chevron-down"], span[data-testid="down-context"], [data-testid="message-context-button"]',
   /** 🆕 CITAÇÃO: item "Responder" do menu de contexto (texto casa i18n no código). */
   contextMenu: '[data-testid="msg-context-menu"], div[role="menu"], [data-testid="dropdown"]',
-  /** 🆕 CITAÇÃO: preview da mensagem citada preso ao campo de composição. */
+  /** 🆕 CITAÇÃO: preview da mensagem citada preso ao campo de composição.
+   *  Ao vivo 2026-09-23: o testid é quoted-message e ele fica DENTRO do footer
+   *  (ao lado do compose-box). Scoping em footer evita falso positivo com
+   *  citações históricas do painel, que usam o mesmo testid. */
   replyPreview:
-    '[data-testid="quoted-preview"], [data-testid="reply-preview"], [data-testid*="quoted" i], .reply-preview',
+    'footer [data-testid="quoted-message"], footer [data-testid="quoted-preview"], footer [data-testid="reply-preview"], footer [data-testid*="quoted" i], footer .reply-preview',
 } as const;
 
 export type SelectorKey = keyof typeof SELECTORS;

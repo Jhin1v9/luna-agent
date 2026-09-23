@@ -1035,29 +1035,52 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           `citação: mensagem com "${query}" NÃO achada nem no painel nem na lupa — resposta NÃO enviada (sem citar ficaria órfã). Evidência: ${ev.screenshotPath}`,
         );
       }
-      // 2. Hover na mensagem → botão de contexto → "Responder".
-      //    Ao vivo 2026-09-23: os testid nomeados do WA (msg-options etc.)
-      //    NÃO existem mais nesta versão (wds-design-system). O que funciona
-      //    independente de versão: qualquer <button> VISÍVEL dentro da row
-      //    no hover é o chevron de contexto (registrado no selector memory).
+      // 2. Hover na mensagem → icon-down-context → "Responder".
+      //    Ao vivo 2026-09-23 (WA 2026, wds-design-system): o chevron de
+      //    contexto é [data-testid="icon-down-context"] (div[role=button]),
+      //    renderizado SÓ com hover real e às vezes demora um tick. Os testids
+      //    antigos (msg-options etc.) foram REMOVIDOS nesta versão.
       const rowSel = `${SELECTORS.messageRow}:has-text(${JSON.stringify(query)})`;
       const row = page.locator(rowSel).last();
       await row.hover();
       await page.waitForTimeout(250 + Math.floor(Math.random() * 250));
-      const ctx = page.locator(`${rowSel} button:visible`).last();
-      if ((await ctx.count().catch(() => 0)) === 0) {
-        const ev = await this.captureEvidence('citacao-botao-ctx-nao-achado');
-        throw new Error(`citação: botão de contexto da mensagem não achado (row: ${rowSel} button:visible). Evidência: ${ev.screenshotPath}`);
+      const ctxBtn = row.locator(SELECTORS.msgContextButton).first();
+      let ctxOk = false;
+      for (let attempt = 0; attempt < 3 && !ctxOk; attempt++) {
+        ctxOk = await ctxBtn
+          .waitFor({ state: 'visible', timeout: 1_500 })
+          .then(() => true)
+          .catch(() => false);
+        if (!ctxOk) {
+          // hover "fugiu" (scroll/re-render) — re-hover e tenta de novo
+          await row.hover().catch(() => {});
+          await page.waitForTimeout(400);
+        }
       }
-      await ctx.click();
+      if (!ctxOk) {
+        const ev = await this.captureEvidence('citacao-botao-ctx-nao-achado');
+        throw new Error(`citação: botão de contexto (icon-down-context) da mensagem não ficou visível após hover (row: ${rowSel}). Evidência: ${ev.screenshotPath}`);
+      }
+      await ctxBtn.click({ force: true }).catch(async () => {
+        await ctxBtn.evaluate((b) => (b as HTMLElement).click());
+      });
       await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
       // 3. Item "Responder" — i18n: Responder/Reply/Contestar. O menu abre num
-      //    popover fora da row; busca por role genérico + texto (resiliente a
-      //    mudança de testid, mesmo espírito do botão de contexto).
-      const menuItem = page
-        .locator('[role="menuitem"]:visible, [role="listitem"]:visible, li:visible')
-        .filter({ hasText: /responder|reply|contestar/i })
-        .first();
+      //    popover fora da row (button[role=menuitem]). Preferência por texto
+      //    exato ("Responder" vs "Responder en privado") com fallback regex.
+      const menuOpened = await page
+        .locator('div[role="menu"]:visible')
+        .waitFor({ state: 'visible', timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!menuOpened) {
+        const ev = await this.captureEvidence('citacao-menu-nao-abriu');
+        throw new Error(`citação: cliquei no chevron mas o menu de contexto não abriu. Evidência: ${ev.screenshotPath}`);
+      }
+      const menuItemExact = page.locator('[role="menuitem"]:visible', { hasText: /^(Responder|Reply|Contestar)$/i }).first();
+      const menuItem = (await menuItemExact.count().catch(() => 0)) > 0
+        ? menuItemExact
+        : page.locator('[role="menuitem"]:visible').filter({ hasText: /responder|reply|contestar/i }).first();
       if ((await menuItem.count().catch(() => 0)) === 0) {
         const ev = await this.captureEvidence('citacao-menu-responder-nao-achado');
         throw new Error(`citação: item "Responder" do menu não achado. Evidência: ${ev.screenshotPath}`);

@@ -29,6 +29,12 @@ function fakeLocator(state: FakeState, log: (s: string) => void) {
     filter() {
       return self;
     },
+    locator() {
+      return self;
+    },
+    async waitFor() {
+      return undefined; // todo seletor "fica visível" no fake
+    },
     async hover() {
       log('hover');
     },

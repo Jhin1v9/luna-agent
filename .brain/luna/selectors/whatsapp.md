@@ -197,3 +197,11 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - seletor novo: qualquer `button:visible` DENTRO da row da mensagem no hover (WA 2026 wds-design-system não expõe mais testid estável no chevron); item do menu por role genérico + texto (responder|reply|contestar)
 - evidência: citacao-botao-ctx-nao-achado-2026-09-23T21-15-14-280Z.png (chevron visível no hover, testid ausente)
 - fallback visual: screenshot + DOM no incidente
+
+### 2026-09-23 · citação v2 (mention.respond v2) — autor: Luna
+- uso: replyToMessage (botão de contexto + preview de citação)
+- seletor antigo: qualquer `button:visible` dentro da row no hover (FALHOU 2x ao vivo — o chevron 2026 é div[role=button], não <button>)
+- seletor novo: `[data-testid="icon-down-context"]` dentro do msg-container, só renderizado com hover real (re-hover em retry de 3); preview de citação: `footer [data-testid="quoted-message"]` (o mesmo testid é usado por citações HISTÓRICAS do painel — sem o escopo footer o check dava falso positivo)
+- item Responder: button[role=menuitem], texto exato "Responder" preferido (regex cairia em "Responder en privado")
+- evidência: inspeção DOM ao vivo via perfil dedicado (tmp-inspect3/4), menu capturado em tmp-inspect3-menu.png
+- fallback visual: screenshot + DOM no incidente
