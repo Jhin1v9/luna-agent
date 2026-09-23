@@ -69,7 +69,7 @@ export class OperatorSession {
   }
 
   /** Escreve texto no composer e envia (com verificação de que o campo esvaziou). */
-  private async send(page: import('playwright-core').Page, text: string): Promise<void> {
+  async sendText(page: import('playwright-core').Page, text: string): Promise<void> {
     const composer = page.locator(COMPOSER_SEL).first();
     await composer.click({ timeout: 4_000 });
     await page.waitForTimeout(200);
@@ -97,14 +97,14 @@ export class OperatorSession {
       'Confirme com "ok, entendi" e aguarde as instruções da Luna.',
     ].join('\n');
     this.say(`injetando prompt §26 + contexto (${ctx.caller} — ${ctx.motivo})`);
-    await this.send(page, full);
+    await this.sendText(page, full);
     this.say('prompt enviado — Operador inicializado');
   }
 
   /** Marca de espera padrão (§26): Abner nunca fica em silêncio morto. */
   async hold(page: import('playwright-core').Page): Promise<void> {
     this.say('enviando marca de espera');
-    await this.send(page, HOLD_TEXT);
+    await this.sendText(page, HOLD_TEXT);
   }
 
   /** Best-effort: lê a última resposta do assistente na página. */

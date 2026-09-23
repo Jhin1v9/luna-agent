@@ -54,6 +54,9 @@ const envSchema = z.object({
   INVESTIGATE_BUDGET_ROUNDS: z.coerce.number().int().positive().default(3),
   INVESTIGATE_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   LIVE_AUTONOMY: z.enum(['none', 'yolo', 'auto']).default('yolo'),
+  // F6 — Pré-voo do Operador (ADR-036): espera da confirmação de atividade
+  // antes de discar (ordem invertida — nunca ligar com operador frio).
+  OPERATOR_PREFLIGHT_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
   // P3 — Canal admin: whitelist de user_ids do Telegram (vírgula) e
   // confirmação inline para ações destrutivas/irreversíveis.
   ADMIN_TELEGRAM_IDS: z.string().default(''),
