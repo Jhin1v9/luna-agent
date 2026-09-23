@@ -1,5 +1,11 @@
 # Guia de hardware — Voz da Luna (F6, §26)
 
+> ⚠️ **DECRETO DO OWNER (2026-09-22, noite): o wiring de áudio atual está
+> VALIDADO (chamada real com o Pai funcionou) e é o OFICIAL. NÃO renomear
+> dispositivos, NÃO mover B1/B2, NÃO "limpar" o circuito. Funciona = não mexe.**
+> A seção de rename do AUX abaixo fica apenas como histórico — executar SOMENTE
+> se o owner pedir expressamente.
+
 > Software 100% pronto (voice/ no whatsplay). Status verificado automaticamente
 > pela Luna em 2026-09-22 (pós-reboot do owner). Siga a ordem; cada checkpoint
 > tem como conferir.
