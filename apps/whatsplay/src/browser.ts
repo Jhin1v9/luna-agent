@@ -724,6 +724,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             allInputs: document.querySelectorAll('input').length,
             sideTextboxes: document.querySelectorAll('#side [role="textbox"]').length,
             side: !!document.querySelector('#side'),
+            iifeNum: (() => 42)(),
+            arrowMap: [1, 2].map((x) => x * 2).join(','),
+            funcExpr: (function () { return 7; })(),
           })`)
           .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
         const dump = await page
