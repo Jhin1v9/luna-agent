@@ -1,7 +1,7 @@
 import type { Logger } from 'pino';
 import type { Pool } from 'pg';
 import type { WhatsAppTransport } from '../transport.js';
-import { KimiCliAdapter } from '@luna/agent';
+import { FallbackAdapter } from '@luna/agent';
 import { OperatorSession } from './operator-session.js';
 import { preflightOperator } from './operator-preflight.js';
 import { CallConductor } from './call-conductor.js';
@@ -13,6 +13,11 @@ import type { CallBrief } from './operator-preflight.js';
  * composto pelo Kimi → operador ativo) → placeVoiceCall → conductora
  * durante a chamada → endCall. Falha em qualquer etapa = explícita, e o
  * destinatário é avisado por texto quando dá (nunca silêncio sem aviso).
+ *
+ * Cérebro das chamadas (2026-09-23): FallbackAdapter ADR-039 — Kimi API
+ * primária, Gemini na reserva. Antes era KimiCliAdapter puro: quota do
+ * CLI morta = TODA chamada abortava no pré-voo. Mesmo decreto do
+ * orchestrator: kimi first, fallback explícito no log.
  */
 
 export interface CallExecutorDeps {
@@ -23,7 +28,19 @@ export interface CallExecutorDeps {
 
 export function createCallExecutor(deps: CallExecutorDeps) {
   const { pool, transport, log } = deps;
-  const live = new KimiCliAdapter({ mode: 'kimi-cli' }, { timeoutMs: 120_000 });
+  const live = new FallbackAdapter(
+    {
+      mode: 'kimi-api',
+      apiKey: process.env.LLM_API_KEY,
+      apiBaseUrl: process.env.LLM_BASE_URL,
+      apiModel: process.env.LLM_MODEL,
+      fallbackApiKey: process.env.GEMINI_API_KEY,
+      fallbackBaseUrl: process.env.GEMINI_BASE_URL,
+      fallbackModel: process.env.GEMINI_MODEL,
+    },
+    undefined,
+    { onFallback: ({ from, to, reason }) => log.warn({ from, to, reason: reason.slice(0, 160) }, `voice.call: fallback ${from}→${to}`) },
+  );
   const operator = new OperatorSession({ log });
   let busy = false;
 
@@ -36,7 +53,14 @@ export function createCallExecutor(deps: CallExecutorDeps) {
     const correlationId = `corr_call_${Date.now()}`;
     try {
       const ev = await pool.query(`SELECT payload FROM events WHERE event_id = $1`, [eventId]);
-      const brief = (ev.rows[0]?.payload ?? {}) as CallBrief;
+      const stored = (ev.rows[0]?.payload ?? {}) as Record<string, unknown>;
+      // publishEvent grava o ENVELOPE INTEIRO na coluna payload — o brief
+      // (CallBrief) fica em stored.payload. Defesa em profundidade: aceita
+      // também o bare payload (se destinatário estiver na raiz). Evidência
+      // ao vivo 2026-09-23: discou pra 'undefined' e crashou no .includes.
+      const inner = stored && typeof stored === 'object' && 'payload' in stored ? (stored.payload ?? {}) : stored;
+      const brief = inner as CallBrief;
+      if (!brief.destinatario) throw new Error('voice.call: evento sem destinatário — ABORTO (envelope malformado)');
       log.info({ brief, correlation_id: correlationId }, 'voice.call: pedido recebido — pré-voo');
 
       const tab = await preflightOperator({ operator, live, log, timeoutMs: 30_000 }, brief);
