@@ -4,6 +4,8 @@ import { KimiWebAdapter } from './kimi-web.js';
 import { KimiApiAdapter } from './kimi-api.js';
 import { KimiCliAdapter } from './kimi-cli.js';
 import { GeminiAdapter } from './gemini.js';
+import { PiAdapter } from './pi.js';
+import { FallbackAdapter } from './fallback.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
   switch (config.mode) {
@@ -12,11 +14,18 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
     case 'kimi-web':
       return new KimiWebAdapter(config);
     case 'kimi-api':
-      return new KimiApiAdapter(config);
+      // ADR-039: com GEMINI_API_KEY no ambiente, o fast brain nasce com a
+      // reserva ligada (quota 403/429 → Gemini, uma tentativa). Sem a key,
+      // comportamento histórico: KimiApiAdapter puro (falha explícita).
+      return config.fallbackApiKey ?? process.env.GEMINI_API_KEY
+        ? new FallbackAdapter(config)
+        : new KimiApiAdapter(config);
     case 'kimi-cli':
       return new KimiCliAdapter(config);
     case 'gemini':
       return new GeminiAdapter(config);
+    case 'pi':
+      return new PiAdapter(config);
   }
 }
 
@@ -55,6 +64,9 @@ export { KimiCliAdapter } from './kimi-cli.js';
 export type { CliSpawn, CliSpawned, KimiCliAdapterDeps } from './kimi-cli.js';
 export { GeminiAdapter } from './gemini.js';
 export { FallbackAdapter } from './fallback.js';
+export type { FallbackHooks } from './fallback.js';
+export { PiAdapter } from './pi.js';
+export type { PiAdapterDeps } from './pi.js';
 export { probeVisionSupport } from './vision-probe.js';
 export type { VisionProbeResult } from './vision-probe.js';
 export {

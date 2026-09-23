@@ -1,90 +1,164 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { FallbackAdapter } from './fallback.js';
+import type { KimiAdapterConfig } from './types.js';
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-}
-
-const CONFIG = {
-  mode: 'kimi-api' as const,
-  apiKey: 'kimi-key',
-  apiBaseUrl: 'https://api.kimi.com/coding/v1',
-  apiModel: 'kimi-k2.6',
-  fallbackApiKey: 'gemini-key',
-  fallbackBaseUrl: 'https://gen.test/openai/',
-  fallbackModel: 'gemini-2.5-flash',
+const CONFIG: KimiAdapterConfig = {
+  mode: 'kimi-api',
+  apiKey: 'kimi-test-key',
+  apiBaseUrl: 'https://kimi.test/v1',
+  apiModel: 'kimi-k2-test',
+  fallbackApiKey: 'gemini-test-key',
+  fallbackBaseUrl: 'https://gemini.test/v1beta/openai/',
+  fallbackModel: 'gemini-test',
 };
 
-describe('FallbackAdapter — quota da Kimi cai pro Gemini (nunca mais msg morta)', () => {
-  it('Kimi OK → resposta da primária, reserva NÃO chamada, provider kimi-api', async () => {
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+const okBody = (text: string) => ({
+  choices: [{ message: { content: text } }],
+  usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+});
+
+afterEach(() => {
+  delete process.env.GEMINI_API_KEY;
+});
+
+describe('FallbackAdapter (ADR-039 — Kimi primária → Gemini na quota)', () => {
+  it('Kimi ok → resposta pela primária, provider kimi-api, hook NÃO dispara', async () => {
+    const seen: string[] = [];
+    let hooked = 0;
+    const a = new FallbackAdapter(CONFIG, async (url) => {
+      seen.push(url);
+      return jsonResponse(okBody('resposta da kimi'));
+    }, {
+      onFallback: () => hooked++,
+    });
+    const r = await a.sendTurn({ session_key: 's1', prompt: 'oi' });
+    expect(r.reply_text).toBe('resposta da kimi');
+    expect(r.provider).toBe('kimi-api');
+    expect(hooked).toBe(0);
+    expect(seen).toHaveLength(1); // gemini nem foi consultado
+  });
+
+  it('403 de quota → UMA tentativa no Gemini → MESMO prompt, provider gemini-api + usage dele', async () => {
+    const seen: Array<{ url: string; auth: string; body: string }> = [];
+    const hooks: Array<{ from: string; to: string; reason: string }> = [];
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      seen.push({
+        url,
+        auth: (init?.headers as Record<string, string>).authorization,
+        body: String(init?.body ?? ''),
+      });
+      if (url.startsWith('https://kimi.test')) {
+        return jsonResponse({ error: { message: 'quota exceeded for this month' } }, 403);
+      }
+      return jsonResponse(okBody('resposta do gemini'));
+    };
+    const a = new FallbackAdapter(CONFIG, fetchImpl, { onFallback: (i) => hooks.push(i) });
+    const r = await a.sendTurn({ session_key: 's2', prompt: 'PROMPT_DO_CLIENTE xyz' });
+
+    expect(seen).toHaveLength(2); // kimi 1x, gemini 1x — nunca mais que uma tentativa de reserva
+    expect(seen[0]!.url).toBe('https://kimi.test/v1/chat/completions');
+    expect(seen[0]!.auth).toBe('Bearer kimi-test-key');
+    expect(seen[1]!.url).toBe('https://gemini.test/v1beta/openai/chat/completions');
+    expect(seen[1]!.auth).toBe('Bearer gemini-test-key');
+    // MESMO prompt e contexto pro reserva (sem resumo, sem perda de turno)
+    expect(seen[1]!.body).toContain('PROMPT_DO_CLIENTE xyz');
+    expect(r.reply_text).toBe('resposta do gemini');
+    expect(r.provider).toBe('gemini-api');
+    expect(r.usage).toEqual({ input_tokens: 10, output_tokens: 5 });
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]).toMatchObject({ from: 'kimi-api', to: 'gemini-api' });
+    expect(hooks[0]!.reason).toMatch(/403|quota/i);
+  });
+
+  it('429 rate-limit também dispara o fallback', async () => {
     const urls: string[] = [];
     const a = new FallbackAdapter(CONFIG, async (url) => {
       urls.push(url);
-      if (url.includes('api.kimi.com')) return jsonResponse({ choices: [{ message: { content: 'resposta kimi' } }] });
-      return jsonResponse({ choices: [{ message: { content: 'resposta gemini' } }] });
+      return url.startsWith('https://kimi.test')
+        ? jsonResponse({ error: 'rate limit' }, 429)
+        : jsonResponse(okBody('ok gemini'));
     });
-    const r = await a.sendTurn({ session_key: 's', prompt: 'p' });
-    expect(r.reply_text).toBe('resposta kimi');
-    expect(r.provider).toBe('kimi-api');
-    expect(urls.every((u) => u.includes('api.kimi.com'))).toBe(true);
-  });
-
-  it('Kimi 403 quota → MESMO prompt pro Gemini, provider gemini-api no resultado', async () => {
-    const geminiBodies: string[] = [];
-    const a = new FallbackAdapter(CONFIG, async (url, init) => {
-      if (url.includes('api.kimi.com')) {
-        return jsonResponse({ error: { message: "You've reached your 5-hour quota" } }, 403);
-      }
-      geminiBodies.push(String(init?.body));
-      return jsonResponse({
-        choices: [{ message: { content: 'resposta gemini' } }],
-        usage: { prompt_tokens: 10, completion_tokens: 5 },
-      });
-    });
-    const r = await a.sendTurn({ session_key: 's', prompt: 'persona + contexto + pergunta' });
-    expect(r.reply_text).toBe('resposta gemini');
+    const r = await a.sendTurn({ session_key: 's3', prompt: 'oi' });
     expect(r.provider).toBe('gemini-api');
-    expect(geminiBodies[0]).toContain('persona + contexto + pergunta'); // mesmo prompt/contexto
-    expect(r.usage).toEqual({ input_tokens: 10, output_tokens: 5 });
+    expect(urls).toHaveLength(2);
   });
 
-  it('erro NÃO-quota (timeout/rede) NÃO usa reserva — sobe', async () => {
+  it('erro NÃO-quota (500/timeout) SOBE — nunca cai pro Gemini', async () => {
+    const urls: string[] = [];
     const a = new FallbackAdapter(CONFIG, async (url) => {
-      if (url.includes('api.kimi.com')) {
-        const e = new Error('aborted');
-        e.name = 'AbortError';
-        throw e;
-      }
-      return jsonResponse({ choices: [{ message: { content: 'x' } }] });
+      urls.push(url);
+      return jsonResponse({ error: 'internal' }, 500);
     });
-    await expect(a.sendTurn({ session_key: 's', prompt: 'p' })).rejects.toThrow(/timeout/);
+    await expect(a.sendTurn({ session_key: 's4', prompt: 'oi' })).rejects.toThrow(/500/);
+    expect(urls).toHaveLength(1); // gemini nunca foi chamado
   });
 
-  it('resposta malformada NÃO usa reserva (é bug, não quota)', async () => {
-    const a = new FallbackAdapter(CONFIG, async (url) => {
-      if (url.includes('api.kimi.com')) return jsonResponse({ choices: [] });
-      return jsonResponse({ choices: [{ message: { content: 'x' } }] });
-    });
-    await expect(a.sendTurn({ session_key: 's', prompt: 'p' })).rejects.toThrow(/sem choices/);
+  it('quota da Kimi + falha do Gemini → erro explícito com as duas causas', async () => {
+    const a = new FallbackAdapter(CONFIG, async (url) =>
+      url.startsWith('https://kimi.test')
+        ? jsonResponse({ error: 'quota' }, 403)
+        : jsonResponse({ error: 'unauthorized' }, 401),
+    );
+    await expect(a.sendTurn({ session_key: 's5', prompt: 'oi' })).rejects.toThrow(
+      /fallback Gemini falhou após quota da Kimi/,
+    );
   });
 
-  it('Gemini com key inválida (401) → marca reserva quebrada e falha explícita', async () => {
+  it('quota da Kimi + Gemini com 401 → key inválida marcada: não insiste (fail-closed)', async () => {
     let geminiCalls = 0;
     const a = new FallbackAdapter(CONFIG, async (url) => {
-      if (url.includes('api.kimi.com')) return jsonResponse({ error: { message: 'quota exceeded' } }, 429);
+      if (url.startsWith('https://kimi.test')) return jsonResponse({ error: 'quota' }, 403);
       geminiCalls++;
-      return jsonResponse({ error: { message: 'Invalid Auth key' } }, 401);
+      return jsonResponse({ error: 'invalid key' }, 401);
     });
-    await expect(a.sendTurn({ session_key: 's', prompt: 'p' })).rejects.toThrow(/reserva Gemini com key inválida|fallback Gemini falhou/);
-    // segunda chamada: reserva não é mais tentada
-    const callsBefore = geminiCalls;
-    await expect(a.sendTurn({ session_key: 's', prompt: 'p' })).rejects.toThrow();
-    expect(geminiCalls).toBe(callsBefore);
+    await expect(a.sendTurn({ session_key: 's6', prompt: 'oi' })).rejects.toThrow(/401/);
+    await expect(a.sendTurn({ session_key: 's6', prompt: 'oi' })).rejects.toThrow(/key inválida/);
+    expect(geminiCalls).toBe(1); // segunda chamada nem tentou o gemini de novo
   });
 
-  it('sem GEMINI_API_KEY → falha explícita nomeando o que falta', async () => {
-    const a = new FallbackAdapter({ ...CONFIG, fallbackApiKey: '' }, async () => jsonResponse({}, 403));
-    delete process.env.GEMINI_API_KEY;
-    await expect(a.sendTurn({ session_key: 's', prompt: 'p' })).rejects.toThrow(/GEMINI_API_KEY/);
+  it('sem GEMINI_API_KEY e sem config.fallbackApiKey → erro explícito "sem reserva"', async () => {
+    delete process.env.GEMINI_API_KEY; // ambiente externo pode ter — o teste exige ausência
+    const bare: KimiAdapterConfig = {
+      mode: 'kimi-api',
+      apiKey: 'kimi-test-key',
+      apiBaseUrl: 'https://kimi.test/v1',
+      apiModel: 'kimi-k2-test',
+    };
+    const a = new FallbackAdapter(bare, async () => jsonResponse({ error: 'quota' }, 403));
+    await expect(a.sendTurn({ session_key: 's7', prompt: 'oi' })).rejects.toThrow(/sem GEMINI_API_KEY/);
+  });
+
+  it('reserva usa GEMINI_BASE_URL/GEMINI_MODEL do env quando config não traz', async () => {
+    process.env.GEMINI_API_KEY = 'gemini-env-key';
+    process.env.GEMINI_BASE_URL = 'https://gemini.env.test/openai/';
+    process.env.GEMINI_MODEL = 'gemini-env-model';
+    const seen: string[] = [];
+    const bare: KimiAdapterConfig = {
+      mode: 'kimi-api',
+      apiKey: 'kimi-test-key',
+      apiBaseUrl: 'https://kimi.test/v1',
+      apiModel: 'kimi-k2-test',
+    };
+    const a = new FallbackAdapter(bare, async (url) => {
+      seen.push(url);
+      return url.startsWith('https://kimi.test')
+        ? jsonResponse({ error: 'quota' }, 403)
+        : jsonResponse({
+            choices: [{ message: { content: 'ok' } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+          });
+    });
+    const r = await a.sendTurn({ session_key: 's8', prompt: 'oi' });
+    expect(r.provider).toBe('gemini-api');
+    expect(seen[1]).toBe('https://gemini.env.test/openai/chat/completions');
+    delete process.env.GEMINI_BASE_URL;
+    delete process.env.GEMINI_MODEL;
   });
 });

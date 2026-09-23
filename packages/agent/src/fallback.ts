@@ -24,6 +24,11 @@ import { GeminiAdapter } from './gemini.js';
 
 const QUOTA_RE = /403|401|429|quota|rate.?limit|insufficient|exceeded/i;
 
+/** Hook de observabilidade do fallback (log + evento router.provider.unavailable). */
+export interface FallbackHooks {
+  onFallback?: (info: { from: string; to: string; reason: string }) => void;
+}
+
 export class FallbackAdapter implements KimiLiveAdapter {
   readonly mode = 'kimi-api' as const;
   private primary: KimiApiAdapter;
@@ -33,12 +38,20 @@ export class FallbackAdapter implements KimiLiveAdapter {
   constructor(
     private readonly config: KimiAdapterConfig,
     private readonly fetchImpl?: (url: string, init?: RequestInit) => Promise<Response>,
+    private readonly hooks: FallbackHooks = {},
   ) {
     this.primary = new KimiApiAdapter(config, fetchImpl);
     const geminiKey = config.fallbackApiKey ?? process.env.GEMINI_API_KEY;
     if (geminiKey) {
+      // BaseUrl/modelo da reserva vêm de GEMINI_* por padrão — LLM_* aponta
+      // para a PRIMÁRIA e não pode vazar para o adapter do Gemini.
       this.fallback = new GeminiAdapter(
-        { mode: 'gemini', apiKey: geminiKey, apiBaseUrl: config.fallbackBaseUrl, apiModel: config.fallbackModel },
+        {
+          mode: 'gemini',
+          apiKey: geminiKey,
+          apiBaseUrl: config.fallbackBaseUrl ?? process.env.GEMINI_BASE_URL,
+          apiModel: config.fallbackModel ?? process.env.GEMINI_MODEL,
+        },
         fetchImpl,
       );
     }
@@ -62,6 +75,9 @@ export class FallbackAdapter implements KimiLiveAdapter {
       }
       try {
         const r = await this.fallback.sendTurn(request);
+        // Sem fallback silencioso: hook vira log explícito +
+        // evento router.provider.unavailable no orchestrator.
+        this.hooks.onFallback?.({ from: 'kimi-api', to: 'gemini-api', reason: msg });
         return { ...r, provider: 'gemini-api' };
       } catch (err2) {
         const msg2 = err2 instanceof Error ? err2.message : String(err2);

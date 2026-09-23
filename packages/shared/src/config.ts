@@ -54,6 +54,13 @@ const envSchema = z.object({
   INVESTIGATE_BUDGET_ROUNDS: z.coerce.number().int().positive().default(3),
   INVESTIGATE_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   LIVE_AUTONOMY: z.enum(['none', 'yolo', 'auto']).default('yolo'),
+  // ── BLOCO 2 (ADR-039) — Cérebro Vivo RESERVA: pi-coding-agent (MIT).
+  // 'kimi' = Kimi CLI (default, primário); 'pi' = reserva quando o Kimi CLI
+  // está sem quota. Troca = só .env, zero código (mesma interface estável).
+  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi']).default('kimi'),
+  PI_BIN: z.string().default('pi'),
+  PI_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+  PI_ENTRY: z.string().optional(), // override do caminho do cli.js do pi
   // F6 — Pré-voo do Operador (ADR-036): espera da confirmação de atividade
   // antes de discar (ordem invertida — nunca ligar com operador frio).
   OPERATOR_PREFLIGHT_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),

@@ -186,6 +186,25 @@ Ver `AGENTS.md` para as regras do projeto.
 
 ## Operação (Luna v1)
 
+**Fallbacks de provider (ADR-039) — nunca mais offline por quota:**
+
+```
+FAST:  Kimi API → (403/429 quota) → Gemini → (falha) → retry/DLQ + Telegram
+LIVE:  Kimi CLI → (quota) → Pi (NIM) → (falha) → degradação + alerta Telegram
+```
+
+- FAST: `LLM_*` é o primário (Kimi). Com `GEMINI_API_KEY` no `.env`, TODO
+  fast brain (orchestrator, worker, whatsplay, watchdog) cai pro Gemini em
+  quota — 1 tentativa, log explícito (`fallback: kimi-api→gemini-api`),
+  evento `router.provider.unavailable`, `usage_entries` com o provider real.
+  Modelo Gemini validado: `gemini-3.6-flash` (GEMINI_MODEL no zod).
+- LIVE: `LIVE_BRAIN_PROVIDER=kimi | pi` (default kimi). `pi` =
+  pi-coding-agent (MIT) instalado global; precisa de provider logado
+  (`pi` → `/login` → NVIDIA NIM — ação humana, ver ADR-039). Onboarding de
+  guardrail: `ONBOARDING-LIVE-BRAIN-PI.md` (vai no prompt de todo turno).
+- Quando a quota da Kimi reseta ela volta a ser primária sozinha — o
+  fallback só dispara em erro de quota, nunca por conveniência.
+
 **Serviços (pm2):** `luna-orchestrator` (:3100), `luna-whatsplay` (Chrome
 dedicado WhatsApp), `luna-worker` (jobs, classifier, auto-heal, admin
 Telegram), `luna-watchdog` (saúde + self-test 6h + backup diário),

@@ -1,9 +1,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
-import { getPool, closePool, checkConnection, recordActivity, writeHeartbeat } from '@luna/database';
+import { getPool, closePool, checkConnection, recordActivity, writeHeartbeat, publishEvent } from '@luna/database';
 import { migrate } from '@luna/database/migrate';
-import { createAdapter, assertProductionAdapter, probeVisionSupport, FallbackAdapter } from '@luna/agent';
+import { createAdapter, assertProductionAdapter, probeVisionSupport, FallbackAdapter, type KimiLiveAdapter } from '@luna/agent';
 import { EventBus } from './events/bus.js';
 import { createMessageHandler } from './agent/handler.js';
 import { createSimulateHandler } from './test/simulate.js';
@@ -20,29 +20,11 @@ const log = createLogger({ name: 'orchestrator' });
 // Adapter do cérebro vivo (§7.3, ADR-010/015/016/018/019). Nunca expor à internet.
 // Contrato Model Router §9: LLM_* no .env decide provider/modelo — trocar
 // provider é só trocar o .env. Decreto: modelo mais barato, nunca 2.7/K3.
+// O adapter efetivo é montado dentro do main() — o hook de fallback precisa
+// do pool para publicar router.provider.unavailable (sem fallback silencioso).
 const isGeminiMode = config.KIMI_ADAPTER_MODE === 'gemini';
 const llmIsGemini = config.LLM_PROVIDER === 'gemini';
-// Fallback (fechamento): Kimi primária; quota 403/429 cai pro Gemini grátis
-// (só com key válida — validação lazy). usage_entries registra provider REAL.
-const adapter =
-  config.KIMI_ADAPTER_MODE === 'kimi-api'
-    ? new FallbackAdapter({
-        mode: 'kimi-api',
-        apiKey: config.LLM_API_KEY,
-        apiBaseUrl: config.LLM_BASE_URL,
-        apiModel: config.LLM_MODEL,
-        fallbackApiKey: config.GEMINI_API_KEY,
-        fallbackBaseUrl: config.GEMINI_BASE_URL,
-        fallbackModel: config.GEMINI_MODEL,
-      })
-    : createAdapter({
-        mode: config.KIMI_ADAPTER_MODE,
-        webUrl: config.KIMI_WEB_URL,
-        webToken: config.KIMI_WEB_TOKEN,
-        apiKey: isGeminiMode && !llmIsGemini ? config.GEMINI_API_KEY : config.LLM_API_KEY,
-        apiBaseUrl: isGeminiMode && !llmIsGemini ? config.GEMINI_BASE_URL : config.LLM_BASE_URL,
-        apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
-      });
+let adapter: KimiLiveAdapter;
 // Handler de simulação (só montado fora de produção; precisa do pool/bus do main).
 let simulateHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
 let workspaceHandler: ((req: IncomingMessage, res: ServerResponse) => Promise<void>) | null = null;
@@ -170,6 +152,47 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   log.info('postgres connected');
+
+  // 1b. Adapter do FAST com fallback ADR-039: Kimi primária → Gemini na
+  // reserva (403/429/quota). Sem fallback silencioso: log explícito +
+  // evento router.provider.unavailable com correlation auditável.
+  const buildAdapter = (): KimiLiveAdapter =>
+    config.KIMI_ADAPTER_MODE === 'kimi-api'
+      ? new FallbackAdapter(
+          {
+            mode: 'kimi-api',
+            apiKey: config.LLM_API_KEY,
+            apiBaseUrl: config.LLM_BASE_URL,
+            apiModel: config.LLM_MODEL,
+            fallbackApiKey: config.GEMINI_API_KEY,
+            fallbackBaseUrl: config.GEMINI_BASE_URL,
+            fallbackModel: config.GEMINI_MODEL,
+          },
+          undefined,
+          {
+            onFallback: ({ from, to, reason }) => {
+              log.warn({ from, to, reason }, `fallback: ${from}→${to}, motivo: ${reason.slice(0, 160)}`);
+              publishEvent(pool, {
+                event_type: 'router.provider.unavailable',
+                source: 'fast_brain',
+                payload: { from, to, reason: reason.slice(0, 300) },
+                idempotency_key: `pf:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+              }).catch((err) => log.error({ err }, 'falha ao publicar router.provider.unavailable'));
+            },
+          },
+        )
+      : createAdapter({
+          mode: config.KIMI_ADAPTER_MODE,
+          webUrl: config.KIMI_WEB_URL,
+          webToken: config.KIMI_WEB_TOKEN,
+          apiKey: isGeminiMode && !llmIsGemini ? config.GEMINI_API_KEY : config.LLM_API_KEY,
+          apiBaseUrl: isGeminiMode && !llmIsGemini ? config.GEMINI_BASE_URL : config.LLM_BASE_URL,
+          apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
+        });
+  adapter = buildAdapter();
+  if (config.KIMI_ADAPTER_MODE === 'kimi-api' && !config.GEMINI_API_KEY) {
+    log.warn('GEMINI_API_KEY ausente — fast brain SEM reserva (quota da Kimi = falha explícita)');
+  }
 
   // 2. Migrações
   if (config.RUN_MIGRATIONS_ON_BOOT) {

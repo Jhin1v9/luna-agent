@@ -48,14 +48,24 @@ async function main(): Promise<void> {
   runner.register('memory.summarize', createSummarizeHandler({ pool, adapter: classifyAdapter, log }));
   // P2 — HANDOFF_LIVE real (ADR-034): investigação com o Cérebro Vivo
   // (kimi CLI headless, ADR-033). Autonomia configurável (LIVE_AUTONOMY).
-  const { KimiCliAdapter } = await import('@luna/agent');
-  const liveAdapter = new KimiCliAdapter(
-    { mode: 'kimi-cli' },
-    {
-      timeoutMs: Math.min(config.INVESTIGATE_TIMEOUT_MS, 600_000),
-      autonomy: config.LIVE_AUTONOMY,
-    },
-  );
+  // ADR-039 — live brain tem RESERVA: LIVE_BRAIN_PROVIDER=pi troca pra
+  // pi-coding-agent (MIT) quando o Kimi CLI está sem quota. Mesma interface
+  // estável — quem programa contra `live` não sente a troca.
+  const liveTimeoutMs = Math.min(config.INVESTIGATE_TIMEOUT_MS, 600_000);
+  const liveAdapter =
+    config.LIVE_BRAIN_PROVIDER === 'pi'
+      ? new (await import('@luna/agent')).PiAdapter(
+          { mode: 'pi' },
+          { timeoutMs: liveTimeoutMs, entry: config.PI_ENTRY },
+        )
+      : new (await import('@luna/agent')).KimiCliAdapter(
+          { mode: 'kimi-cli' },
+          {
+            timeoutMs: liveTimeoutMs,
+            autonomy: config.LIVE_AUTONOMY,
+          },
+        );
+  log.info({ live_brain: config.LIVE_BRAIN_PROVIDER }, 'cérebro vivo selecionado (LIVE_BRAIN_PROVIDER)');
   const { createInvestigateHandler } = await import('./jobs/investigate.js');
   // Chamada de voz (decreto owner): o job só publica o evento — quem liga é o daemon do whatsplay.
   const { createVoiceCallHandler } = await import('./jobs/voice-call.js');
