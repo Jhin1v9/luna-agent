@@ -33,3 +33,11 @@ kimiwork cobre o fast brain + composição de prompts.
 - [ ] FallbackAdapter: encadear kimiwork como meio da cadeia (kimi-api → kimiwork → gemini)
 
 *2026-09-24 · autor: Luna (decreto verbal do owner Abner, ~01:52)*
+
+## Atualização 2026-09-24 — caça ao BRAIN_API_TOKEN (resultado)
+- Token achado no VPS (`/home/nexo/.git-credentials`, PAT GitHub `gho_...` do sync brain-sync.js → repo Jhin1v9/principal-brain):
+  **INVÁLIDO** — GitHub responde 401 Bad credentials; atlas `/brain/api/*` responde 401 "token inválido".
+- Conclusão: são DOIS segredos distintos e o do screenshot não serve pra nenhum. O `BRAIN_API_TOKEN`
+  do atlas segue só no env do processo servidor. Comando pra achar no VPS (ação humana):
+  `grep -r "BRAIN_API_TOKEN" /home/nexo /etc/systemd/system 2>/dev/null | head`
+- Segurança: PAT exposto em screenshot → se ainda existir no GitHub, REVOGAR e gerar novo.
