@@ -107,6 +107,82 @@ export class OperatorSession {
     await this.sendText(page, HOLD_TEXT);
   }
 
+  /**
+   * Voice mode ativo? (bug da 2ª chamada ao vivo: o prompt foi injetado em
+   * modo TEXTO — a voz nunca entrou. Decreto owner: entrar em modo de voz
+   * ANTES de injetar.) Marcadores best-effort: caption "escutando/listening",
+   * overlay do voice mode, ou o composer substituído pela UI de voz.
+   */
+  private async isVoiceModeActive(page: import('playwright-core').Page): Promise<boolean> {
+    const r = await page
+      .evaluate(`(() => {
+        const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
+        const body = (document.body.innerText || '').slice(0, 4000);
+        if (/tô escutando|ta escutando|listening|ouvindo você|i'm listening/i.test(body)) return true;
+        const overlay = document.querySelector('[data-testid*="voice-mode" i], [data-testid*="voice_mode" i], [class*="voice-mode" i]');
+        if (overlay && visible(overlay)) return true;
+        return false;
+      })()`)
+      .catch(() => false);
+    return r === true;
+  }
+
+  /** Garante o ChatGPT em MODO DE VOZ (clique no ícone de ondas, à direita
+   *  do composer). Falha explícita se não conseguir entrar — o caller NÃO
+   *  disca (nunca ligar com operador que não consegue falar). */
+  async ensureVoiceMode(page: import('playwright-core').Page): Promise<void> {
+    if (await this.isVoiceModeActive(page)) {
+      this.say('voice mode já está ativo ✅ — não clico de novo');
+      return;
+    }
+    this.say('voice mode INATIVO — clicando no ícone de voz (lado direito do composer)');
+    const candidates = [
+      'button[data-testid="voice-mode-entry-button"]',
+      'button[aria-label*="Start voice" i]',
+      'button[aria-label*="modo de voz" i]',
+      'button[aria-label*="voice mode" i]',
+      'button[aria-label*="Iniciar voz" i]',
+    ];
+    for (const sel of candidates) {
+      const ok = await page
+        .locator(sel)
+        .first()
+        .click({ timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!ok) {
+        this.say(`seletor não casou: ${sel}`);
+        continue;
+      }
+      this.say(`cliquei no ícone de voz (${sel}) — verificando`);
+      await page.waitForTimeout(1_800);
+      if (await this.isVoiceModeActive(page)) {
+        this.say('voice mode ativo ✅');
+        return;
+      }
+      this.say('clique não ativou o modo de voz — tentando próximo seletor');
+    }
+    // último recurso: clique por posição (último botão visível à direita do composer)
+    const fallback = await page
+      .evaluate(`(() => {
+        const composer = document.querySelector('#prompt-textarea')?.closest('div');
+        const scope = composer ? composer.parentElement : document;
+        const btns = Array.from(scope.querySelectorAll('button')).filter((b) => b.offsetParent !== null);
+        const last = btns[btns.length - 1];
+        if (last) { last.click(); return true; }
+        return false;
+      })()`)
+      .catch(() => false);
+    if (fallback === true) {
+      await page.waitForTimeout(1_800);
+      if (await this.isVoiceModeActive(page)) {
+        this.say('voice mode ativo ✅ (fallback posicional)');
+        return;
+      }
+    }
+    throw new Error('não consegui entrar em modo de voz no ChatGPT — NÃO vou discar (operador não conseguiria falar)');
+  }
+
   /** Best-effort: lê a última resposta do assistente na página. */
   async readLatestReply(page: import('playwright-core').Page): Promise<string | null> {
     const replies = await page

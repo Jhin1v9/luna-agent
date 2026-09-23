@@ -60,7 +60,8 @@ const COMPOSE_PROMPT = (brief: CallBrief): string =>
     '',
     'Regras do prompt final: o Operador é a voz da Luna (NEXO DIGITAL); nunca inventa fatos/preços/prazos;',
     'mantém a conversa viva (marca de espera padrão quando processando); trata a Luna como colega;',
-    'e SEMPRE se despede curto e simpático ao encerrar.',
+    'PAPÉIS (explícitos): o Operador é SÓ A VOZ — nunca decide nada, segue o que aparecer no chat;',
+    'a Kimi (Live) é a conductora que vê tudo e intervem; e SEMPRE se despede curto e simpático ao encerrar.',
   ].join('\n');
 
 /** Confirmação = resposta do assistente apareceu na conversa. */
@@ -93,6 +94,24 @@ export async function preflightOperator(deps: PreflightDeps, brief: CallBrief): 
     log?.info(extra ?? {}, `preflight: ${msg}`);
   };
 
+  // ORDEM FINAL (decreto owner): aba aberta → entra em modo voz → compõe
+  // prompt (Kimi) → injeta → confirma operador ativo → disca.
+  //
+  // (a) conecta no chrome-voice e garante a aba
+  const connected = await deps.operator.connect();
+  if (!connected) {
+    throw new Error('pré-voo abortado: chrome-voice não respondeu — não vou discar com operador frio');
+  }
+  const tab = await deps.operator.ensureChatGptTab();
+  if (!tab) {
+    throw new Error('pré-voo abortado: aba do ChatGPT não abriu — não vou discar com operador frio');
+  }
+
+  // (a2) MODO DE VOZ antes de tudo (bug ao vivo da 2ª chamada: prompt injetado
+  // em modo texto, a voz nunca entrou). Falha aqui = aborto, zero discagem.
+  await deps.operator.ensureVoiceMode(tab);
+  say('voice mode confirmado — compondo o prompt');
+
   // (b) composição do prompt PELO KIMI CODE — falha aqui = aborto total.
   let promptText: string;
   try {
@@ -107,16 +126,6 @@ export async function preflightOperator(deps: PreflightDeps, brief: CallBrief): 
     const msg = err instanceof Error ? err.message : String(err);
     log?.error({ err: msg }, 'preflight: FALHA ao compor o prompt do Operador (Kimi CLI) — ABORTO, sem prompt genérico, sem discar');
     throw new Error(`pré-voo abortado: Kimi CLI falhou ao compor o prompt do Operador (${msg.slice(0, 200)}) — não vou discar com operador robótico`);
-  }
-
-  // (a) conecta no chrome-voice e garante a aba
-  const connected = await deps.operator.connect();
-  if (!connected) {
-    throw new Error('pré-voo abortado: chrome-voice não respondeu — não vou discar com operador frio');
-  }
-  const tab = await deps.operator.ensureChatGptTab();
-  if (!tab) {
-    throw new Error('pré-voo abortado: aba do ChatGPT não abriu — não vou discar com operador frio');
   }
 
   // (b2) injeta o prompt COMPOSTO
