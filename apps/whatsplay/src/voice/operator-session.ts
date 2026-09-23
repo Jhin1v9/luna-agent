@@ -118,12 +118,15 @@ export class OperatorSession {
       .evaluate(`(() => {
         const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
         const body = (document.body.innerText || '').slice(0, 4000);
-        if (/tô escutando|ta escutando|listening|ouvindo você|i'm listening/i.test(body)) return true;
-        const overlay = document.querySelector('[data-testid*="voice-mode" i], [data-testid*="voice_mode" i], [class*="voice-mode" i]');
+        if (/tô escutando|ta escutando|listening|ouvindo você|i'm listening|escuchando|te escucha/i.test(body)) return true;
+        // probe 2026-09-23: a UI em espanhol expõe o orb como "voice-floating-orb"
+        const overlay = document.querySelector('[data-testid*="voice-mode" i], [data-testid*="voice_mode" i], [class*="voice-mode" i], [data-testid="voice-floating-orb"]');
         if (overlay && visible(overlay)) return true;
         // marcador FORTE (probe real 2026-09-23): botões da sessão de voz ativa
+        // (UI PT + ES — sessão do owner caiu em espanhol e "Finalizar Voz"
+        // escapava de todos os padrões, travando o pré-voo das chamadas)
         const voiceButtons = Array.from(document.querySelectorAll('button')).some((b) =>
-          visible(b) && /encerrar voz|desativar microfone|end voice|stop voice|mute microphone|desativar voz/i.test(b.getAttribute('aria-label') || ''));
+          visible(b) && /encerrar voz|finalizar voz|terminar voz|desativar microfone|end voice|stop voice|mute microphone|desativar voz/i.test(b.getAttribute('aria-label') || ''));
         if (voiceButtons) return true;
         return false;
       })()`)
