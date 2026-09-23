@@ -1036,19 +1036,26 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         );
       }
       // 2. Hover na mensagem → botão de contexto → "Responder".
-      const row = page.locator(`${SELECTORS.messageRow}:has-text(${JSON.stringify(query)})`).last();
+      //    Ao vivo 2026-09-23: os testid nomeados do WA (msg-options etc.)
+      //    NÃO existem mais nesta versão (wds-design-system). O que funciona
+      //    independente de versão: qualquer <button> VISÍVEL dentro da row
+      //    no hover é o chevron de contexto (registrado no selector memory).
+      const rowSel = `${SELECTORS.messageRow}:has-text(${JSON.stringify(query)})`;
+      const row = page.locator(rowSel).last();
       await row.hover();
       await page.waitForTimeout(250 + Math.floor(Math.random() * 250));
-      const ctx = page.locator(`#main ${SELECTORS.msgContextButton}`).last();
+      const ctx = page.locator(`${rowSel} button:visible`).last();
       if ((await ctx.count().catch(() => 0)) === 0) {
         const ev = await this.captureEvidence('citacao-botao-ctx-nao-achado');
-        throw new Error(`citação: botão de contexto da mensagem não achado — seletor: ${SELECTORS.msgContextButton}. Evidência: ${ev.screenshotPath}`);
+        throw new Error(`citação: botão de contexto da mensagem não achado (row: ${rowSel} button:visible). Evidência: ${ev.screenshotPath}`);
       }
       await ctx.click();
       await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
-      // 3. Item "Responder" — i18n: Responder/Reply/Contestar/Antworten.
+      // 3. Item "Responder" — i18n: Responder/Reply/Contestar. O menu abre num
+      //    popover fora da row; busca por role genérico + texto (resiliente a
+      //    mudança de testid, mesmo espírito do botão de contexto).
       const menuItem = page
-        .locator(`${SELECTORS.contextMenu} [role="menuitem"], ${SELECTORS.contextMenu} div, ${SELECTORS.contextMenu} li`)
+        .locator('[role="menuitem"]:visible, [role="listitem"]:visible, li:visible')
         .filter({ hasText: /responder|reply|contestar/i })
         .first();
       if ((await menuItem.count().catch(() => 0)) === 0) {

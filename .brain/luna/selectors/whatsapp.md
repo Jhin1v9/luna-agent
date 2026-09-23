@@ -172,3 +172,28 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - seletor antigo: (seletor anterior falhou)
 - seletor novo: [data-testid="chat-list-search"]
 - fallback visual: screenshot + DOM no incidente
+
+### 2026-09-23 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: div[role='listitem']:has(span[title='🏆Production - 2026🙏🏻'])
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-23 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: header div[role='button'] span[title] ou span[title*='Production']
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-23 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: footer div[contenteditable='true'][data-tab='10']
+- fallback visual: screenshot + DOM no incidente
+
+### 2026-09-23 · citação (mention.respond v2) — autor: Luna
+- uso: replyToMessage (botão de contexto da mensagem + item Responder)
+- seletor antigo: [data-testid="msg-options"], [data-testid="chevron-down"], span[data-testid="down-context"], [data-testid="message-context-button"]
+- seletor novo: qualquer `button:visible` DENTRO da row da mensagem no hover (WA 2026 wds-design-system não expõe mais testid estável no chevron); item do menu por role genérico + texto (responder|reply|contestar)
+- evidência: citacao-botao-ctx-nao-achado-2026-09-23T21-15-14-280Z.png (chevron visível no hover, testid ausente)
+- fallback visual: screenshot + DOM no incidente
