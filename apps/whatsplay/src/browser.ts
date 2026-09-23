@@ -718,10 +718,24 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         return false;
       }
       await page.waitForTimeout(900);
-      // jid: o resultado da busca por número não tem title casável — clica no
-      // primeiro item da lista com retry/verificação (helper acima). Só se
-      // isso falhar em tudo é que cai pro Enter de último recurso.
       if (isJid) {
+        // WA 2026-09: os resultados da busca renderizam FORA do #pane-side
+        // (evidência 22:57: clique na row caía num elemento oculto da lista
+        // normal e o painel ficava no intro). Enter com o campo de busca
+        // focado abre o 1º resultado independente da estrutura do DOM — vira
+        // o caminho PRIMÁRIO. Clica no campo pra garantir o foco antes.
+        await search.click({ timeout: 1_500 }).catch(() => {});
+        await page.waitForTimeout(300);
+        await page.keyboard.press('Enter').catch(() => {});
+        await page.waitForTimeout(1_800);
+        if (await matches()) {
+          await search.click({ timeout: 1_000 }).catch(() => {});
+          await page.keyboard.press('Control+a').catch(() => {});
+          await page.keyboard.press('Backspace').catch(() => {});
+          await page.keyboard.press('Escape').catch(() => {});
+          return true;
+        }
+        this.config.log?.warn({}, 'openChat jid: Enter não abriu o resultado — tentando clique na row visível');
         if (await this.clickJidSearchResult(page, matches)) {
           await search.click({ timeout: 1_000 }).catch(() => {});
           await page.keyboard.press('Control+a').catch(() => {});
@@ -729,7 +743,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           await page.keyboard.press('Escape').catch(() => {});
           return true;
         }
-        this.config.log?.warn({}, 'openChat jid: clique no 1º resultado esgotou as tentativas — tentando Enter');
+        this.config.log?.warn({}, 'openChat jid: clique no 1º resultado também esgotou');
       }
       // Na view de busca o DOM muda: o resultado é role="listitem" (não "row")
       // e pode não ter data-testid="cell-frame-container" — cobre os três
@@ -751,6 +765,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       }
       if (!(await matches())) {
         // último recurso: Enter abre o primeiro resultado da busca no WA Web
+        // (campo precisa estar focado — clicamos antes, evidência 22:57)
+        await search.click({ timeout: 1_000 }).catch(() => {});
+        await page.waitForTimeout(300);
         await page.keyboard.press('Enter').catch(() => {});
         await page.waitForTimeout(2_000);
       }
@@ -955,7 +972,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   private async clickJidSearchResult(page: Page, matches: () => Promise<boolean>): Promise<boolean> {
     const waits = [1_500, 3_000, 5_000];
     for (let attempt = 0; attempt < waits.length; attempt++) {
-      const item = page.locator('#pane-side [role="listitem"], #pane-side [role="row"]').first();
+      const item = page.locator('#pane-side [role="listitem"]:visible, #pane-side [role="row"]:visible, #side [role="listitem"]:visible').first();
       try {
         await item.waitFor({ state: 'visible', timeout: waits[attempt]! });
         await item.click({ timeout: 3_000 });
