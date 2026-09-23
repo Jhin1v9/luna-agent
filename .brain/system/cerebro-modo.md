@@ -1,0 +1,35 @@
+# Cérebro — modos do brain (decreto owner 2026-09-24)
+
+## Decreto
+Kimi Work (a Luna no runtime Kimi Work) é a **2ª opção de cérebro para tudo** — fast brain e
+live brain — sempre que o Kimi Code (kimi-api) estiver sem quota. Cadeia alvo:
+**kimi-api → kimiwork → gemini** (ADR-039 mantém gemini como reserva técnica).
+
+Evidência que motivou o decreto (2026-09-24 ~01:55): ligação de voz abortada no pré-voo —
+Kimi coding plan em 403 (limite semanal) E Gemini em 429. Sistema ficou sem cérebro nenhum
+exatamente no cenário que o owner quer coberto.
+
+## Skill de troca
+`cerebro` (skills gerenciadas do Kimi Work): `modo.mjs <primario|kimiwork|status>`.
+- primario: KIMI_ADAPTER_MODE=kimi-api, LIVE_BRAIN_PROVIDER=kimi — aplicável hoje.
+- kimiwork: **bloqueado fail-closed** até `packages/agent/src/kimiwork.ts` existir.
+- Toda troca: reiniciar whatsplay/orchestrator/worker + synapse + commit autor Luna.
+
+## Design do adapter kimiwork (pendente — ação de desenvolvimento)
+`KimiAdapterMode` ganha `'kimiwork'`; `createAdapter` ganha o case.
+Contrato do adapter: mesmo `KimiLiveAdapter` (sendPrompt → texto). Mecanismo proposto:
+1. INSERT em `kimiwork_inbox` (kind='llm.turn', payload={prompt, reply_to}) — reusa a ponte
+   Kimi Work existente (daemon já enfileira/consome essa caixa).
+2. Resposta assíncrona: a Luna (Kimi Work) processa o turno na varredura/conversa e grava a
+   resposta em tabela `kimiwork_llm_respostas` (nova, append-only).
+3. Adapter faz poll com timeout (ex.: 120s). Timeout = falha explícita (nunca cai pro mock).
+Ressalva de arquitetura: a latência depende da cadência do agente Kimi Work (varredura a cada
+poucos minutos) — ok pro live brain e pra respostas com HUMAN_RESPONSE_DELAY, ruim pra
+interação de voz em tempo real; pra voz, a conductora segue no Operador (ChatGPT) e o
+kimiwork cobre o fast brain + composição de prompts.
+## Estado
+- [x] Decreto registrado · [x] Skill criada e testada · [ ] Adapter kimiwork.ts implementado
+- [ ] zod `loadConfig` aceitar 'kimiwork' no enum de KIMI_ADAPTER_MODE
+- [ ] FallbackAdapter: encadear kimiwork como meio da cadeia (kimi-api → kimiwork → gemini)
+
+*2026-09-24 · autor: Luna (decreto verbal do owner Abner, ~01:52)*
