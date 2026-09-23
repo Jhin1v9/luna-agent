@@ -563,11 +563,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     await page.waitForTimeout(400);
     if ((await this.currentOpenChatTitle()) === null) return true;
     // fallback: clicar no wordmark/header da lista (deseleta o painel)
-    await page
-      .evaluate(`(() => {
+    await
+      evalWithArg(page, `(_) => {
         const el = document.querySelector('#side [data-testid="wa-wordmark"]') || document.querySelector('#side header');
         if (el) el.click();
-      })()`)
+      }`, null)
       .catch(() => {});
     await page.waitForTimeout(400);
     return (await this.currentOpenChatTitle()) === null;
@@ -631,11 +631,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         // "346 850 931 92" — compara só os números). Diagnóstico ao vivo
         // 2026-09-22: openChat por jid falhava e o retry abria painel
         // aleatório que matches() dava como válido.
-        const hdr = await page
-          .evaluate(`(() => {
+        const hdr = await
+          evalWithArg(page, `(_) => {
             const h = document.querySelector('[data-testid="conversation-info-header"]');
             return h ? (h.textContent || '').replace(/[^0-9]/g, '') : '';
-          })`)
+          }`, null)
           .catch(() => '');
         return typeof hdr === 'string' && hdr.includes(searchKey.replace(/[^0-9]/g, ''));
       }
@@ -775,8 +775,8 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
    */
   async observePanel(): Promise<{ state: string; title: string | null; infoPanelOpen: boolean }> {
     const page = this.requirePage();
-    const raw = (await page
-      .evaluate(`(() => {
+    const raw = (await
+      evalWithArg(page, `(_) => {
         const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
         const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
         const title = titleEl && visible(titleEl) ? (titleEl.textContent || '').trim() : null;
@@ -799,7 +799,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         else if (title) state = 'chat';
         else state = 'lista';
         return { state, title, infoPanelOpen };
-      })()`)
+      }`, null)
       .catch(() => null)) as { state: string; title: string | null; infoPanelOpen: boolean } | null;
     return raw ?? { state: 'desconhecido', title: null, infoPanelOpen: false };
   }
@@ -975,16 +975,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   /** Chat aberto no momento é grupo? (best-effort — marcadores do header). */
   async currentChatIsGroup(): Promise<boolean> {
     const page = this.requirePage();
-    return page
-      .evaluate(`(() => {
+    return (await
+      evalWithArg(page, `(_) => {
         const header = document.querySelector('[data-testid="conversation-info-header"]');
         if (!header) return false;
         if (header.querySelector('[data-testid*="group"]')) return true;
         const text = header.textContent || '';
         return /\\bgrupo\\b|\\bgroup\\b|participantes|members/i.test(text);
-      })()`)
+      }`, null)
       .then((r) => r === true)
-      .catch(() => false);
+      .catch(() => false));
   }
 
   /**
@@ -1025,15 +1025,15 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.keyboard.type(query, { delay: 25 + Math.floor(Math.random() * 40) });
       // 3. WA demora a marcar os resultados no histórico.
       await page.waitForTimeout(1_200 + Math.floor(Math.random() * 600));
-      const resultCount = await page
-        .evaluate(`(() => {
+      const resultCount = await
+        evalWithArg(page, `(_) => {
           const marks = document.querySelectorAll(${JSON.stringify(SELECTORS.searchHighlight)});
           let visiveis = 0;
           for (const m of marks) {
             if (m.offsetParent !== null || m.getClientRects().length > 0) visiveis++;
           }
           return visiveis;
-        })()`)
+        }`, null)
         .then((r) => Number(r) || 0)
         .catch(() => 0);
       // 4. Fecha a lupa (Escape) — painel volta ao chat normal.
@@ -1155,8 +1155,8 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       //    senão falha (nunca envia órfã nem cita a msg errada). O check exige
       //    que o texto do preview contenha a query: pega o caso "menu abriu
       //    ancorado em outra mensagem" antes de qualquer envio.
-      const preview = await page
-        .evaluate(`(() => {
+      const preview = await
+        evalWithArg(page, `(_) => {
           const els = document.querySelectorAll(${JSON.stringify(SELECTORS.replyPreview)});
           const q = ${JSON.stringify(query.toLowerCase().slice(0, 20))}; // probe curto: o preview trunca texto longo
           for (const el of els) {
@@ -1165,7 +1165,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             if (((el.textContent || '').toLowerCase()).includes(q)) return true;
           }
           return false;
-        })()`)
+        }`, null)
         .then((r) => r === true)
         .catch(() => false);
       if (!preview) {
@@ -1189,8 +1189,8 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   /** Rola o painel até a mensagem mais recente que casa com a query.
    *  true = achou (e o painel está posicionado nela). */
   private async scrollMessageIntoView(page: Page, query: string): Promise<boolean> {
-    return page
-      .evaluate(`(() => {
+    return (await
+      evalWithArg(page, `(_) => {
         const rows = document.querySelectorAll('#main ${SELECTORS.messageRow}');
         for (let i = rows.length - 1; i >= 0; i--) {
           const r = rows[i];
@@ -1204,9 +1204,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           }
         }
         return false;
-      })()`)
+      }`, null)
       .then((r) => r === true)
-      .catch(() => false);
+      .catch(() => false));
   }
 
   /** Lupa: busca a query no chat e clica o 1º resultado pra pular até a
