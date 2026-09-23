@@ -1,33 +1,71 @@
 # Pedidos de Clientes — painel Nexo (VPS)
 
-Baseline da primeira varredura autônoma (2026-09-24). Fonte: `/nexo/api/admin/requests` (login NextAuth como ADMIN).
-Colunas: data do pedido · cliente (org) · projeto · status · resumo.
+Fonte: `/nexo/api/admin/requests|organizations|projects` (login NextAuth ADMIN) × relatórios do Brain
+(MEMORY/OPINIONES por cliente) × mensagens WhatsApp (tabela `messages`).
+Atualizado: 2026-09-24 01:45 (+02:00) · autor: Luna — varredura com reconciliação bidirecional.
 
-> **Nota operacional (brain remoto):** o brain remoto rejeita escrita sem API key de
-> servidor (HTTP 401). Escrita local em `.brain/` continua funcional; não tentar burlar.
+> **Brain remoto (NEXO Brain / atlas):** leitura aberta OK (`/brain/api/*` — nodes, search, timeline,
+> synapse/status). Escrita exige `Authorization: Bearer $BRAIN_API_TOKEN` — o token vive SÓ no env do
+> servidor atlas na VPS (não está neste repo, .env ou backups). Sem ele: 401. Não burlar.
+> **Ação humana:** gerar/copiar o token do servidor e colocar no `.env` local como `BRAIN_API_TOKEN`.
 
-## Abertos / em andamento (clientes)
+## ⚠️ DIVERGÊNCIA ATIVA
 
-| Data | Cliente | Projeto | Status | Pedido |
-|---|---|---|---|---|
-| 2026-09-21 | HDM - Industrial | Main WebSite | ANALYZING | Carrossel/slider de imagens em movimento; novas profissões (eletromecânico, mecânico industrial); aplicar logo própria (PDF recebido 21/09, em documentos/brand/). 1 comentário. |
-| 2026-09-21 | HDM - Industrial | Main WebSite | CLIENT_REVIEWING | Seção/aba de envio de currículos dos funcionários, com envio direcionado a rrhh@hdmindustrial.es. 3 comentários. |
-| 2026-09-10 | Ona Dance | Ona Dance web | CLIENT_REVIEWING | Trustpilot — revisar aviso/configuração no wp-admin (brtpmj-...). 1 comentário. |
-| 2026-09-10 | Ona Dance | Ona Dance web | CLIENT_REVIEWING | Produtos esgotados — adicionar "Avísame cuando vuelva" com captura de e-mail. 1 comentário. |
-| 2026-09-10 | Ona Dance | Ona Dance web | CLIENT_REVIEWING | Home — mostrar só produtos disponíveis em "Relacionados/Destacados". 0 comentários. |
+**Ona Dance — slider → vídeo vertical: no relatório, FORA do painel.**
+O relatório do grupo (MEMORY 2026-09) e as mensagens de 21–23/09 dizem que a tarefa "trocar o slider do
+hero da onadance.com pelo vídeo vertical da Jess (41s)" está registrada no Dashboard Pro e pendente de
+execução. **Conferi as 16 solicitações do painel: ela NÃO existe lá.** O painel não tem rota REST de
+escrita (server actions; PATCH → 405), então não pude criar. → Abner/time: criar a solicitação no painel
+ou liberar escrita. Sem isso a tarefa mais quente da Jess está invisível pro time no workspace.
 
-## Concluídos recentes (referência)
+---
 
-| Data | Cliente | Projeto | Status | Pedido |
-|---|---|---|---|---|
-| 2026-09-16 | Ona Dance | Ona Dance web | COMPLETED | Crear nuevo cupón |
-| 2026-09-14 | HDM - Industrial | Main WebSite | COMPLETED | Animação de scroll reveal no site (6 comentários) |
+## Ona Dance (Jess) — projeto "Ona Dance web" (onadance.com)
+
+### Timeline (painel × WhatsApp × relatório)
+
+| Data | Fonte | Evento |
+|---|---|---|
+| 10/09 | Painel | 3 solicitações criadas: Trustpilot no wp-admin (brtpmj-…), "Avísame cuando vuelva" p/ produtos esgotados, Home só com produtos disponíveis |
+| 14/09 | Painel | Scroll reveal → COMPLETED 21/09 |
+| 16/09 | Painel | Crear cupón → COMPLETED 17/09 |
+| 21/09 13:23 | WhatsApp (Jess → Luna) | "oi Luna, meu site já ficou pronto?" (perguntou 3x no dia) |
+| 21/09 | WhatsApp (grupo) | Hero + vídeo vertical (41s) recebidos no Drive (Nexo > Cliente > Jess) |
+| 21/09 18:09 | WhatsApp (Luna) | "Tarefa registrada — Slider do hero": trocar imagem do slider pelo vídeo vertical |
+| 21–23/09 | WhatsApp (grupo) | Confusão "temporal / a de 10" esclarecida = era a tarefa do vídeo do slider |
+| 23/09 | Relatório (OPINIONES) | Jess elogiou clareza e bom humor; cliente_feliz, sem follow-up |
+| 2026-09 | Relatório (MEMORY grupo) | "A tarefa já existe no Dashboard Pro, pendente de execução" — ⚠️ **NÃO existe no painel (ver divergência acima)** |
+
+### Status atual
+| Pedido | Status painel | No relatório? |
+|---|---|---|
+| Slider → vídeo vertical (41s) | ❌ AUSENTE do painel | Sim (diz que existe) |
+| Trustpilot wp-admin | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora neste relatório |
+| "Avísame cuando vuelva" | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
+| Home só disponíveis | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
+| Scroll reveal | COMPLETED 21/09 | Sim |
+| Crear cupón | COMPLETED 17/09 | Sim |
+
+Regra "cliente disse JÁ FEZ A SOLICITUD mas relatório não dizia": busca no WhatsApp (todas as conversas)
+por 'já fiz/pedi/enviei', 'ya hice/pedí/envié', 'solicitud feita/enviada' → **0 ocorrências**. Nada a
+acrescer nesse sentido.
+
+## HDM - Industrial (hdmindustrial.es) — projeto "Main WebSite"
+
+Cliente opera via painel/e-mail (sem WhatsApp na base Luna — nada a cruzar com conversas).
+
+| Data | Evento | Status |
+|---|---|---|
+| 14/09 | Animação scroll reveal | COMPLETED 21/09 |
+| 21/09 13:23 | Seção/aba de envio de currículos → rrhh@hdmindustrial.es (3 comentários, último 21/09) | CLIENT_REVIEWING |
+| 21/09 17:40 | Carrossel/slider móvel + profissões (eletromecânico, mecânico industrial) + logo própria — PDF recebido 21/09 via chat, guardado em documentos/brand/ (1 comentário) | ANALYZING |
+
+Tudo quadra entre painel e relatório. Nenhuma solicitação nova desde 21/09 17:40.
 
 ## Itens internos Nexo (não são pedidos de cliente)
 
-Projeto "Projetos Dashboard" (org Nexo, workspace owner): 9 itens de ago/2026 — revisar/migrar VPS,
-backup, anúncios Instagram/TikTok (IN_DEVELOPMENT), modificar formulário de clientes (PREPARING_SOLUTION),
-modificar web Nexo (RECEIVED). Acompanhados internamente, fora do escopo deste arquivo.
+Projeto "Projetos Dashboard" (org Nexo): 9 itens de 27/08 — anúncios Instagram/TikTok IN_DEVELOPMENT,
+modificar formulário PREPARING_SOLUTION, modificar web Nexo RECEIVED, resto COMPLETED/CLOSED.
 
 ---
-*2026-09-24 · autor: Luna (varredura autônoma)*
+*2026-09-24 · autor: Luna · reconciliação: painel × relatório × WhatsApp — divergência 1 (slider Ona Dance)*
