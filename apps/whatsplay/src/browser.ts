@@ -127,6 +127,13 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         '--no-sandbox',
         '--disable-blink-features=AutomationControlled',
         '--no-first-run',
+        // 2026-09-24 (decreto owner): a cada reinício do Chrome o infobar
+        // "Não foi possível encerrar corretamente / Restaurar?" segurava a
+        // tela e atrapalhava a automação. Estes flags matam a bolha de
+        // restauração de sessão.
+        '--disable-session-crashed-bubble',
+        '--hide-crash-restore-bubble',
+        '--disable-restore-session-state',
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${this.config.userDataDir}`,
         WA_URL,
@@ -410,14 +417,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     // data-testid="chat-list-search-container" no wrapper. O seletor de CLIQUE
     // casava via input[aria-label*="Buscar"], mas este de LEITURA não —
     // 'obtido: null' com o termo VISÍVEL na tela (evidência
-    // openchat-busca-*.png 22:32), loop digitava/apagava pra sempre. Leitura
-    // agora cobre os MESMOS casamentos do clique + fallback genérico.
-    const v = await page
-      .evaluate(`(() => {
-        // offsetParent === null para elementos position:fixed/sticky (header do
-        // WA 2026 é sticky) — o check antigo marcava o input VISÍVEL como
-        // invisível e a leitura voltava null com o termo na tela (2ª evidência
-        // 22:36). Visibilidade real = rect não-nulo + display/visibility.
+    // openchat-busca-*.png 22:32), loop digitava/apagava pra sempre.
+    //
+    // ⚠️ PADRÃO OBRIGATÓRIO (bug 2026-09-24, confirmado em probe): nesta página
+    // o WhatsApp/Web, evaluate com IIFE DESCALÇO `(() => {...})()` devolve
+    // undefined puro; a chamada de função com arg `((_) => {...})(null)`
+    // (padrão evalWithArg, já usado em composeBoxTextLen) funciona. Sempre
+    // avaliar via chamada com argumento.
+    const v = await evalWithArg(
+      page,
+      `(_) => {
         const visible = (e) => {
           if (!e) return false;
           const r = e.getBoundingClientRect();
@@ -443,27 +452,10 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             return val.trim();
           }
         }
-        // DIAGNÓSTICO: nenhum casou — despeja os candidatos reais do #side
-        const dump = [];
-        for (const b of document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]')) {
-          const r = b.getBoundingClientRect();
-          const s = getComputedStyle(b);
-          dump.push({
-            tag: b.tagName, type: b.type || null,
-            aria: b.getAttribute('aria-label'),
-            testid: b.getAttribute('data-testid'),
-            val: (b.value !== undefined ? b.value : b.textContent || '').slice(0, 30),
-            rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
-            vis: s.display + '/' + s.visibility, cls: (b.className || '').toString().slice(0, 40),
-          });
-        }
-        return 'DIAG:' + JSON.stringify(dump);
-      })`)
-      .catch(() => null);
-    if (typeof v === 'string' && v.startsWith('DIAG:')) {
-      this.config.log?.warn({ dump: v.slice(5) }, 'searchFieldValue: nenhum seletor casou — dump real do #side');
-      return null;
-    }
+        return null;
+      }`,
+      null,
+    ).catch(() => null);
     return typeof v === 'string' ? v : null;
   }
 
@@ -603,23 +595,25 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     // caminho — título do chat não casa com número, e número é único.
     // Normaliza estado: busca residual de ciclo anterior deixa a lista filtrada
     // e quebra o clique na row (bug ao vivo 2026-09-22 — evidência repair-*).
-    await page
-      .evaluate(`(() => {
+    await evalWithArg(
+      page,
+      `(_) => {
         const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
                     document.querySelector('#side input[aria-label*="Buscar" i]') ||
                     document.querySelector('#side input[aria-label*="Search" i]') ||
                     document.querySelector('#side input[aria-label*="Pesquisar" i]') ||
                     document.querySelector('#side [role="textbox"]') ||
                     document.querySelector('#side div[contenteditable="true"]');
-        if (box && (box.textContent || '').trim()) {
+        if (box && (box.value !== undefined ? box.value : (box.textContent || '')).trim()) {
           box.focus();
           document.execCommand('selectAll');
           document.execCommand('delete');
         }
         const x = document.querySelector('#side [data-testid="search-back"], #side button[aria-label*="cerrar" i], #side button[aria-label*="close" i]');
         if (x) x.click();
-      })`)
-      .catch(() => {});
+      }`,
+      null,
+    ).catch(() => {});
     await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(500);
 
@@ -712,48 +706,6 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
         this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca não bateu após insertText — limpando e repetindo');
-        // diagnóstico: dump de TODOS os candidatos — escrito em ARQUIVO (o
-        // objeto no log some na serialização do pino, evidência 22:41). O
-        // evaluate anterior devolveu `undefined` puro — este primeiro faz
-        // probe mínimo (title/contagens) pra separar "page.evaluate quebrado
-        // nessa página" de "seletor não casa".
-        const probe = await page
-          .evaluate(`JSON.stringify({
-            title: document.title,
-            sideInputs: document.querySelectorAll('#side input').length,
-            allInputs: document.querySelectorAll('input').length,
-            sideTextboxes: document.querySelectorAll('#side [role="textbox"]').length,
-            side: !!document.querySelector('#side'),
-            iifeNum: (() => 42)(),
-            arrowMap: [1, 2].map((x) => x * 2).join(','),
-            funcExpr: (function () { return 7; })(),
-          })`)
-          .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
-        const dump = await page
-          .evaluate(`(() => {
-            const els = document.querySelectorAll('#side input, #side [role="textbox"], #side div[contenteditable="true"]');
-            const out = { count: els.length, items: [] };
-            for (let i = 0; i < els.length && i < 5; i++) {
-              const b = els[i];
-              let rectStr = 'no-rect';
-              try { const r = b.getBoundingClientRect(); rectStr = [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(','); } catch (e) { rectStr = 'rect-erro'; }
-              out.items.push({
-                i, tag: b.tagName,
-                val: (b.value !== undefined ? b.value : b.textContent || '').slice(0, 30),
-                rect: rectStr,
-              });
-            }
-            return JSON.stringify(out);
-          })`)
-          .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
-        try {
-          mkdirSync(this.config.evidenceDir, { recursive: true });
-          const dumpPath = join(this.config.evidenceDir, `openchat-busca-dump-${Date.now()}.json`);
-          writeFileSync(dumpPath, JSON.stringify({ probe: String(probe), dump: String(dump) }, null, 1), 'utf8');
-          this.config.log?.warn({ dumpPath }, 'openChat: leitura não bateu — dump dos candidatos em arquivo');
-        } catch {
-          this.config.log?.warn({}, 'openChat: leitura não bateu (falhou até gravar o dump)');
-        }
         // evidência visual pro diagnóstico (print → LLM averigua onde clicar)
         const ev = await this.captureEvidence(`openchat-busca-t${attempt + 1}`).catch(() => null);
         if (ev) this.config.log?.debug({ shot: ev.screenshotPath }, 'evidência da busca truncada capturada');
