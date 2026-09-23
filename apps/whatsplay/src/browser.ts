@@ -1040,7 +1040,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       //    contexto é [data-testid="icon-down-context"] (div[role=button]),
       //    renderizado SÓ com hover real e às vezes demora um tick. Os testids
       //    antigos (msg-options etc.) foram REMOVIDOS nesta versão.
-      const rowSel = `${SELECTORS.messageRow}:has-text(${JSON.stringify(query)})`;
+      //    ⚠️ :not(:has(quoted-message)): sem isso, o :has-text casa com a
+      //    NOSSA PRÓPRIA resposta que cita a mensagem (o texto da citação
+      //    interna conta) — evidência ao vivo citacao-menu-nao-abriu (menu
+      //    abriu em cima da msg da Luna, não da pergunta do owner).
+      const rowSel = `${SELECTORS.messageRow}:has-text(${JSON.stringify(query)}):not(:has([data-testid="quoted-message"]))`;
       const row = page.locator(rowSel).last();
       await row.hover();
       await page.waitForTimeout(250 + Math.floor(Math.random() * 250));
@@ -1065,29 +1069,32 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await ctxBtn.evaluate((b) => (b as HTMLElement).click());
       });
       await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
-      // 3. Item "Responder" — i18n: Responder/Reply/Contestar. O menu abre num
-      //    popover fora da row (button[role=menuitem]). Preferência por texto
-      //    exato ("Responder" vs "Responder en privado") com fallback regex.
+      // 3. Confirmar que o menu abriu. ⚠️ Ao vivo 2026-09-23: o CONTAINER do
+      //    menu nesta versão NÃO tem role="menu" (só os itens têm
+      //    role="menuitem") — checar div[role="menu"] dava falso "não abriu"
+      //    com o menu visível na screenshot (evidência citacao-menu-nao-abriu).
       const menuOpened = await page
-        .locator('div[role="menu"]:visible')
-        .waitFor({ state: 'visible', timeout: 2_000 })
+        .locator('[role="menuitem"]:visible')
+        .waitFor({ state: 'visible', timeout: 2_500 })
         .then(() => true)
         .catch(() => false);
       if (!menuOpened) {
         const ev = await this.captureEvidence('citacao-menu-nao-abriu');
-        throw new Error(`citação: cliquei no chevron mas o menu de contexto não abriu. Evidência: ${ev.screenshotPath}`);
+        throw new Error(`citação: cliquei no chevron mas o menu de contexto não abriu (nenhum menuitem visível). Evidência: ${ev.screenshotPath}`);
       }
-      const menuItemExact = page.locator('[role="menuitem"]:visible', { hasText: /^(Responder|Reply|Contestar)$/i }).first();
-      const menuItem = (await menuItemExact.count().catch(() => 0)) > 0
-        ? menuItemExact
-        : page.locator('[role="menuitem"]:visible').filter({ hasText: /responder|reply|contestar/i }).first();
-      if ((await menuItem.count().catch(() => 0)) === 0) {
-        const ev = await this.captureEvidence('citacao-menu-responder-nao-achado');
-        throw new Error(`citação: item "Responder" do menu não achado. Evidência: ${ev.screenshotPath}`);
-      }
-      await menuItem.click();
+      // 3b. Selecionar "Responder" por TECLADO (sugestão do owner 2026-09-23):
+      //     "Responder" é SEMPRE o primeiro item do menu, em qualquer idioma —
+      //     seta pra baixo + enter é mais preciso que casar texto (i18n) e
+      //     evita confusão com "Responder en privado". A confirmação real vem
+      //     do passo 4: se o preview não anexar, falha explícita (nunca órfã).
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(200 + Math.floor(Math.random() * 150));
+      await page.keyboard.press('Enter');
       await page.waitForTimeout(400);
       // 4. A citação TEM que estar anexada — senão falha (nunca envia órfã).
+      //    (mantido como rede de segurança do atalho de teclado: se o foco
+      //    não caiu no menu e a seta rolou o painel, o Enter não anexa nada
+      //    e isso é pego aqui, antes de qualquer envio.)
       const preview = await page
         .evaluate(`(() => {
           const p = document.querySelectorAll(${JSON.stringify(SELECTORS.replyPreview)});
@@ -1122,6 +1129,10 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const rows = document.querySelectorAll('#main ${SELECTORS.messageRow}');
         for (let i = rows.length - 1; i >= 0; i--) {
           const r = rows[i];
+          // mesma regra do replyToMessage: ignorar rows que só casam por
+          // causa de uma CITAÇÃO interna (quoted-message) — queremos a msg
+          // original, não a nossa resposta que a cita.
+          if (r.querySelector('[data-testid="quoted-message"]')) continue;
           if ((r.textContent || '').toLowerCase().includes(${JSON.stringify(query.toLowerCase())})) {
             r.scrollIntoView({ block: 'center' });
             return true;
