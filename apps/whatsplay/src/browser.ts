@@ -405,17 +405,33 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   /** Valor VISÍVEL atual do campo de busca (null = não achado). */
   private async searchFieldValue(page: Page): Promise<string | null> {
-    // WA Web 2026-09-23: o campo de busca virou <input> dentro de
-    // chat-list-search-container (era contenteditable) — texto agora mora
-    // em .value, não em textContent. Lê os dois.
+    // WA Web 2026-09: o campo de busca é <input> com aria-label (PT "Buscar"/
+    // ES "Buscar..." — a sessão do owner cai em espanhol) SEM
+    // data-testid="chat-list-search-container" no wrapper. O seletor de CLIQUE
+    // casava via input[aria-label*="Buscar"], mas este de LEITURA não —
+    // 'obtido: null' com o termo VISÍVEL na tela (evidência
+    // openchat-busca-*.png 22:32), loop digitava/apagava pra sempre. Leitura
+    // agora cobre os MESMOS casamentos do clique + fallback genérico.
     const v = await page
       .evaluate(`(() => {
         const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
-        const boxes = document.querySelectorAll('#side [data-testid="chat-list-search-container"] input, #side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]');
-        for (const b of boxes) {
-          if (!visible(b)) continue;
-          const val = b.value !== undefined ? b.value : (b.textContent || '');
-          return val.trim();
+        const sels = [
+          '#side [data-testid="chat-list-search-container"] input',
+          '#side input[aria-label*="Buscar" i]',
+          '#side input[aria-label*="Search" i]',
+          '#side input[aria-label*="Pesquisar" i]',
+          '#side [data-testid="chat-list-search"]',
+          '#side [role="textbox"]',
+          '#side div[contenteditable="true"]',
+          '#side input[type="text"]',
+          '#side input:not([type="hidden"])',
+        ];
+        for (const s of sels) {
+          for (const b of document.querySelectorAll(s)) {
+            if (!visible(b)) continue;
+            const val = b.value !== undefined ? b.value : (b.textContent || '');
+            return val.trim();
+          }
         }
         return null;
       })`)
@@ -562,6 +578,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     await page
       .evaluate(`(() => {
         const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
+                    document.querySelector('#side input[aria-label*="Buscar" i]') ||
+                    document.querySelector('#side input[aria-label*="Search" i]') ||
+                    document.querySelector('#side input[aria-label*="Pesquisar" i]') ||
                     document.querySelector('#side [role="textbox"]') ||
                     document.querySelector('#side div[contenteditable="true"]');
         if (box && (box.textContent || '').trim()) {
