@@ -69,3 +69,16 @@ modificar formulário PREPARING_SOLUTION, modificar web Nexo RECEIVED, resto COM
 
 ---
 *2026-09-24 · autor: Luna · reconciliação: painel × relatório × WhatsApp — divergência 1 (slider Ona Dance)*
+
+## Central de Relatórios (/relatorios/) — inventário 2026-09-24
+
+Regra do owner (decreto 2026-09-24): **cliente ativo = relatório obrigatório; Luna checa toda varredura.**
+
+| Cliente | Acesso | Estado |
+|---|---|---|
+| HDM | hdm-industrial@nexo-digital.app | ✅ relatório existe, ⚠️ **desatualizado** (14/09; não cobre os pedidos de 21/09 — carrossel, currículos, logo — apesar de o próprio relatório dizer "toda solicitação feita pelo painel entra neste relatório") |
+| Jr-Reformas (Juninho) | juninho@nexo-digital.app | ✅ completo |
+| Santa Fe | santafe@nexo-digital.app | ⚠️ acesso cadastrado, conteúdo "Relatório em breve" |
+| Ona Dance (Jess) | — | ❌ **sem acesso, sem card, sem relatório** — e é quem tem mais pedidos abertos |
+
+Novas divergências de reconciliação: relatório HDM × painel (desatualizado); Jess sem relatório (regra violada).
