@@ -936,6 +936,82 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   }
 
   /**
+   * CHAMADA RECEBIDA (decreto owner 2026-09-24 — ponte Kimi Work): detecta o
+   * popup de chamada entrante (Aceptar/Rechazar, PT/ES/EN) e devolve quem
+   * está ligando. O daemon enfileira call.incoming no kimiwork_inbox e o
+   * Kimi Work decide: atender (call.answer), recusar (call.decline) ou
+   * deixar tocar. Sem isso a Luna simplesmente não atendia — ninguém via o
+   * popup.
+   */
+  async detectIncomingCall(): Promise<{ caller: string } | null> {
+    const page = this.requirePage();
+    const r = await evalWithArg(
+      page,
+      `(_) => {
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const accept = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
+          visible(b) && /^(aceptar|atender|answer|accept|responder)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+        const decline = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
+          visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+        if (!accept && !decline) return null;
+        // quem liga: título do header se um chat está aberto, senão o texto do popup
+        let caller = '';
+        const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
+        if (titleEl && visible(titleEl)) caller = (titleEl.textContent || '').trim();
+        if (!caller) {
+          const popup = accept ? accept.closest('div[class]')?.parentElement : null;
+          caller = popup ? (popup.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) : '';
+        }
+        return JSON.stringify({ caller });
+      }`,
+      null,
+    ).catch(() => null);
+    if (typeof r !== 'string' || !r) return null;
+    try {
+      const parsed = JSON.parse(r) as { caller: string };
+      return parsed && typeof parsed.caller === 'string' ? { caller: parsed.caller } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Atende a chamada recebida (clique em Aceptar, verificado). */
+  async acceptCall(): Promise<void> {
+    const page = this.requirePage();
+    this.config.log?.info({}, 'voice-call: atendendo chamada recebida (Aceptar)');
+    const ok = await page
+      .locator('button[aria-label="Aceptar" i], button[aria-label="Atender" i], button[aria-label="Answer" i], [role="button"][aria-label="Aceptar" i]')
+      .first()
+      .click({ timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ok) throw new Error('botão Aceptar não encontrado — não consegui atender');
+    await page.waitForTimeout(1_500);
+    const obs = await this.observePanel();
+    this.config.log?.info({}, `voice-call: pós-atender → ${this.describeObservation(obs)}`);
+  }
+
+  /** Recusa a chamada recebida (clique em Rechazar, verificado). */
+  async declineCall(): Promise<void> {
+    const page = this.requirePage();
+    this.config.log?.info({}, 'voice-call: recusando chamada recebida (Rechazar)');
+    const ok = await page
+      .locator('button[aria-label="Rechazar" i], button[aria-label="Recusar" i], button[aria-label="Decline" i], [role="button"][aria-label="Rechazar" i]')
+      .first()
+      .click({ timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ok) throw new Error('botão Rechazar não encontrado — não consegui recusar');
+    await page.waitForTimeout(1_000);
+  }
+
+  /**
    * ENCERRA a chamada atual (decreto owner): observa, acha o botão de
    * encerrar, clica e VERIFICA que voltou pro chat normal. Narrado.
    */

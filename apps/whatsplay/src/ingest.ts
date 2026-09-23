@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { resolveIngressIdentity, insertInboundMessage, publishEvent, recordAudit } from '@luna/database';
+import { resolveIngressIdentity, insertInboundMessage, publishEvent, recordAudit, insertKimiWorkEvent } from '@luna/database';
 import type { Logger } from 'pino';
 import type { UnreadMessage, WhatsAppTransport } from './transport.js';
 import { shouldRespond } from './rules.js';
@@ -78,6 +78,26 @@ export function createIngest(deps: IngestDeps) {
       result: 'success',
       metadata: { external_id: msg.external_id, chat_id: msg.chat_id, is_group: msg.is_group },
     });
+
+    // PONTE KIMI WORK (decreto owner 2026-09-24): a menção/resposta direta
+    // cai na caixa de entrada do cérebro Kimi Work — é ELE quem decide e
+    // age (pelo messages+luna_outbound), não um fluxo hardcoded. Idempotente.
+    await insertKimiWorkEvent(pool, {
+      kind: 'whatsapp.message',
+      payload: {
+        conversation_id: identity.conversation_id,
+        message_id: messageId,
+        chat_id: msg.chat_id,
+        chat_name: msg.chat_name,
+        author_name: msg.author_name ?? msg.chat_name,
+        text: msg.text,
+        is_group: msg.is_group,
+        mentioned_luna: msg.mentioned_luna,
+        quoted_from_luna: msg.quoted_from_luna ?? false,
+        correlation_id: event.correlation_id,
+      },
+      idempotencyKey: `kimiwork:wa:msg:${msg.external_id}`,
+    }).catch((err) => log.warn({ err: String(err).slice(0, 120) }, 'kimiwork inbox: falha ao enfileirar (não bloqueia o ingest)'));
 
     log.info({ correlation_id: event.correlation_id, chat: msg.chat_name }, 'mensagem ingerida');
     return 'published';

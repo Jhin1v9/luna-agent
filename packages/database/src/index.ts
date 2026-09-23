@@ -59,3 +59,5 @@ export type { IngressIdentity } from './ingress.js';
 
 export { buildAdminFullPack } from './admin-pack.js';
 export type { AdminPack } from './admin-pack.js';
+export { insertKimiWorkEvent, listPendingKimiWorkEvents, markKimiWorkEvent } from './kimiwork.js';
+export type { KimiWorkEventInput, KimiWorkEventRow } from './kimiwork.js';

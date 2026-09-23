@@ -179,6 +179,48 @@ async function main(): Promise<void> {
   });
   log.info('ouvindo NOTIFY voice_call_requests (chamadas de voz)');
 
+  // PONTE KIMI WORK (decreto owner 2026-09-24) — DUAS pontes:
+  // 1) detector de chamada RECEBIDA → kimiwork_inbox (o Kimi Work decide:
+  //    atender/recusar/deixar tocar — nunca mais chamada ignorada em silêncio);
+  // 2) LISTEN whatsapp_actions → executa ordens do Kimi Work no Chrome
+  //    (call.answer / call.decline hoje; texto segue pela fila messages +
+  //    pg_notify('luna_outbound'), com send-safety e allowlist).
+  const { insertKimiWorkEvent } = await import('@luna/database');
+  let lastIncomingRingAt = 0;
+  const incomingTimer = setInterval(async () => {
+    try {
+      const incoming = await transport.detectIncomingCall?.();
+      if (!incoming) return;
+      const now = Date.now();
+      if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca
+      lastIncomingRingAt = now;
+      await insertKimiWorkEvent(pool, {
+        kind: 'call.incoming',
+        payload: { caller: incoming.caller },
+        idempotencyKey: `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`,
+      });
+      log.info({ caller: incoming.caller }, 'kimiwork inbox: chamada recebida enfileirada');
+      if (telegramConfig.botToken && telegramConfig.teamChatId) {
+        await sendTeamMessage(`📞 Chamada recebida de ${incoming.caller} — Kimi Work decidindo (inbox).`, telegramConfig).catch(() => {});
+      }
+    } catch (err) {
+      log.warn({ err: String(err).slice(0, 140) }, 'kimiwork inbox: detector de chamada falhou (best-effort)');
+    }
+  }, 5_000);
+  const actionListen = await pool.connect();
+  await actionListen.query("LISTEN whatsapp_actions");
+  actionListen.on('notification', (n) => {
+    if (!n.payload) return;
+    (async () => {
+      const order = JSON.parse(n.payload as string) as { action?: string };
+      log.info({ order }, 'whatsapp_actions: ordem do Kimi Work');
+      if (order.action === 'call.answer') await transport.acceptCall?.();
+      else if (order.action === 'call.decline') await transport.declineCall?.();
+      else log.warn({ action: order.action }, 'whatsapp_actions: ação desconhecida — ignorada');
+    })().catch((err) => log.error({ err }, 'whatsapp_actions: execução falhou'));
+  });
+  log.info('ouvindo NOTIFY whatsapp_actions (ordens do Kimi Work)');
+
   const telegram =
     telegramConfig.botToken && telegramConfig.teamChatId
       ? (text: string) => sendTeamMessage(text, telegramConfig)

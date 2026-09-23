@@ -65,6 +65,12 @@ export interface WhatsAppTransport {
    *  casa com messageQuery (painel ou lupa), anexa citação visual (Reply) e
    *  envia text respondendo ELA. Falha explícita se a citação não anexar. */
   replyToMessage?(chatId: string, messageQuery: string, text: string): Promise<string>;
+  /** 🆕 PONTE KIMI WORK: detecta chamada recebida (popup Aceptar/Rechazar). */
+  detectIncomingCall?(): Promise<{ caller: string } | null>;
+  /** 🆕 PONTE KIMI WORK: atende a chamada recebida. */
+  acceptCall?(): Promise<void>;
+  /** 🆕 PONTE KIMI WORK: recusa a chamada recebida. */
+  declineCall?(): Promise<void>;
 }
 
 /** 🆕 Resultado da lupa (busca dentro do chat). */
