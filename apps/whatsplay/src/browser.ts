@@ -342,44 +342,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         if (inMain > 0) inputSelector = opts.inputSelector;
       }
       await page.click(inputSelector);
-      // LIMPEZA DO CAMPO (decreto owner 2026-09-22, "msg esquisita"): abort
-      // anterior deixava rascunho no campo e o texto novo concatenava com o
-      // resíduo. Sempre limpa antes de digitar; resíduo = warn (indica abort).
-      const residue = await this.clearComposeBox(page, inputSelector);
-      if (residue > 0) {
-        this.config.log?.warn(
-          { chars: residue, chat: chatId },
-          'campo de composição continha resíduo — limpo (abort anterior provável)',
-        );
-      }
-      await page.waitForTimeout(150);
-      // Invariante: o painel tem que estar aberto NA HORA de digitar — se
-      // fechou (sweep/guard/reload), aborta ANTES de escrever (senão o
-      // texto vira rascunho em whatever chat estiver aberto).
-      if ((await this.currentOpenChatTitle()) === null) {
-        throw new Error('painel fechou antes da digitação — envio ABORTADO pra não virar rascunho no chat errado');
-      }
-      // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
-      await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
-      await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
-      await page.keyboard.press('Enter');
-      // Confirmação REAL de envio (decreto owner + diagnóstico ao vivo
-      // 2026-09-22): mensagem marcada 'sent' SEM chegar no chat — o Enter nem
-      // sempre pega. O campo VISÍVEL tem que esvaziar; se não esvaziar, dá um
-      // segundo Enter; se AINDA ficar de rascunho, limpa e FALHA explícita
-      // (nunca 'sent' falso — falha retryável > silêncio com sucesso fake).
-      await page.waitForTimeout(500);
-      let leftover = await this.composeBoxTextLen(page, inputSelector);
-      if (leftover > 0) {
-        this.config.log?.warn({ chars: leftover, chat: chatId }, 'campo não esvaziou no 1º Enter — tentando de novo');
-        await page.keyboard.press('Enter');
-        await page.waitForTimeout(600);
-        leftover = await this.composeBoxTextLen(page, inputSelector);
-      }
-      if (leftover > 0) {
-        await this.clearComposeBox(page, inputSelector);
-        throw new Error(`envio NÃO confirmado: campo ainda tinha ${leftover} chars após 2× Enter — rascunho limpo, mensagem NÃO enviada`);
-      }
+      await this.composeTypeAndSend(page, inputSelector, text, chatId);
       this.lastHeartbeatAt = new Date();
       return `sent:${chatId}:${Date.now()}`;
     } finally {
@@ -389,6 +352,54 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       } catch {
         /* PanelStuckError já reportou via onStuck */
       }
+    }
+  }
+
+  /**
+   * Digita no campo de composição e confirma o envio de verdade (decreto
+   * owner 2026-09-22): limpa resíduo, exige painel aberto na hora da
+   * digitação, e o campo VISÍVEL tem que esvaziar — se não esvaziar após
+   * 2× Enter, limpa e FALHA explícita (nunca 'sent' falso).
+   * Compartilhado por sendMessage e replyToMessage (v2 citação).
+   */
+  private async composeTypeAndSend(page: Page, inputSelector: string, text: string, chatId: string): Promise<void> {
+    // LIMPEZA DO CAMPO (decreto owner 2026-09-22, "msg esquisita"): abort
+    // anterior deixava rascunho no campo e o texto novo concatenava com o
+    // resíduo. Sempre limpa antes de digitar; resíduo = warn (indica abort).
+    const residue = await this.clearComposeBox(page, inputSelector);
+    if (residue > 0) {
+      this.config.log?.warn(
+        { chars: residue, chat: chatId },
+        'campo de composição continha resíduo — limpo (abort anterior provável)',
+      );
+    }
+    await page.waitForTimeout(150);
+    // Invariante: o painel tem que estar aberto NA HORA de digitar — se
+    // fechou (sweep/guard/reload), aborta ANTES de escrever (senão o
+    // texto vira rascunho em whatever chat estiver aberto).
+    if ((await this.currentOpenChatTitle()) === null) {
+      throw new Error('painel fechou antes da digitação — envio ABORTADO pra não virar rascunho no chat errado');
+    }
+    // Delay humano mínimo contra padrão robótico (risco de ban — ADR-004).
+    await page.waitForTimeout(300 + Math.floor(Math.random() * 500));
+    await page.keyboard.type(text, { delay: 15 + Math.floor(Math.random() * 30) });
+    await page.keyboard.press('Enter');
+    // Confirmação REAL de envio (decreto owner + diagnóstico ao vivo
+    // 2026-09-22): mensagem marcada 'sent' SEM chegar no chat — o Enter nem
+    // sempre pega. O campo VISÍVEL tem que esvaziar; se não esvaziar, dá um
+    // segundo Enter; se AINDA ficar de rascunho, limpa e FALHA explícita
+    // (nunca 'sent' falso — falha retryável > silêncio com sucesso fake).
+    await page.waitForTimeout(500);
+    let leftover = await this.composeBoxTextLen(page, inputSelector);
+    if (leftover > 0) {
+      this.config.log?.warn({ chars: leftover, chat: chatId }, 'campo não esvaziou no 1º Enter — tentando de novo');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(600);
+      leftover = await this.composeBoxTextLen(page, inputSelector);
+    }
+    if (leftover > 0) {
+      await this.clearComposeBox(page, inputSelector);
+      throw new Error(`envio NÃO confirmado: campo ainda tinha ${leftover} chars após 2× Enter — rascunho limpo, mensagem NÃO enviada`);
     }
   }
 
@@ -990,6 +1001,129 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         /* PanelStuckError já reportou via onStuck */
       }
     }
+  }
+
+  /**
+   * 🆕 CITAÇÃO (mention.respond v2, PLANO-SKILLS): responde UMA mensagem
+   * específica com citação visual. Caminho: abre o chat → localiza a msg
+   * (painel; se não estiver visível, lupa pula pra ela) → hover → menu de
+   * contexto → "Responder" → verifica o preview de citação ANEXADO → digita
+   * e envia com confirmação real. Se a citação não anexar, FALHA explícita
+   * (nunca manda sem citação fingindo que foi com — o owner quer saber a
+   * qual msg a resposta se refere).
+   */
+  async replyToMessage(chatId: string, messageQuery: string, text: string): Promise<string> {
+    const page = this.requirePage();
+    const guard = this.panelGuard;
+    if (!(await this.isPageHealthy())) await this.ensurePageHealthy();
+    await guard?.beginCycle('replyToMessage');
+    try {
+      if (!(await this.openChat(chatId))) {
+        throw new Error(`citação: não consegui abrir o chat '${chatId}' — resposta abortada`);
+      }
+      const query = messageQuery.slice(0, 60);
+      // 1. Localizar a mensagem: tenta o painel aberto primeiro; se não
+      //    achar, usa a lupa pra pular até ela e tenta de novo.
+      let achou = await this.scrollMessageIntoView(page, query);
+      if (!achou) {
+        this.config.log?.info({ chat: chatId, query }, 'citação: msg não visível no painel — usando a lupa');
+        achou = await this.jumpViaLupa(page, query);
+      }
+      if (!achou) {
+        const ev = await this.captureEvidence('citacao-msg-nao-achada');
+        throw new Error(
+          `citação: mensagem com "${query}" NÃO achada nem no painel nem na lupa — resposta NÃO enviada (sem citar ficaria órfã). Evidência: ${ev.screenshotPath}`,
+        );
+      }
+      // 2. Hover na mensagem → botão de contexto → "Responder".
+      const row = page.locator(`${SELECTORS.messageRow}:has-text(${JSON.stringify(query)})`).last();
+      await row.hover();
+      await page.waitForTimeout(250 + Math.floor(Math.random() * 250));
+      const ctx = page.locator(`#main ${SELECTORS.msgContextButton}`).last();
+      if ((await ctx.count().catch(() => 0)) === 0) {
+        const ev = await this.captureEvidence('citacao-botao-ctx-nao-achado');
+        throw new Error(`citação: botão de contexto da mensagem não achado — seletor: ${SELECTORS.msgContextButton}. Evidência: ${ev.screenshotPath}`);
+      }
+      await ctx.click();
+      await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
+      // 3. Item "Responder" — i18n: Responder/Reply/Contestar/Antworten.
+      const menuItem = page
+        .locator(`${SELECTORS.contextMenu} [role="menuitem"], ${SELECTORS.contextMenu} div, ${SELECTORS.contextMenu} li`)
+        .filter({ hasText: /responder|reply|contestar/i })
+        .first();
+      if ((await menuItem.count().catch(() => 0)) === 0) {
+        const ev = await this.captureEvidence('citacao-menu-responder-nao-achado');
+        throw new Error(`citação: item "Responder" do menu não achado. Evidência: ${ev.screenshotPath}`);
+      }
+      await menuItem.click();
+      await page.waitForTimeout(400);
+      // 4. A citação TEM que estar anexada — senão falha (nunca envia órfã).
+      const preview = await page
+        .evaluate(`(() => {
+          const p = document.querySelectorAll(${JSON.stringify(SELECTORS.replyPreview)});
+          for (const el of p) if (el.offsetParent !== null || el.getClientRects().length > 0) return true;
+          return false;
+        })()`)
+        .then((r) => r === true)
+        .catch(() => false);
+      if (!preview) {
+        const ev = await this.captureEvidence('citacao-preview-nao-anexado');
+        throw new Error(`citação: cliquei em Responder mas o preview não anexou (seletor: ${SELECTORS.replyPreview}) — NÃO enviei pra não mandar sem citação. Evidência: ${ev.screenshotPath}`);
+      }
+      // 5. Digita e envia com confirmação real (mesmo contrato do sendMessage).
+      await this.composeTypeAndSend(page, SELECTORS.inputBox, text, chatId);
+      this.lastHeartbeatAt = new Date();
+      return `sent:${chatId}:${Date.now()}`;
+    } finally {
+      try {
+        await this.closeCurrentChat();
+        await guard?.endCycle('replyToMessage');
+      } catch {
+        /* PanelStuckError já reportou via onStuck */
+      }
+    }
+  }
+
+  /** Rola o painel até a mensagem mais recente que casa com a query.
+   *  true = achou (e o painel está posicionado nela). */
+  private async scrollMessageIntoView(page: Page, query: string): Promise<boolean> {
+    return page
+      .evaluate(`(() => {
+        const rows = document.querySelectorAll('#main ${SELECTORS.messageRow}');
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const r = rows[i];
+          if ((r.textContent || '').toLowerCase().includes(${JSON.stringify(query.toLowerCase())})) {
+            r.scrollIntoView({ block: 'center' });
+            return true;
+          }
+        }
+        return false;
+      })()`)
+      .then((r) => r === true)
+      .catch(() => false);
+  }
+
+  /** Lupa: busca a query no chat e clica o 1º resultado pra pular até a
+   *  mensagem. true = o painel ficou posicionado numa mensagem que casa. */
+  private async jumpViaLupa(page: Page, query: string): Promise<boolean> {
+    const lupa = page.locator(SELECTORS.inChatSearchButton).first();
+    if ((await lupa.count().catch(() => 0)) === 0) return false;
+    await lupa.click();
+    await page.waitForTimeout(400);
+    const campo = page.locator(SELECTORS.inChatSearchInput).first();
+    if ((await campo.count().catch(() => 0)) === 0) return false;
+    await campo.click();
+    await page.keyboard.type(query, { delay: 25 + Math.floor(Math.random() * 40) });
+    await page.waitForTimeout(1_500);
+    // Clica a 1ª marcação de resultado → o painel pula pra mensagem.
+    const hit = page.locator(`#main ${SELECTORS.searchHighlight}`).first();
+    if ((await hit.count().catch(() => 0)) > 0) {
+      await hit.click().catch(() => {});
+      await page.waitForTimeout(500);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    return this.scrollMessageIntoView(page, query);
   }
 
   /** Evidência para auto-reparo (§14/F1.5): screenshot + DOM simplificado. */

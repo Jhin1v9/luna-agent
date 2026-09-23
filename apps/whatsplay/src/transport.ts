@@ -61,6 +61,10 @@ export interface WhatsAppTransport {
    *  lupa do cabeçalho, digita a query e conta as marcações de resultado.
    *  Não envia nada — só localiza. */
   searchInChat?(chatId: string, query: string): Promise<ChatSearchResult>;
+  /** 🆕 CITAÇÃO (mention.respond v2, PLANO-SKILLS): localiza a mensagem que
+   *  casa com messageQuery (painel ou lupa), anexa citação visual (Reply) e
+   *  envia text respondendo ELA. Falha explícita se a citação não anexar. */
+  replyToMessage?(chatId: string, messageQuery: string, text: string): Promise<string>;
 }
 
 /** 🆕 Resultado da lupa (busca dentro do chat). */

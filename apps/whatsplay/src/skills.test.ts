@@ -119,6 +119,44 @@ describe('skill layer (PLANO-SKILLS.md §2)', () => {
     expect(m.lastSend).not.toBeNull();
   });
 
+  it('mention.respond v2: com replyToMessage no transport, responde COM CITAÇÃO (não usa send comum)', async () => {
+    const m = makeMock();
+    const replies: Array<{ target: string; query: string; text: string }> = [];
+    (m.transport as { replyToMessage?: unknown }).replyToMessage = async (t: string, q: string, x: string) => {
+      replies.push({ target: t, query: q, text: x });
+      return `sent-quoted:${t}`;
+    };
+    const s = createWhatsAppSkills({ transport: m.transport });
+    const r = await s['mention.respond']({
+      conversation: '🏆Production - 2026🙏🏻',
+      text: 'anotado!',
+      mentionQuery: 'temos uma tarefa nova',
+      author: 'Superclim',
+    });
+    expect(r.mentionFound).toBe(true);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.query).toBe('temos uma tarefa nova');
+    expect(replies[0]!.text).toBe('Superclim, anotado!');
+    expect(m.calls.filter((c) => c.startsWith('sendMessage'))).toHaveLength(0); // sem envio órfão
+    expect(m.calls.filter((c) => c.startsWith('searchInChat'))).toHaveLength(0); // lupa é a ponte do transport
+  });
+
+  it('mention.respond v2: falha da citação NÃO degrada pra envio comum — explode pra retry', async () => {
+    const m = makeMock();
+    (m.transport as { replyToMessage?: unknown }).replyToMessage = async () => {
+      throw new Error('citação: mensagem NÃO achada nem no painel nem na lupa');
+    };
+    const s = createWhatsAppSkills({ transport: m.transport });
+    await expect(
+      s['mention.respond']({
+        conversation: 'grupo',
+        text: 'anotado!',
+        mentionQuery: 'qualquer coisa',
+      }),
+    ).rejects.toThrow('NÃO achada');
+    expect(m.lastSend).toBeNull(); // nada enviado sem citação
+  });
+
   it('contact.find resolve pelo mapa; sem mapa → null', async () => {
     const m = makeMock();
     const withMap = createWhatsAppSkills({

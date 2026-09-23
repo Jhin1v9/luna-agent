@@ -120,9 +120,21 @@ export function createWhatsAppSkills(deps: SkillsDeps): WhatsAppSkills {
 
     'mention.respond': async (input) => {
       const target = await resolveTarget(input.conversation);
-      // Lupa confirma que a mensagem mencionada existe no chat (audit).
-      // Falha da lupa NÃO aborta a resposta — mencionar num chat recente
-      // não exige a mensagem estar visível; o contexto já viaja no texto.
+      // v2 (PLANO-SKILLS): com query da mensagem mencionada e transport com
+      // citação, responde ELA com citação visual — o owner quer saber a qual
+      // msg a resposta se refere. Falha da citação NÃO degrada pra envio
+      // comum (órfã) — explode explícito pra retry com evidência.
+      if (input.mentionQuery && input.mentionQuery.trim() && deps.transport.replyToMessage) {
+        const texto = input.author ? `${input.author}, ${input.text}` : input.text;
+        const externalId = await deps.transport.replyToMessage(target, input.mentionQuery.trim(), texto);
+        deps.log?.info(
+          { author: input.author ?? null, target },
+          'mention.respond: resposta enviada COM CITAÇÃO da mensagem mencionada',
+        );
+        return { externalId, mentionFound: true };
+      }
+      // v1 (sem query ou sem transport de citação): lupa confirma que a
+      // mensagem existe (audit) e envia comum citando o autor no texto.
       let mentionFound: boolean | null = null;
       if (input.mentionQuery && transport.searchInChat) {
         try {
@@ -136,10 +148,7 @@ export function createWhatsAppSkills(deps: SkillsDeps): WhatsAppSkills {
           deps.log?.warn({ err: String(err).slice(0, 200) }, 'mention.respond: lupa falhou — respondendo sem verificação');
         }
       }
-      // v1: resposta no chat citando autor + contexto (citação visual = v2).
-      const texto = input.author
-        ? `${input.author}, ${input.text}`
-        : input.text;
+      const texto = input.author ? `${input.author}, ${input.text}` : input.text;
       const externalId = await transport.sendMessage(target, texto);
       return { externalId, mentionFound };
     },
