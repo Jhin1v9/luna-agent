@@ -713,7 +713,19 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         if (typed === searchKey) break;
         this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca não bateu após insertText — limpando e repetindo');
         // diagnóstico: dump de TODOS os candidatos — escrito em ARQUIVO (o
-        // objeto no log some na serialização do pino, evidência 22:41).
+        // objeto no log some na serialização do pino, evidência 22:41). O
+        // evaluate anterior devolveu `undefined` puro — este primeiro faz
+        // probe mínimo (title/contagens) pra separar "page.evaluate quebrado
+        // nessa página" de "seletor não casa".
+        const probe = await page
+          .evaluate(`JSON.stringify({
+            title: document.title,
+            sideInputs: document.querySelectorAll('#side input').length,
+            allInputs: document.querySelectorAll('input').length,
+            sideTextboxes: document.querySelectorAll('#side [role="textbox"]').length,
+            side: !!document.querySelector('#side'),
+          })`)
+          .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
         const dump = await page
           .evaluate(`(() => {
             const out = [];
@@ -731,11 +743,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             }
             return JSON.stringify(out, null, 1);
           })`)
-          .catch((e) => JSON.stringify({ erro: String(e).slice(0, 200) }));
+          .catch((e) => 'EVAL_ERRO:' + String(e).slice(0, 150));
         try {
           mkdirSync(this.config.evidenceDir, { recursive: true });
           const dumpPath = join(this.config.evidenceDir, `openchat-busca-dump-${Date.now()}.json`);
-          writeFileSync(dumpPath, String(dump), 'utf8');
+          writeFileSync(dumpPath, JSON.stringify({ probe: String(probe), dump: String(dump) }, null, 1), 'utf8');
           this.config.log?.warn({ dumpPath }, 'openChat: leitura não bateu — dump dos candidatos em arquivo');
         } catch {
           this.config.log?.warn({}, 'openChat: leitura não bateu (falhou até gravar o dump)');
