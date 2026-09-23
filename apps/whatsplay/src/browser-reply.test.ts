@@ -33,7 +33,7 @@ function fakeLocator(state: FakeState, log: (s: string) => void) {
       return self;
     },
     async evaluate(fn: unknown) {
-      if (typeof fn === 'function') (fn as (b: unknown) => void)({});
+      if (typeof fn === 'function') (fn as (b: unknown) => void)({ focus() {}, click() {} });
       return undefined;
     },
     async waitFor() {

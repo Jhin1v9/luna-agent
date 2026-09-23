@@ -1074,12 +1074,15 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await ctxBtn.click({ force: true });
       });
       await page.waitForTimeout(300 + Math.floor(Math.random() * 200));
-      // 3. Confirmar que o menu abriu. ⚠️ Ao vivo 2026-09-23: o CONTAINER do
-      //    menu nesta versão NÃO tem role="menu" (só os itens têm
-      //    role="menuitem") — checar div[role="menu"] dava falso "não abriu"
-      //    com o menu visível na screenshot (evidência citacao-menu-nao-abriu).
+      // 3. Confirmar que o menu abriu.
+      //    ⚠️ CAUSA RAIZ 2026-09-23 (repro tmp-repro2): o waitFor É STRICT —
+      //    com 11 itens role=menuitem visíveis, locator.waitFor() lançava
+      //    'strict mode violation' e o .catch(() => false) engolia, mentindo
+      //    'menu não abriu' com o menu ABERTO na screenshot. .first() resolve.
+      //    ⚠️ container do menu NÃO tem role="menu" nesta versão — só itens.
       const menuOpened = await page
         .locator('[role="menuitem"]:visible')
+        .first()
         .waitFor({ state: 'visible', timeout: 2_500 })
         .then(() => true)
         .catch(() => false);
@@ -1088,12 +1091,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         throw new Error(`citação: cliquei no chevron mas o menu de contexto não abriu (nenhum menuitem visível). Evidência: ${ev.screenshotPath}`);
       }
       // 3b. Selecionar "Responder" por TECLADO (sugestão do owner 2026-09-23):
-      //     "Responder" é SEMPRE o primeiro item do menu, em qualquer idioma —
-      //     seta pra baixo + enter é mais preciso que casar texto (i18n) e
-      //     evita confusão com "Responder en privado". A confirmação real vem
-      //     do passo 4: se o preview não anexar, falha explícita (nunca órfã).
-      await page.keyboard.press('ArrowDown');
-      await page.waitForTimeout(200 + Math.floor(Math.random() * 150));
+      //     "Responder" é SEMPRE o primeiro item, em qualquer idioma. NÃO usar
+      //     ArrowDown: o 1º item já abre com tabindex=0 (focado) — seta pra
+      //     baixo moveria o foco pro 2º item ("Responder en privado") e Enter
+      //     responderia NO PRIVADO (violação de guardrail). Foco programático
+      //     no 1º item + Enter = determinístico e i18n-free. A confirmação
+      //     real vem do passo 4: se o preview não anexar/referenciar a query,
+      //     falha explícita (nunca órfã, nunca msg errada).
+      const firstItem = page.locator('[role="menuitem"]:visible').first();
+      await firstItem.evaluate((b) => (b as HTMLElement).focus());
+      await page.waitForTimeout(150 + Math.floor(Math.random() * 150));
       await page.keyboard.press('Enter');
       await page.waitForTimeout(400);
       // 4. A citação TEM que estar anexada E referenciar A MENSAGEM CERTA —
