@@ -56,9 +56,9 @@ describe('skill layer (PLANO-SKILLS.md §2)', () => {
 
   it('chat.send resolve alvo pelo ContactMap (número mapeado = determinístico)', async () => {
     const m = makeMock();
-    const map: Record<string, ContactRef> = { Superclim: { name: 'Superclim', phone: '+34 600 00 00 00' } };
+    const map: Record<string, ContactRef> = { 'Jordi Local Superclim': { name: 'Jordi Local Superclim', phone: '+34 600 00 00 00' } };
     const s = createWhatsAppSkills({ transport: m.transport, resolveContact: async (n) => map[n] ?? null });
-    await s['chat.send']('Superclim', 'oi');
+    await s['chat.send']('Jordi Local Superclim', 'oi');
     expect(m.lastSend?.target).toBe('+34 600 00 00 00');
   });
 
@@ -161,11 +161,11 @@ describe('skill layer (PLANO-SKILLS.md §2)', () => {
     const m = makeMock();
     const withMap = createWhatsAppSkills({
       transport: m.transport,
-      resolveContact: async (n) => (n === 'Pai' ? { name: 'Pai', phone: '+34 697 64 81 13' } : null),
+      resolveContact: async (n) => (n === 'Fernanda 😎' ? { name: 'Fernanda 😎', phone: '+34 697 64 81 13' } : null),
     });
-    expect(await withMap['contact.find']('Pai')).toEqual({ name: 'Pai', phone: '+34 697 64 81 13' });
+    expect(await withMap['contact.find']('Fernanda 😎')).toEqual({ name: 'Fernanda 😎', phone: '+34 697 64 81 13' });
     expect(await withMap['contact.find']('desconhecido')).toBeNull();
     const noMap = createWhatsAppSkills({ transport: m.transport });
-    expect(await noMap['contact.find']('Pai')).toBeNull();
+    expect(await noMap['contact.find']('Fernanda 😎')).toBeNull();
   });
 });

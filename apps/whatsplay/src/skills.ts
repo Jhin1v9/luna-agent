@@ -6,6 +6,7 @@ import type {
   WhatsAppTransport,
 } from './transport.js';
 import { extractMention } from './rules.js';
+import { normalizeSpelling, resolveDono } from './owners.js';
 
 /**
  * SKILL LAYER (PLANO-SKILLS.md, docs/) — camada de ação da Luna.
@@ -79,18 +80,24 @@ export function createWhatsAppSkills(deps: SkillsDeps): WhatsAppSkills {
 
   /** Resolve o alvo pelo ContactMap quando possível — busca por número
    *  mapeada é determinística; sem mapeamento, cai no nome (comportamento
-   *  atual). */
+   *  atual). DONOS passam pela normalização de apelidos antes (owners.ts):
+   *  "pai"/"noke"/"superclim" viram o canônico e o número vem do ContactMap. */
   async function resolveTarget(target: string): Promise<string> {
-    if (!resolveContact) return target;
-    const ref = await resolveContact(target).catch(() => null);
+    const dono = resolveDono(target);
+    const lookup = dono ? dono.canonical : target;
+    if (dono && normalizeSpelling(lookup) !== normalizeSpelling(target)) {
+      deps.log?.info({ grafia: target, canonical: dono.canonical }, 'skill: apelido de dono normalizado');
+    }
+    if (!resolveContact) return dono?.phone ?? target;
+    const ref = await resolveContact(lookup).catch(() => null);
     if (ref?.phone) {
-      deps.log?.info({ name: target, phone: ref.phone }, 'skill: alvo resolvido pelo ContactMap');
+      deps.log?.info({ name: lookup, phone: ref.phone }, 'skill: alvo resolvido pelo ContactMap');
       return ref.phone;
     }
     if (ref && !ref.phone) {
-      deps.log?.warn({ name: target }, 'skill: contato mapeado SEM número — usando nome (busca por nome)');
+      deps.log?.warn({ name: lookup }, 'skill: contato mapeado SEM número — usando nome (busca por nome)');
     }
-    return target;
+    return dono?.phone ?? target;
   }
 
   return {
@@ -154,8 +161,14 @@ export function createWhatsAppSkills(deps: SkillsDeps): WhatsAppSkills {
     },
 
     'contact.find': async (name) => {
-      if (!resolveContact) return null;
-      return resolveContact(name).catch(() => null);
+      const dono = resolveDono(name);
+      const lookup = dono ? dono.canonical : name;
+      if (!resolveContact) return dono ? { name: dono.canonical, phone: dono.phone } : null;
+      const ref = await resolveContact(lookup).catch(() => null);
+      // dono sem linha no ContactMap ainda devolve o registro canônico
+      // (número vem do DONOS — decreto owner, não de scraping).
+      if (ref) return ref;
+      return dono ? { name: dono.canonical, phone: dono.phone } : null;
     },
   };
 }
