@@ -414,7 +414,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     // agora cobre os MESMOS casamentos do clique + fallback genérico.
     const v = await page
       .evaluate(`(() => {
-        const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
+        // offsetParent === null para elementos position:fixed/sticky (header do
+        // WA 2026 é sticky) — o check antigo marcava o input VISÍVEL como
+        // invisível e a leitura voltava null com o termo na tela (2ª evidência
+        // 22:36). Visibilidade real = rect não-nulo + display/visibility.
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
         const sels = [
           '#side [data-testid="chat-list-search-container"] input',
           '#side input[aria-label*="Buscar" i]',
