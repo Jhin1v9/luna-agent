@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest';
+import pino from 'pino';
+import { CallConductor, parseDecision } from './call-conductor.js';
+
+/**
+ * CALL CONDUCTOR (ADR-037): Kimi Live maestra — lê turnos, decide say/act/hold.
+ */
+
+const log = pino({ level: 'silent' });
+
+function fakeTab(turnsQueue: Array<Array<{ role: string; text: string }>>) {
+  const page: { calls: number; evaluate: () => Promise<unknown> } = {
+    calls: 0,
+    async evaluate() {
+      page.calls++;
+      return turnsQueue.shift() ?? [];
+    },
+  };
+  return page as never;
+}
+
+function fakeOperator() {
+  const sent: string[] = [];
+  return {
+    sent,
+    async sendText(_p: unknown, t: string) {
+      sent.push(t);
+    },
+  };
+}
+
+function fakeLive(replies: string[]) {
+  const prompts: string[] = [];
+  let n = 0;
+  return {
+    prompts,
+    async sendTurn(req: { prompt: string }) {
+      prompts.push(req.prompt);
+      return { reply_text: replies[Math.min(n++, replies.length - 1)]!, session_id: 's', duration_ms: 1 };
+    },
+  };
+}
+
+const brief = {
+  participantes: ['Pai', 'Abner (dono)'],
+  objetivo: 'Pedir pro Abner retornar a ligação da Jess',
+  poderes: ['escrever no chat do Operador', 'agir no WhatsApp', 'escalar'],
+  tom: 'parceira de time, direta',
+};
+
+describe('parseDecision (tolerante)', () => {
+  it('say/act/hold + fallback texto cru', () => {
+    expect(parseDecision('{"action":"say","text":"fala isso"}')).toEqual({ kind: 'say', text: 'fala isso' });
+    expect(parseDecision('{"action":"act","name":"wa_msg","detail":"manda msg"}')).toEqual({ kind: 'act', name: 'wa_msg', detail: 'manda msg' });
+    expect(parseDecision('{"action":"hold"}')).toEqual({ kind: 'hold' });
+    expect(parseDecision('texto sem json nenhum')).toEqual({ kind: 'say', text: 'texto sem json nenhum' });
+  });
+});
+
+describe('CallConductor loop', () => {
+  it('turno do participante → Kimi decide say → texto digitado no chat do Operador + audit', async () => {
+    const tab = fakeTab([[{ role: 'user', text: 'quem é a cliente?' }]]);
+    const op = fakeOperator();
+    const live = fakeLive(['{"action":"say","text":"É a Jess — ela quer falar contigo direto."}']);
+    const audits: string[] = [];
+    const c = new CallConductor({
+      operator: op as never,
+      live: live as never,
+      log,
+      pollMs: 50,
+      pool: { query: async (sql: string, params?: unknown[]) => { audits.push(String(params?.[0])); return { rowCount: 1 }; } },
+      correlationId: 'corr-teste',
+    });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 400));
+    h.stop();
+    expect(live.prompts[0]).toContain('quem é a cliente?');
+    expect(live.prompts[0]).toContain('Jess');
+    expect(op.sent).toEqual(['É a Jess — ela quer falar contigo direto.']);
+    expect(audits).toContain('conductor.say');
+  });
+
+  it('ação → executeAction com evidência + audit; Kimi caindo degrada SEM derrubar o loop', async () => {
+    const tab = fakeTab([
+      [{ role: 'user', text: 'manda msg pra Jess' }],
+      [{ role: 'user', text: 'e aí?' }],
+    ]);
+    const op = fakeOperator();
+    let n = 0;
+    const live = {
+      async sendTurn() {
+        n++;
+        if (n === 1) return { reply_text: '{"action":"act","name":"wa_msg","detail":"Jess: retorna ligação"}', session_id: 's', duration_ms: 1 };
+        throw new Error('kimi-cli: exit 1');
+      },
+    };
+    const actions: string[] = [];
+    const c = new CallConductor({
+      operator: op as never,
+      live: live as never,
+      log,
+      pollMs: 50,
+      executeAction: async (name, detail) => {
+        actions.push(name + ':' + detail);
+        return 'msg enfileirada com sucesso';
+      },
+    });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 500));
+    h.stop();
+    expect(actions[0]).toContain('wa_msg');
+    expect(op.sent).toContain('msg enfileirada com sucesso'); // evidência vira fala
+    // Kimi caiu no 2º turno — o loop sobreviveu (sem exceção)
+    expect(op.sent.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('cursor: turnos já lidos NÃO reprocessam', async () => {
+    const tab = fakeTab([[{ role: 'user', text: 'oi' }]]);
+    const live = fakeLive(['{"action":"hold"}']);
+    const op = fakeOperator();
+    const c = new CallConductor({ operator: op as never, live: live as never, log, pollMs: 60 });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 600));
+    h.stop();
+    expect(live.prompts.length).toBe(1); // 1 turno só, lido 1x
+  });
+});
