@@ -126,7 +126,7 @@ export class OperatorSession {
         // (UI PT + ES — sessão do owner caiu em espanhol e "Finalizar Voz"
         // escapava de todos os padrões, travando o pré-voo das chamadas)
         const voiceButtons = Array.from(document.querySelectorAll('button')).some((b) =>
-          visible(b) && /encerrar voz|finalizar voz|terminar voz|desativar microfone|end voice|stop voice|mute microphone|desativar voz/i.test(b.getAttribute('aria-label') || ''));
+          visible(b) && /encerrar voz|finalizar voz|terminar voz|desativar microfone|desactivar micrófono|configuraci.n de voz|end voice|stop voice|mute microphone|desativar voz/i.test(b.getAttribute('aria-label') || ''));
         if (voiceButtons) return true;
         return false;
       })()`)
@@ -181,8 +181,7 @@ export class OperatorSession {
         continue;
       }
       this.say(`cliquei no ícone de voz (${sel}) — verificando`);
-      await page.waitForTimeout(1_800);
-      if (await this.isVoiceModeActive(page)) {
+      if (await this.waitVoiceModeActive(page, 12_000)) {
         this.say('voice mode ativo ✅');
         return;
       }
@@ -200,13 +199,25 @@ export class OperatorSession {
       })()`)
       .catch(() => false);
     if (fallback === true) {
-      await page.waitForTimeout(1_800);
-      if (await this.isVoiceModeActive(page)) {
+      if (await this.waitVoiceModeActive(page, 12_000)) {
         this.say('voice mode ativo ✅ (fallback posicional)');
         return;
       }
     }
     throw new Error('não consegui entrar em modo de voz no ChatGPT — NÃO vou discar (operador não conseguiria falar)');
+  }
+
+  /** Poll de ativação do modo voz: a UI demora 3-8s pra montar (cria a
+   *  conversa, conecta na sessão de voz) — checar uma vez após 1.8s era
+   *  cedo demais e abortava chamadas que ESTAVAM ativando (bug ao vivo
+   *  2026-09-23: o clique funcionou, o aborto deixou a voz ligada). */
+  private async waitVoiceModeActive(page: import('playwright-core').Page, timeoutMs: number): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (await this.isVoiceModeActive(page)) return true;
+      await page.waitForTimeout(1_500);
+    }
+    return false;
   }
 
   /** Best-effort: lê a última resposta do assistente na página. */
