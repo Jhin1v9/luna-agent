@@ -637,7 +637,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             return h ? (h.textContent || '').replace(/[^0-9]/g, '') : '';
           }`, null)
           .catch(() => '');
-        return typeof hdr === 'string' && hdr.includes(searchKey.replace(/[^0-9]/g, ''));
+        if (typeof hdr === 'string' && hdr.includes(searchKey.replace(/[^0-9]/g, ''))) return true;
+        // CONTATO SALVO (WA 2026, evidência 23:00): o header mostra o NOME
+        // salvo ("Abner"), não o número — a checagem de dígitos nunca casava
+        // e TODO openChat por jid de contato salvo falhava. A busca por
+        // número é única (o 1º resultado é sempre esse contato), então um
+        // painel 1:1 aberto com título é aceito — desde que NÃO seja grupo
+        // (a seção "Grupos en común" também rende rows clicáveis). Título
+        // visto vai pro log pra auditoria do chat aberto.
+        if (await this.currentChatIsGroup()) return false;
+        this.config.log?.info({ titulo_visto: title }, 'openChat jid: header sem dígitos — aceitando painel de contato salvo (busca por número é única)');
+        return true;
       }
       // O header do WA Web (153) devolve o título SEM os emoji ("Production
       // - 2026") enquanto a row da lista tem o title completo ("🏆Production
