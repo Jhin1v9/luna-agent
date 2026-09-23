@@ -57,4 +57,16 @@ export interface WhatsAppTransport {
   sendMedia?(chatId: string, mediaPath: string, caption?: string): Promise<string>;
   /** Chat aberto no momento é grupo? (best-effort, v0 — sweep de teste). */
   currentChatIsGroup?(): Promise<boolean>;
+  /** 🆕 LUPA (PLANO-SKILLS): busca dentro do chat aberto. Abre o chat, clica a
+   *  lupa do cabeçalho, digita a query e conta as marcações de resultado.
+   *  Não envia nada — só localiza. */
+  searchInChat?(chatId: string, query: string): Promise<ChatSearchResult>;
+}
+
+/** 🆕 Resultado da lupa (busca dentro do chat). */
+export interface ChatSearchResult {
+  /** Achou pelo menos uma mensagem com a query. */
+  found: boolean;
+  /** Quantas marcações de resultado o painel mostrou (0 = nada achado). */
+  resultCount: number;
 }

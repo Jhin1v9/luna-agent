@@ -32,6 +32,16 @@ export const SELECTORS = {
   chatTitle: '[data-testid="conversation-info-header-chat-title"], header span[title]',
   /** Marcador de grupo (header de grupo tem "Você" / participants info). */
   groupHeader: '[data-testid="conversation-info-header"]',
+  /** 🆕 LUPA (PLANO-SKILLS): botão de busca DENTRO do chat (cabeçalho #main).
+   *  WA Web muda o aria-label por idioma (Search/Pesquisar/Buscar) — casamos
+   *  os três, case-insensitive, restrito ao header da conversa aberta. */
+  inChatSearchButton:
+    '#main header button[aria-label*="Search" i], #main header button[aria-label*="Pesquisar" i], #main header button[aria-label*="Buscar" i]',
+  /** 🆕 LUPA: campo de busca que abre no topo do painel da conversa. */
+  inChatSearchInput:
+    '#main [data-testid="search-input"] input, #main [data-testid="search-input"], #main input[placeholder*="Search" i], #main input[placeholder*="Pesquisar" i], #main input[placeholder*="Buscar" i]',
+  /** 🆕 LUPA: marcações de texto que casaram com a busca (resultados). */
+  searchHighlight: '.matched-text, span[class*="highlight" i], [data-testid="search-message-highlight"]',
 } as const;
 
 export type SelectorKey = keyof typeof SELECTORS;

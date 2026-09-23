@@ -17,6 +17,7 @@ import {
 } from './page-scripts.js';
 import { detectStateFromProbes, type StateProbes } from './state.js';
 import type {
+  ChatSearchResult,
   ConversationMessage,
   SessionState,
   TransportStatus,
@@ -393,12 +394,17 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   /** Valor VISÍVEL atual do campo de busca (null = não achado). */
   private async searchFieldValue(page: Page): Promise<string | null> {
+    // WA Web 2026-09-23: o campo de busca virou <input> dentro de
+    // chat-list-search-container (era contenteditable) — texto agora mora
+    // em .value, não em textContent. Lê os dois.
     const v = await page
       .evaluate(`(() => {
-        const boxes = document.querySelectorAll('#side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]');
+        const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
+        const boxes = document.querySelectorAll('#side [data-testid="chat-list-search-container"] input, #side [data-testid="chat-list-search"], #side [role="textbox"], #side div[contenteditable="true"]');
         for (const b of boxes) {
-          if (b.offsetParent === null) continue;
-          return (b.textContent || '').trim();
+          if (!visible(b)) continue;
+          const val = b.value !== undefined ? b.value : (b.textContent || '');
+          return val.trim();
         }
         return null;
       })`)
@@ -614,7 +620,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     // engolido pelo catch) e a digitação ia pra lugar nenhum (evidência
     // repair-*.png 11:16: busca vazia com página saudável).
     const search = page
-      .locator('#side [data-testid="chat-list-search"]:visible, #side [role="textbox"]:visible, #side div[contenteditable="true"]:visible')
+      .locator('#side [data-testid="chat-list-search-container"] input:visible, #side input[aria-label*="Buscar" i]:visible, #side [data-testid="chat-list-search"]:visible, #side [role="textbox"]:visible, #side div[contenteditable="true"]:visible')
       .first();
     if ((await search.count()) > 0) {
       // INVARIANTE: NUNCA digitar com painel aberto — se um chat abriu no
@@ -920,6 +926,70 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       })()`)
       .then((r) => r === true)
       .catch(() => false);
+  }
+
+  /**
+   * 🆕 LUPA (PLANO-SKILLS): busca dentro do chat. Abre o chat, clica a lupa do
+   * cabeçalho, digita a query e conta as marcações de resultado. NÃO envia
+   * nada — só localiza a mensagem (base da skill message.find e da
+   * mention.respond v2 com citação). Se a UI não bater com os seletores,
+   * captura evidência e falha explícita (seletor vai pro selector memory).
+   */
+  async searchInChat(chatId: string, query: string): Promise<ChatSearchResult> {
+    const page = this.requirePage();
+    const guard = this.panelGuard;
+    if (!(await this.isPageHealthy())) await this.ensurePageHealthy();
+    await guard?.beginCycle('searchInChat');
+    try {
+      if (!(await this.openChat(chatId))) {
+        throw new Error(`lupa: não consegui abrir o chat '${chatId}' — busca abortada`);
+      }
+      // 1. Lupa do cabeçalho (#main header) — aria-label muda por idioma.
+      const lupa = page.locator(SELECTORS.inChatSearchButton).first();
+      if ((await lupa.count().catch(() => 0)) === 0) {
+        const ev = await this.captureEvidence('lupa-botao-nao-achado');
+        throw new Error(
+          `lupa: botão de busca no cabeçalho não achado (seletores: ${SELECTORS.inChatSearchButton}) — evidência: ${ev.screenshotPath}`,
+        );
+      }
+      await lupa.click();
+      await page.waitForTimeout(400 + Math.floor(Math.random() * 300));
+      // 2. Campo de busca que abre no topo do painel.
+      const campo = page.locator(SELECTORS.inChatSearchInput).first();
+      if ((await campo.count().catch(() => 0)) === 0) {
+        const ev = await this.captureEvidence('lupa-campo-nao-achado');
+        throw new Error(
+          `lupa: campo de busca do painel não achado (seletores: ${SELECTORS.inChatSearchInput}) — evidência: ${ev.screenshotPath}`,
+        );
+      }
+      await campo.click();
+      await page.keyboard.type(query, { delay: 25 + Math.floor(Math.random() * 40) });
+      // 3. WA demora a marcar os resultados no histórico.
+      await page.waitForTimeout(1_200 + Math.floor(Math.random() * 600));
+      const resultCount = await page
+        .evaluate(`(() => {
+          const marks = document.querySelectorAll(${JSON.stringify(SELECTORS.searchHighlight)});
+          let visiveis = 0;
+          for (const m of marks) {
+            if (m.offsetParent !== null || m.getClientRects().length > 0) visiveis++;
+          }
+          return visiveis;
+        })()`)
+        .then((r) => Number(r) || 0)
+        .catch(() => 0);
+      // 4. Fecha a lupa (Escape) — painel volta ao chat normal.
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      this.lastHeartbeatAt = new Date();
+      return { found: resultCount > 0, resultCount };
+    } finally {
+      try {
+        await this.closeCurrentChat(); // decreto: nunca deixar aberto
+        await guard?.endCycle('searchInChat');
+      } catch {
+        /* PanelStuckError já reportou via onStuck */
+      }
+    }
   }
 
   /** Evidência para auto-reparo (§14/F1.5): screenshot + DOM simplificado. */
