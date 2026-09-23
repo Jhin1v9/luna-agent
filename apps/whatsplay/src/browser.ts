@@ -643,24 +643,31 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       await page.keyboard.press('Control+a').catch(() => {});
       await page.keyboard.press('Backspace').catch(() => {});
       await page.waitForTimeout(300);
-      // Digita o termo INTEIRO de uma vez; o WA pode re-renderizar o campo
-      // e truncar — a conferência pega, limpa e REPETE mais devagar. Sem
-      // re-click por bloco (o re-click abria resultados no meio da digitação).
+      // WA 2026: o campo de busca é um <input> CONTROLADO pelo React — teclas
+      // individuais (keyboard.type) disparam re-render no meio da digitação e
+      // o campo RESETA, truncando o termo (bug ao vivo 2026-09-23 22:19: "ele
+      // digita meu número e tira, digita e tira"; log: obtido: null 8x seguidas).
+      // insertText injeta o termo INTEIRO num único evento de input — sem
+      // janela de re-render no meio. Passo a passo conferido (decreto owner):
+      // campo limpo → injeta → LÊ o valor de volta → só continua se bater.
       let typed: string | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         if (!(await noPanel())) {
           await page.keyboard.press('Escape').catch(() => {});
           await page.waitForTimeout(400);
           await search.click({ timeout: 1_500 }).catch(() => {});
         }
-        await page.keyboard.type(searchKey, { delay: attempt === 0 ? 40 : 90 });
+        await page.keyboard.press('Control+a').catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.waitForTimeout(250);
+        await page.keyboard.insertText(searchKey);
         await page.waitForTimeout(600);
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
-        this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca truncada pelo WA — limpando e tentando mais devagar');
-        await page.keyboard.press('Control+a').catch(() => {});
-        await page.keyboard.press('Backspace').catch(() => {});
-        await page.waitForTimeout(400);
+        this.config.log?.debug({ tentativa: attempt + 1, obtido: typed }, 'busca não bateu após insertText — limpando e repetindo');
+        // evidência visual pro diagnóstico (print → LLM averigua onde clicar)
+        const ev = await this.captureEvidence(`openchat-busca-t${attempt + 1}`).catch(() => null);
+        if (ev) this.config.log?.debug({ shot: ev.screenshotPath }, 'evidência da busca truncada capturada');
       }
       if (typed !== null && typed !== searchKey) {
         this.config.log?.warn({ esperado: searchKey, obtido: typed }, 'busca truncada pelo WA — limpando pra retry');
