@@ -52,19 +52,31 @@ export class OperatorSession {
     return this.browser !== null;
   }
 
-  /** Garante uma aba do chatgpt.com aberta (reusa existente). */
+  /**
+   * Garante uma aba do chatgpt.com aberta (reusa existente) E a ancora no
+   * chat FIXO do Operador (OPERATOR_CHAT_URL no .env — decreto owner 2026-
+   * 09-23: sempre o MESMO chat pra o ChatGPT manter o contexto acumulado da
+   * Luna entre chamadas, nunca conversa nova por chamada). Se a aba estiver
+   * em outra conversa, navega pro chat fixo antes de qualquer ação.
+   */
   async ensureChatGptTab(): Promise<import('playwright-core').Page | null> {
     if (!this.browser) return null;
     const ctx = this.browser.contexts()[0];
+    const fixedUrl = process.env.OPERATOR_CHAT_URL?.trim();
     const page = ctx?.pages().find((p) => p.url().includes('chatgpt.com'));
     if (page) {
-      this.say('aba do ChatGPT já está aberta — reutilizo');
+      if (fixedUrl && !page.url().includes(fixedUrl.replace(/^https?:\/\//, ''))) {
+        this.say(`aba do ChatGPT fora do chat fixo do Operador — navegando p/ ${fixedUrl}`);
+        await page.goto(fixedUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+      } else {
+        this.say(fixedUrl ? 'aba do ChatGPT já está no chat fixo do Operador ✅' : 'aba do ChatGPT já está aberta — reutilizo');
+      }
       return page;
     }
     this.say('aba do ChatGPT não existe — abrindo uma nova');
     const p = await ctx?.newPage().catch(() => null);
     if (!p) return null;
-    await p.goto('https://chatgpt.com', { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+    await p.goto(fixedUrl ?? 'https://chatgpt.com', { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     return p;
   }
 
