@@ -142,6 +142,23 @@ export class OperatorSession {
       this.say('voice mode já está ativo ✅ — não clico de novo');
       return;
     }
+    // 🆕 2026-09-23 (bug ao vivo, 3ª tentativa de chamada): com RASCUNHO no
+    // composer, o botão azul vira "Enviar prompt" e o "Iniciar Voz" (ES:
+    // 'Iniciar Voz' — o botão de ondas à direita do composer) NÃO EXISTE no
+    // DOM. O rascunho de uma sessão anterior travava o pré-voo inteiro.
+    // O prompt do Operador é injetado DEPOIS (ordem do pré-voo), então
+    // limpar o composer aqui é seguro.
+    await page
+      .locator('#prompt-textarea')
+      .first()
+      .click({ timeout: 2_000 })
+      .then(async () => {
+        await page.keyboard.press('Control+a');
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(600);
+        this.say('composer limpo (rascunho anterior descartado) — procurando o botão de voz');
+      })
+      .catch(() => this.say('composer não focável — seguindo pro scan dos seletores'));
     this.say('voice mode INATIVO — clicando no ícone de voz (lado direito do composer)');
     const candidates = [
       'button[data-testid="voice-mode-entry-button"]',
@@ -149,6 +166,8 @@ export class OperatorSession {
       'button[aria-label*="modo de voz" i]',
       'button[aria-label*="voice mode" i]',
       'button[aria-label*="Iniciar voz" i]',
+      'button[aria-label="Iniciar Voz"]', // ES exato (sessão do owner cai em espanhol)
+      'button[aria-label*="Comenzar voz" i]',
     ];
     for (const sel of candidates) {
       const ok = await page
