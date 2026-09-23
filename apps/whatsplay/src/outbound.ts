@@ -39,6 +39,10 @@ interface OutboundMessageRow {
   address: string | null;
   contact_name: string | null;
   correlation_id: string | null;
+  /** 🆕 CITAÇÃO (mention.respond v2): trecho da mensagem a citar — quando
+   *  presente, a entrega usa replyToMessage (citação visual) em vez de
+   *  sendMessage comum. Falha da citação NUNCA degrada pra envio órfão. */
+  reply_to_query: string | null;
 }
 
 export function createOutboundListener(deps: OutboundDeps) {
@@ -129,7 +133,8 @@ export function createOutboundListener(deps: OutboundDeps) {
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
       `SELECT m.id, m.body, m.conversation_id, ct.address, ct.name AS contact_name,
-              m.metadata->>'correlation_id' AS correlation_id
+              m.metadata->>'correlation_id' AS correlation_id,
+              m.metadata->>'reply_to_query' AS reply_to_query
        FROM messages m
        JOIN conversations cv ON cv.id = m.conversation_id
        LEFT JOIN contacts ct ON ct.id = cv.contact_id
@@ -193,9 +198,17 @@ export function createOutboundListener(deps: OutboundDeps) {
         // cru ({"type":"ANSWER","text":"..."}), desembrulha antes de
         // sanitizar — a fila envenenada se autocura no reenvio.
         const raw = extractAnswerEnvelopeText(row.body) ?? row.body;
+        const texto = sanitizeOutboundText(raw);
+        // 🆕 CITAÇÃO: metadata reply_to_query → responde A mensagem citada
+        // (mention.respond v2). Falha explícita dentro de replyToMessage —
+        // nunca degrada pra envio sem citação.
+        if (row.reply_to_query && transport.replyToMessage) {
+          deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60) }, 'entrega com CITAÇÃO (reply_to_query)');
+          return transport.replyToMessage(target, row.reply_to_query, texto);
+        }
         return transport.sendMessage(
           target,
-          sanitizeOutboundText(raw),
+          texto,
           opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
         );
       };
