@@ -49,6 +49,30 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Singleton (2026-09-24): quando DUAS instâncias do daemon rodavam juntas,
+  // cada relaunch de uma fechava a aba da outra (ping-pong de abas a cada
+  // 15s na tela do operador). Se existe heartbeat VIVO (<45s) de outro pid,
+  // aborta. Heartbeat velho ou pid morto não bloqueia o boot.
+  const hb = await pool.query(
+    `SELECT pid, seen_at FROM service_heartbeats WHERE service = 'whatsplay' ORDER BY seen_at DESC LIMIT 1`,
+  );
+  if (hb.rows[0] && hb.rows[0].pid !== process.pid) {
+    const seenAgoMs = Date.now() - new Date(hb.rows[0].seen_at as string).getTime();
+    let outraViva = false;
+    if (seenAgoMs < 45_000) {
+      try {
+        process.kill(hb.rows[0].pid as number, 0);
+        outraViva = true;
+      } catch {
+        outraViva = false;
+      }
+    }
+    if (outraViva) {
+      log.fatal({ outraInstancia: hb.rows[0].pid }, 'outra instância do whatsplay está viva — abortando (singleton)');
+      process.exit(1);
+    }
+  }
+
   const transport = new WhatsAppWebTransport({
     chromePath: config.WHATSAPP_CHROME_PATH,
     userDataDir,
@@ -308,7 +332,9 @@ async function main(): Promise<void> {
     const st = watchdog.getState();
     if ((st === 'DISCONNECTED' || st === 'FAILED') && status && !status.pageAlive) {
       log.warn('página WhatsApp morta — relançando Chrome dedicado (auto-reparo)');
-      await transport.close().catch(() => {});
+      // keepBrowser=true: NÃO fechar o Chrome — o launch() reconecta e faz a
+      // higiene de abas. Fechar aqui era o que piscava a janela do operador.
+      await transport.close(true).catch(() => {});
       await transport.launch().catch((err) => log.error({ err }, 'relaunch do Chrome falhou'));
     }
   }, 15_000);

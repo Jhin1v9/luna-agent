@@ -79,32 +79,70 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
   async launch(): Promise<void> {
     mkdirSync(this.config.userDataDir, { recursive: true });
-    try {
-      this.ctx = await chromium.launchPersistentContext(this.config.userDataDir, {
-        executablePath: this.config.chromePath,
-        headless: this.config.headless,
-        viewport: { width: 1280, height: 800 },
-        args: ['--disable-blink-features=AutomationControlled', '--no-first-run'],
-      });
-      this.page = this.ctx.pages()[0] ?? (await this.ctx.newPage());
-      await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-      return;
-    } catch {
-      // Chrome 153 (2026-09-22): após atualização automática o processo
-      // delegado sai com exit 21 e o browser fica órfão sem o pipe do
-      // Playwright — launchPersistentContext quebra pra sempre. Fallback:
-      // subir o Chrome nós mesmos com --remote-debugging-port e conectar
-      // por CDP (mesmo perfil, mesma sessão).
+    // MODO PIPE legado (launchPersistentContext): desligado por padrão desde
+    // 2026-09-24 — quando funcionava, o Chrome ficava sem porta de debug e,
+    // ao daemon morrer, órfão segurando o perfil ( singleton fazia o próximo
+    // spawn abrir ABA NOVA nele a cada ciclo = abas se multiplicando). Só
+    // volte com WHATSAPP_PIPE_MODE=true sabendo do risco.
+    if (process.env.WHATSAPP_PIPE_MODE === 'true') {
+      try {
+        this.ctx = await chromium.launchPersistentContext(this.config.userDataDir, {
+          executablePath: this.config.chromePath,
+          headless: this.config.headless,
+          viewport: { width: 1280, height: 800 },
+          args: ['--disable-blink-features=AutomationControlled', '--no-first-run'],
+        });
+        this.page = this.ctx.pages()[0] ?? (await this.ctx.newPage());
+        await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        return;
+      } catch {
+        // Chrome 153 (2026-09-22): após atualização automática o processo
+        // delegado sai com exit 21 e o browser fica órfão sem o pipe do
+        // Playwright — launchPersistentContext quebra pra sempre. Fallback:
+        // subir o Chrome nós mesmos com --remote-debugging-port e conectar
+        // por CDP (mesmo perfil, mesma sessão).
+      }
     }
     const port = Number(process.env.WHATSAPP_CDP_PORT ?? 9333);
     this.cdp = await this.connectOrSpawnCdp(port);
     this.ctx = this.cdp.contexts()[0] ?? (await this.cdp.newContext());
-    this.page =
-      this.ctx.pages().find((p) => p.url().includes('web.whatsapp')) ??
-      this.ctx.pages()[0] ??
-      (await this.ctx.newPage());
-    if (!this.page.url().includes('web.whatsapp.com')) {
-      await this.page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    // Decreto owner 2026-09-24 (screenshot ao vivo: 6+ abas WA empilhadas;
+    // depois: aba atual fechando e reabrindo a cada 15s): SE JÁ EXISTE ABA
+    // WA ABERTA, REUTILIZA — nunca abrir nova só pra fechar a existente.
+    // Fecha apenas as DUPLICATAS além da 1ª; só cria aba quando NÃO há
+    // nenhuma. (Ping-pong anterior: relaunch abria aba nova, fechava a
+    // antiga, o watchdog via a página morta e relançava de novo.)
+    const waPages = this.ctx.pages().filter((p) => p.url().includes('web.whatsapp'));
+    let page: Page;
+    if (waPages.length > 0) {
+      page = waPages[0] as Page;
+      for (const p of waPages.slice(1)) await p.close().catch(() => {});
+      this.config.log?.info(
+        { mantida: 1, fechadas: waPages.length - 1 },
+        'aba WhatsApp existente REUTILIZADA — nenhuma aba nova aberta (decreto owner)',
+      );
+    } else {
+      page = await this.ctx.newPage();
+      await page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
+    }
+    this.page = page;
+    // Tela de conflito de sessão ("WhatsApp está abierto en otra ventana")?
+    // Aparece quando outra aba segurava a sessão. Clica "Usar aquí" pra ESTA
+    // aba assumir — senão fica sem #pane-side e o watchdog reinicia o ciclo.
+    for (let i = 0; i < 4; i++) {
+      const bodyText = await page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
+      if (!/outra janela|otra ventana|another window/i.test(bodyText)) break;
+      const usou = await page
+        .locator('button:has-text("Usar aquí"), button:has-text("Usar aqui"), button:has-text("Use here")')
+        .first()
+        .click({ timeout: 2_500 })
+        .then(() => true)
+        .catch(() => false);
+      if (usou) {
+        this.config.log?.info({}, 'popup de conflito de abas: cliquei "Usar aquí" — sessão assumida nesta aba');
+        break;
+      }
+      await page.waitForTimeout(1_500);
     }
     // Crash do renderer: não mata o daemon — o health loop (index.ts) detecta
     // e recupera via reload.
@@ -136,7 +174,10 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         '--disable-restore-session-state',
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${this.config.userDataDir}`,
-        WA_URL,
+        // 2026-09-24 (decreto owner): NUNCA passar WA_URL aqui — se já
+        // existir Chrome vivo com este perfil (singleton), o spawn delega e
+        // a URL vira ABA NOVA empilhada a cada ciclo de relaunch. A aba é
+        // aberta (e as antigas fechadas) pelo launch(), não pelo spawn.
       ],
       { detached: true, stdio: 'ignore' },
     );
@@ -960,13 +1001,43 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const decline = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
           visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
         if (!accept && !decline) return null;
-        // quem liga: título do header se um chat está aberto, senão o texto do popup
+        // quem liga: título do header se um chat está aberto, senão o texto do
+        // popup — MAS sem os rótulos/ícones dos botões (bug 2026-09-24: o
+        // textContent bruto do popup vinha "ic-call-end-filledRechazaric-call-
+        // filledAceptar" e TODO caller caía como desconhecido → recusa em loop).
         let caller = '';
         const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
         if (titleEl && visible(titleEl)) caller = (titleEl.textContent || '').trim();
         if (!caller) {
-          const popup = accept ? accept.closest('div[class]')?.parentElement : null;
-          caller = popup ? (popup.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) : '';
+          const btn = accept || decline;
+          // sobe até o container do popup: menor ancestral cujo texto tem AMBOS
+          // os rótulos (aceitar + recusar) — assim não pegamos só o <div> do botão.
+          let popup = btn ? btn.parentElement : null;
+          for (let i = 0; i < 10 && popup && popup.parentElement; i++) {
+            const t = popup.textContent || '';
+            if (/aceptar|atender|answer|accept|responder/i.test(t) && /rechazar|recusar|decline|reject|colgar/i.test(t)) break;
+            popup = popup.parentElement;
+          }
+          if (popup) {
+            // só nós de texto FORA de botões: exclui "Aceptar"/"Rechazar" e
+            // textos de ícone (fonte Material: "ic-call-end-filled" etc.).
+            const parts = [];
+            const walker = document.createTreeWalker(popup, NodeFilter.SHOW_TEXT, null);
+            let node;
+            while ((node = walker.nextNode())) {
+              const p = node.parentElement;
+              if (p && p.closest('button, [role="button"]')) continue;
+              const t = (node.textContent || '').trim();
+              if (t) parts.push(t);
+            }
+            caller = parts
+              .join(' ')
+              .replace(/\\bic-[a-z0-9-]+\\b/gi, ' ') // ícones Material ("ic-call-end-filled")
+              .replace(/\\b(aceptar|atender|answer|accept|responder|rechazar|recusar|decline|reject|colgar)\\b/gi, ' ')
+              .replace(/\\s+/g, ' ')
+              .trim()
+              .slice(0, 60);
+          }
         }
         return JSON.stringify({ caller });
       }`,
@@ -1375,18 +1446,33 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return { screenshotPath, domPath };
   }
 
-  async close(): Promise<void> {
+  /** Fecha o transport.
+   *  - keepBrowser=true (relaunch de auto-reparo do wdTimer): NÃO fecha o
+   *    Chrome — só solta as referências. O launch() seguinte reconecta pelo
+   *    CDP e faz a higiene de abas (abre a nova, fecha as antigas). Fechar
+   *    o Chrome aqui era o que fazia a janela piscar "fecha e abre de novo"
+   *    na tela do operador (reclamação owner 2026-09-24 10:50).
+   *  - keepBrowser=false (shutdown): mata só o Chrome que NÓS spawnamos.
+   *    Se conectamos num Chrome já vivo (chromeProc=null — ex.: sobreviveu
+   *    a um restart do daemon), só solta as referências e deixa ele vivo.
+   *    ctx.close()/cdp.close() num browser conectado via CDP fecha a janela
+   *    inteira — nunca fazer isso num Chrome que não é nosso. */
+  async close(keepBrowser = false): Promise<void> {
+    this.page = null;
+    if (keepBrowser || !this.chromeProc) {
+      this.ctx = null;
+      this.cdp = null;
+      return;
+    }
     if (this.ctx) {
       await this.ctx.close().catch(() => {});
       this.ctx = null;
-      this.page = null;
     }
     if (this.cdp) {
       await this.cdp.close().catch(() => {});
       this.cdp = null;
-      this.page = null;
     }
-    if (this.chromeProc && this.chromeProc.pid) {
+    if (this.chromeProc.pid) {
       try {
         process.kill(-this.chromeProc.pid, 'SIGKILL');
       } catch {
@@ -1396,7 +1482,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           /* já morto */
         }
       }
-      this.chromeProc = null;
     }
+    this.chromeProc = null;
   }
 }
