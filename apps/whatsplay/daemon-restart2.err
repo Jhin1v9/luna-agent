@@ -1,0 +1,8 @@
+C:\Users\Abner\Documents\Luna cto\luna-agent\apps\whatsplay\src\voice\incoming-fastpath.ts:103
+      if (!(await operator.connect())) throw new Error('chrome-voice não respondeu');
+                                             ^
+
+Error: chrome-voice não respondeu
+    at <anonymous> (C:\Users\Abner\Documents\Luna cto\luna-agent\apps\whatsplay\src\voice\incoming-fastpath.ts:103:46)
+
+Node.js v24.15.0

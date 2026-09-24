@@ -296,6 +296,7 @@ async function main(): Promise<void> {
       log.info({ order }, 'whatsapp_actions: ordem do Kimi Work');
       if (order.action === 'call.answer') await transport.acceptCall?.();
       else if (order.action === 'call.decline') await transport.declineCall?.();
+      else if (order.action === 'call.end') await (transport as never as { endCall?: () => Promise<void> }).endCall?.();
       else log.warn({ action: order.action }, 'whatsapp_actions: ação desconhecida — ignorada');
     })().catch((err) => log.error({ err }, 'whatsapp_actions: execução falhou'));
   });

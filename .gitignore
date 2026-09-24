@@ -14,3 +14,9 @@ logs-*.log
 
 # Backups locais (Postgres dumps do watchdog §30 — gerados 1x/dia)
 backups/*.dump
+
+# secrets locais de automacao (cookies de sessao, nunca commitar)
+.brain/.cliente_cookie
+.brain/.rel_cookie
+.brain/.vps_cookie
+.brain/.vps_solicitacoes.txt

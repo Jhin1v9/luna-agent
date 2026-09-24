@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   const pack = await buildClientConversationPack(pool, inner.conversation_id);
   const prompt = renderConversationPrompt(pack, inner.text, null);
   const adapter = createAdapter({
-    mode: 'kimi-api',
+    mode: config.KIMI_ADAPTER_MODE,
     apiKey: config.LLM_API_KEY,
     apiBaseUrl: config.LLM_BASE_URL,
     apiModel: config.LLM_MODEL,

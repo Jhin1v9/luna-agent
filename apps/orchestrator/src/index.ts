@@ -135,14 +135,19 @@ async function main(): Promise<void> {
   log.info({ node: process.version, env: config.NODE_ENV }, 'orchestrator starting');
 
   // Contrato §9: validar capability de VISÃO do FAST no boot (auto-reparo §14).
-  probeVisionSupport({
-    mode: 'kimi-api',
-    apiKey: config.LLM_API_KEY,
-    apiBaseUrl: config.LLM_BASE_URL,
-    apiModel: config.LLM_MODEL,
-  })
-    .then((r) => log.info({ vision: r.supported, detail: r.detail }, 'capability visão do FAST (probe)'))
-    .catch((err) => log.error({ err }, 'probe de visão falhou'));
+  // Só faz sentido em modo kimi-api (decreto owner 2026-09-24: modo kimiwork —
+  // zero petição pra API; o probe seria uma chamada direta ao kimi-api fora do
+  // cérebro configurado).
+  if (config.KIMI_ADAPTER_MODE === 'kimi-api') {
+    probeVisionSupport({
+      mode: 'kimi-api',
+      apiKey: config.LLM_API_KEY,
+      apiBaseUrl: config.LLM_BASE_URL,
+      apiModel: config.LLM_MODEL,
+    })
+      .then((r) => log.info({ vision: r.supported, detail: r.detail }, 'capability visão do FAST (probe)'))
+      .catch((err) => log.error({ err }, 'probe de visão falhou'));
+  }
 
   // 1. Pool Postgres
   const pool = getPool(config.DATABASE_URL);

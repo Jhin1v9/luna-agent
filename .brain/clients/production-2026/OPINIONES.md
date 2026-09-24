@@ -971,3 +971,22 @@ Cliente esclareceu a dúvida sobre a inclusão do vídeo no slider da onadance.c
 }
 ```
 
+## 2026-09-24 — Luna
+
+Cliente explicou a tarefa do hero: substituir imagem do slider da onadance.com por vídeo vertical de 41s (mobile-first). Luna registrou com clareza, pediu contexto quando algo não estava claro e confirmou alinhamento com o time técnico. Cliente respondeu com elogio ("Tou adorando em!").
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site da Jess (onadance.com)",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Acompanhar a tarefa do Dashboard: trocar imagem do slider por vídeo vertical de 41s (revisar corte/duração). Cliente aguardando execução pelo time.",
+  "quality_score": 5,
+  "summary": "Cliente explicou a tarefa do hero: substituir imagem do slider da onadance.com por vídeo vertical de 41s (mobile-first). Luna registrou com clareza, pediu contexto quando algo não estava claro e confirmou alinhamento com o time técnico. Cliente respondeu com elogio (\"Tou adorando em!\").",
+  "client_signal": "pedido"
+}
+```
+

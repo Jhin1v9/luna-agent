@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   loadDotEnv();
   const config = loadConfig();
   const adapter = createAdapter({
-    mode: 'kimi-api',
+    mode: config.KIMI_ADAPTER_MODE,
     apiKey: config.LLM_API_KEY,
     apiBaseUrl: config.LLM_BASE_URL,
     apiModel: config.LLM_MODEL,

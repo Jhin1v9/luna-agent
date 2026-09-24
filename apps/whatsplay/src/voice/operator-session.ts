@@ -41,15 +41,76 @@ export class OperatorSession {
     this.log?.info(extra ?? {}, `operator: ${msg}`);
   }
 
-  /** Conecta no chrome-voice via CDP. */
+  /** Conecta no chrome-voice via CDP. Se não estiver no ar, SOBE (decreto
+   *  owner 2026-09-24: a skill de voz é completa ou quebra — atender a
+   *  chamada sem o Operador não adianta). Spawn headed com o perfil
+   *  ~/.luna/chrome-voice (login do ChatGPT persiste nele) e CDP :9340,
+   *  igual ao connectOrSpawnCdp do transport do WhatsApp. Sessão de login
+   *  expirada = o owner verá a tela de login no Chrome que abrir (explícito). */
   async connect(): Promise<boolean> {
     const { chromium } = await import('playwright-core');
+    this.browser = await chromium.connectOverCDP(this.cdpUrl).catch(() => null);
+    if (this.browser) {
+      this.say(`conectei no chrome-voice (${this.cdpUrl})`);
+      return true;
+    }
+    this.say(`chrome-voice não respondeu em ${this.cdpUrl} — subindo o Chrome do Operador (perfil ~/.luna/chrome-voice)`);
+    const spawned = await this.spawnChromeVoice();
+    if (!spawned) {
+      this.log?.warn({ cdpUrl: this.cdpUrl }, 'operator: chrome-voice NÃO subiu — chamada será atendida sem copiloto (explícito)');
+      return false;
+    }
     this.browser = await chromium.connectOverCDP(this.cdpUrl).catch((err) => {
       this.log?.warn({ err: String(err).slice(0, 150) }, `operator: chrome-voice não respondeu em ${this.cdpUrl}`);
       return null;
     });
-    if (this.browser) this.say(`conectei no chrome-voice (${this.cdpUrl})`);
+    if (this.browser) this.say(`conectei no chrome-voice após spawn (${this.cdpUrl})`);
     return this.browser !== null;
+  }
+
+  private chromeVoiceProc: import('child_process').ChildProcess | null = null;
+
+  private async spawnChromeVoice(): Promise<boolean> {
+    const { spawn } = await import('child_process');
+    const os = await import('os');
+    const path = await import('path');
+    const portMatch = this.cdpUrl.match(/:(\d+)/);
+    const port = portMatch ? portMatch[1] : '9340';
+    const chromePath = process.env.WHATSAPP_CHROME_PATH?.trim() || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+    const userDataDir = path.join(os.homedir(), '.luna', 'chrome-voice');
+    try {
+      this.chromeVoiceProc = spawn(
+        chromePath,
+        [
+          '--start-maximized',
+          '--no-sandbox',
+          '--no-first-run',
+          '--disable-session-crashed-bubble',
+          '--hide-crash-restore-bubble',
+          '--disable-restore-session-state',
+          `--remote-debugging-port=${port}`,
+          `--user-data-dir=${userDataDir}`,
+          'https://chatgpt.com',
+        ],
+        { detached: true, stdio: 'ignore' },
+      );
+      this.chromeVoiceProc.unref();
+    } catch (err) {
+      this.log?.warn({ err: String(err).slice(0, 150) }, 'operator: spawn do chrome-voice falhou');
+      return false;
+    }
+    // poll até o CDP responder (Chrome visível abrindo na máquina do owner)
+    const { chromium } = await import('playwright-core');
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const browser = await chromium.connectOverCDP(this.cdpUrl).catch(() => null);
+      if (browser) {
+        await browser.close().catch(() => {}); // reconectamos no connect()
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
+    return false;
   }
 
   /**

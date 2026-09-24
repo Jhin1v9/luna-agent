@@ -149,8 +149,11 @@ async function main(): Promise<void> {
     log.fatal('postgres unreachable at boot');
     process.exit(1);
   }
+  // Self-test com o adapter CONFIGURADO (decreto owner 2026-09-24: modo
+  // kimiwork — nada de kimi-api hardcoded; o teste exercita exatamente o
+  // cérebro em produção).
   const adapter = createAdapter({
-    mode: 'kimi-api',
+    mode: config.KIMI_ADAPTER_MODE,
     apiKey: config.LLM_API_KEY,
     apiBaseUrl: config.LLM_BASE_URL,
     apiModel: config.LLM_MODEL,

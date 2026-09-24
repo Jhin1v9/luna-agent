@@ -80,6 +80,25 @@ describe('fast path de chamada recebida (decreto owner 08:16)', () => {
     expect(sent).toHaveLength(0); // mas o copiloto não finge estar pronto
   });
 
+  it('REGRESSÃO (crash ao vivo 24/09): prep falha ENQUANTO acceptCall ainda não resolveu → chamada atendida, SEM unhandledRejection', async () => {
+    // Cena real da pane: acceptCall demora (~1.5s de clique+espera) e o
+    // chrome-voice (9340) responde ECONNREFUSED em ~40ms — o `prep` rejeitava
+    // sem nenhum handler anexado (o await prep só vinha depois do await
+    // answering) e o Node derrubava o PROCESSO INTEIRO a cada ligação.
+    // Este teste reproduz a janela da corrida: accept lento + connect falha
+    // rápido. Sem o prep.catch() imediato, o vitest captura a rejeição solta.
+    const { deps, accepted } = makeDeps({
+      acceptCall: () => new Promise<void>((r) => setTimeout(() => { accepted.push(Date.now()); r(); }, 120)),
+    });
+    const { op, sent } = makeOperator({ async connect() { return false; } });
+    const r = await fastAnswerIncoming({ ...deps, operator: op }, ['Pai'], { caller: 'Pai', contexto: null });
+    expect(r).toBe('answered');
+    expect(accepted).toHaveLength(1);
+    expect(sent).toHaveLength(0);
+    // deixa o loop de eventos dar uma volta — rejeição solta apareceria agora
+    await new Promise((r2) => setTimeout(r2, 50));
+  });
+
   it('markBusy marca e desmarca ao redor da chamada', async () => {
     const { deps } = makeDeps();
     const { op } = makeOperator();
