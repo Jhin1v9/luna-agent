@@ -933,3 +933,22 @@ Cliente esclareceu a demanda sobre a troca do slider por um vídeo vertical no s
 }
 ```
 
+## 2026-09-24 — Luna
+
+Cliente esclareceu a dúvida sobre a tarefa do slider no site onadance.com (trocar imagem por vídeo vertical de 41s) e elogiou a clareza e empatia do atendimento da Luna.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 5,
+  "summary": "Cliente esclareceu a dúvida sobre a tarefa do slider no site onadance.com (trocar imagem por vídeo vertical de 41s) e elogiou a clareza e empatia do atendimento da Luna.",
+  "client_signal": "elogio"
+}
+```
+

@@ -205,3 +205,9 @@ Build atual do WhatsApp Web, todos confirmados com extração read-only real:
 - item Responder: button[role=menuitem], texto exato "Responder" preferido (regex cairia em "Responder en privado")
 - evidência: inspeção DOM ao vivo via perfil dedicado (tmp-inspect3/4), menu capturado em tmp-inspect3-menu.png
 - fallback visual: screenshot + DOM no incidente
+
+### 2026-09-24 · auto-reparo — autor: Luna
+- uso: sendMessage
+- seletor antigo: (seletor anterior falhou)
+- seletor novo: #pane-side [role="listitem"]
+- fallback visual: screenshot + DOM no incidente
