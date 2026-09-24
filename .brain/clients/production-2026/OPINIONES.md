@@ -952,3 +952,22 @@ Cliente esclareceu a dúvida sobre a tarefa do slider no site onadance.com (troc
 }
 ```
 
+## 2026-09-24 — Luna
+
+Cliente esclareceu a dúvida sobre a inclusão do vídeo no slider da onadance.com e elogiou o atendimento da Luna.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 5,
+  "summary": "Cliente esclareceu a dúvida sobre a inclusão do vídeo no slider da onadance.com e elogiou o atendimento da Luna.",
+  "client_signal": "elogio"
+}
+```
+
