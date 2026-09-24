@@ -148,6 +148,24 @@ describe('CallConductor loop', () => {
     expect(live.prompts[1]).toContain('painel');
     expect(op.sent).toEqual(['Pergunta se é sobre o painel.']); // 1 say só (do 2º turno)
   });
+
+  it('BATCH (decreto owner 14:28 "ao vivo"): vários turnos no MESMO poll viram UM SÓ pedido à Luna', async () => {
+    // Cenário real: a resposta anterior demorou e 3 falas acumularam. Antes do
+    // batch eram 3 roundtrips seriais (3x a latência); agora é 1 só.
+    const tab = fakeTab([[{ role: 'user', text: 'primeira' }, { role: 'user', text: 'segunda' }, { role: 'user', text: 'terceira' }]]);
+    const live = fakeLive(['{"action":"say","text":"Resposta ao estado atual."}']);
+    const op = fakeOperator();
+    const c = new CallConductor({ operator: op as never, live: live as never, log, pollMs: 60 });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 500));
+    h.stop();
+    expect(live.prompts.length).toBe(1); // 3 turnos, 1 pedido só
+    expect(live.prompts[0]).toContain('primeira');
+    expect(live.prompts[0]).toContain('segunda');
+    expect(live.prompts[0]).toContain('terceira');
+    expect(live.prompts[0]).toContain('Novos turnos');
+    expect(op.sent).toEqual(['Resposta ao estado atual.']);
+  });
 });
 
 describe('GUARDA DE ORDEM EXPLÍCITA (decreto owner: nd de agir sozinha)', () => {

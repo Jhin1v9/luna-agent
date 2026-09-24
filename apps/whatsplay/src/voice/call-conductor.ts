@@ -64,7 +64,7 @@ type Decision =
   | { kind: 'act'; name: string; detail: string }
   | { kind: 'hold' };
 
-const DECIDE_PROMPT = (brief: CallBriefConductor, history: string, turno: ConductorTurn): string =>
+const DECIDE_PROMPT = (brief: CallBriefConductor, history: string, turnos: ConductorTurn[]): string =>
   [
     'Você é a KIMI, conductora desta chamada de voz (sistema a trés: WhatsApp ⇄ Luna ⇄ ChatGPT-voz).',
     'O ChatGPT é SÓ A VOZ — nunca decide nada, fala exatamente o que você escrever no chat dele.',
@@ -74,7 +74,14 @@ const DECIDE_PROMPT = (brief: CallBriefConductor, history: string, turno: Conduc
     `Tom: ${brief.tom}.`,
     '',
     history ? `Histórico recente:\n${history}` : '',
-    `Novo turno (quem falou: ${turno.speaker}): "${turno.text}"`,
+    // BATCH (decreto owner 14:28 "ao vivo"): turnos que chegaram enquanto a
+    // resposta anterior era processada viajam NUM SÓ pedido — cada roundtrip
+    // com a Luna custa segundos; serializar falas rapidas empilhava latência.
+    turnos.length === 1
+      ? `Novo turno (quem falou: ${turnos[0]!.speaker}): "${turnos[0]!.text}"`
+      : `Novos turnos (ordem cronológica — responda ao ESTADO ATUAL da conversa):\n${turnos
+          .map((t, i) => `${i + 1}. ${t.speaker}: "${t.text}"`)
+          .join('\n')}`,
     '',
     'Responda APENAS um JSON: {"action":"say","text":"o que o Operador deve falar"} ou',
     '{"action":"act","name":"nome_da_acao","detail":"detalhe"} ou {"action":"hold"}.',
@@ -189,13 +196,17 @@ export class CallConductor {
     const loop = async (): Promise<void> => {
       while (this.running) {
         try {
-          const fresh = [...(await this.readVoiceNew(tab)), ...(await this.readNewTurns(tab))];
-          for (const turno of fresh) {
-            this.history.push(`- ${turno.speaker}: ${turno.text}`.slice(0, 200));
-            if (this.history.length > 12) this.history.shift();
+          const fresh = [...(await this.readVoiceNew(tab)), ...(await this.readNewTurns(tab))].slice(0, 6);
+          if (fresh.length > 0) {
+            for (const turno of fresh) {
+              this.history.push(`- ${turno.speaker}: ${turno.text}`.slice(0, 200));
+              if (this.history.length > 12) this.history.shift();
+            }
+            // Guarda de ordem explícita olha a fala MAIS RECENTE do lote.
+            const ultimo = fresh[fresh.length - 1]!;
             const decision = await this.deps.live.sendTurn({
               session_key: `conductor:${this.deps.correlationId ?? 'call'}`,
-              prompt: DECIDE_PROMPT(brief, this.history.join('\n'), turno),
+              prompt: DECIDE_PROMPT(brief, this.history.join('\n'), fresh),
             }).then((t) => parseDecision(t.reply_text)).catch((err) => {
               this.failures++;
               this.say(`Kimi Live falhou no turno (${String(err).slice(0, 120)}) — Operador segue com o que tem`, { failures: this.failures });
@@ -203,7 +214,7 @@ export class CallConductor {
             });
             // GUARDA DE ORDEM EXPLÍCITA (decreto owner): act sem ordem direta
             // no turno vira pergunta — nunca ação por conta própria.
-            const guarded = guardAction(decision, turno);
+            const guarded = guardAction(decision, ultimo);
             if (guarded.decision.kind === 'say' && decision.kind === 'act') {
               this.say(`SEM ORDEM EXPLÍCITA — act '${decision.name}' virou pergunta ao owner`);
             }
@@ -211,14 +222,14 @@ export class CallConductor {
             if (final.kind === 'say') {
               this.say(`digita pro Operador: "${final.text.slice(0, 100)}"`);
               await this.deps.operator.sendText(tab, final.text);
-              await this.audit('conductor.say', { text: final.text.slice(0, 150), turno: turno.text.slice(0, 100) });
+              await this.audit('conductor.say', { text: final.text.slice(0, 150), turno: ultimo.text.slice(0, 100) });
             } else if (final.kind === 'act') {
               this.say(`ação: ${final.name} — ${final.detail.slice(0, 100)} (ordem: "${guarded.ordemCitada}")`);
               let evidence = 'sem executor';
               if (this.deps.executeAction) {
                 evidence = await this.deps.executeAction(final.name, final.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
               }
-              await this.audit('conductor.act', { name: final.name, evidence, ordem_citada: guarded.ordemCitada ?? null, turno: turno.text.slice(0, 100) });
+              await this.audit('conductor.act', { name: final.name, evidence, ordem_citada: guarded.ordemCitada ?? null, turno: ultimo.text.slice(0, 100) });
               // ação também vira fala quando couber
               if (evidence && evidence !== 'sem executor') {
                 await this.deps.operator.sendText(tab, evidence).catch(() => {});
