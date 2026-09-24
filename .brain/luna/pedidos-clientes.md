@@ -2,7 +2,7 @@
 
 Fonte: `/nexo/api/admin/requests|organizations|projects` (login NextAuth ADMIN) × relatórios do Brain
 (MEMORY/OPINIONES por cliente) × mensagens WhatsApp (tabela `messages`).
-Atualizado: 2026-09-24 01:45 (+02:00) · autor: Luna — varredura com reconciliação bidirecional.
+Atualizado: 2026-09-24 09:45 (+02:00) · autor: Luna — reconciliação + verificação ao vivo em pre2.onadance.com.
 **Base viva no brain remoto:** `learning/outcomes/positive/2026-09-24-clientes-base-viva-luna.md`
 (consolidado completo: solicitações × relatórios × WhatsApp × pendências — gravado 2026-09-24, reindexado).
 
@@ -11,14 +11,20 @@ Atualizado: 2026-09-24 01:45 (+02:00) · autor: Luna — varredura com reconcili
 > `BRAIN_API_TOKEN` (header `Authorization: Bearer`, endpoint de escrita `POST /brain/api/learning/outcomes`
 > com JSON `{type:'positive'|'negative', title, body}`). NUNCA commite o .env.
 
-## ⚠️ DIVERGÊNCIA ATIVA
+## ⚠️ DIVERGÊNCIAS ATIVAS
 
-**Ona Dance — slider → vídeo vertical: no relatório, FORA do painel.**
-O relatório do grupo (MEMORY 2026-09) e as mensagens de 21–23/09 dizem que a tarefa "trocar o slider do
-hero da onadance.com pelo vídeo vertical da Jess (41s)" está registrada no Dashboard Pro e pendente de
-execução. **Conferi as 16 solicitações do painel: ela NÃO existe lá.** O painel não tem rota REST de
-escrita (server actions; PATCH → 405), então não pude criar. → Abner/time: criar a solicitação no painel
-ou liberar escrita. Sem isso a tarefa mais quente da Jess está invisível pro time no workspace.
+**1) Ona Dance — slider → vídeo: IMPLEMENTADO em pre2 (24/09), mas FORA do painel.**
+Verificação ao vivo 24/09 09:40: pre2.onadance.com já serve o vídeo da Jess no hero
+(`hero-onadance.mp4`, wp-content/uploads/2026/09, autoplay/muted/loop). Ou seja: a tarefa mais
+quente da Jess **foi executada**, mas o painel nunca teve a solicitação registrada — quem olha o
+workspace não vê. → **Ação humana:** criar a solicitação em /nexo/pt/solicitacoes (projeto
+"Ona Dance web"), status CLIENT_REVIEWING, com o texto sugerido enviado no grupo productions
+(msg Telegram 5478). API REST de escrita indisponível (POST → 405, só server action).
+
+**2) Ona Dance — hero em desktop renderiza o vídeo vertical como card em pé** (fundo blur nas
+laterais; screenshot do Abner 09:38). Ideia do Abner: hero full-bleed com o vídeo cobrindo a
+tela toda no desktop. → Tarefa interna repassada ao Nonoke via grupo productions (msg 5477):
+"otimizar hero com vídeo em desktop" (manter vertical no mobile).
 
 ---
 
@@ -41,7 +47,7 @@ ou liberar escrita. Sem isso a tarefa mais quente da Jess está invisível pro t
 ### Status atual
 | Pedido | Status painel | No relatório? |
 |---|---|---|
-| Slider → vídeo vertical (41s) | ❌ AUSENTE do painel | Sim (diz que existe) |
+| Slider → vídeo vertical (41s) | ❌ AUSENTE do painel — ⚠️ mas IMPLEMENTADO em pre2.onadance.com em 24/09 (aguarda aprovação da Jess + publicação) | Sim (diz que existe) |
 | Trustpilot wp-admin | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora neste relatório |
 | "Avísame cuando vuelva" | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
 | Home só disponíveis | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
