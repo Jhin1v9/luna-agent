@@ -46,6 +46,10 @@ export interface IncomingFastpathDeps {
   endPollMs?: number;
   /** Poll da conductora (default 2.5s; testes usam menos). */
   conductorPollMs?: number;
+  /** Decreto owner 2026-09-24 09:08: ATENDER TODAS as chamadas — não recusar
+   *  ninguém. true pula o gate da allowlist (quem liga fora da lista também
+   *  é atendido no fast path). */
+  answerAll?: boolean;
 }
 
 export interface IncomingCallEvent {
@@ -80,7 +84,7 @@ export async function fastAnswerIncoming(
   ev: IncomingCallEvent,
 ): Promise<'answered' | 'not-allowed'> {
   const log = deps.log;
-  if (!matchesAllowlist(allowlist, ev.caller)) return 'not-allowed';
+  if (!deps.answerAll && !matchesAllowlist(allowlist, ev.caller)) return 'not-allowed';
   if (deps.isBusy?.()) {
     log.warn({ caller: ev.caller }, 'fastpath: já estou em uma chamada — não atendo a segunda (explícito)');
     return 'not-allowed';
@@ -90,9 +94,17 @@ export async function fastAnswerIncoming(
   const operator = deps.operator ?? new OperatorSession({ log });
   try {
     // 2) ATENDE NA HORA — não espera NADA. Tudo o mais corre em paralelo.
-    const answering = deps.acceptCall().catch((err) => {
-      log.error({ err: String(err).slice(0, 160) }, 'fastpath: clique de atender falhou');
-    });
+    // Se o clique de atender FALHAR, ABORTA o fluxo aqui: a conductora NÃO
+    // sobe (bug ao vivo 2026-09-24 13:37: com o atender falhando, a
+    // conductora segurava o busy enquanto tocava → as campainhas seguintes
+    // caíam em "já estou em uma chamada" e NADA atendia mais).
+    const answered = await deps.acceptCall().then(
+      () => true,
+      (err) => {
+        log.error({ err: String(err).slice(0, 160) }, 'fastpath: clique de atender falhou — NÃO atendi, libero o busy pra próxima campainha');
+        return false;
+      },
+    );
 
     // 3) Preparo do Operador em paralelo (nunca trava o atendimento).
     const prep = (async () => {
@@ -104,8 +116,16 @@ export async function fastAnswerIncoming(
       log.info({ ms: Date.now() - t0, caller: ev.caller }, 'fastpath: Operador armado (prompt + contexto injetados)');
       return tab;
     })();
+    // CRASH REAL (pane 2026-09-24, diagnóstico ao vivo): sem este catch
+    // imediato, o `prep` rejeitava (ex.: chrome-voice fora do ar) ENQUANTO o
+    // `await answering` abaixo ainda não tinha anexado handler — rejeição sem
+    // consumidor = unhandledRejection = o PROCESSO INTEIRO caía toda vez que
+    // uma ligação entrava (Chrome fechava/reabria na cara do owner). O
+    // `await prep` mais abaixo segue vendo a rejeição normalmente no try/catch.
+    prep.catch(() => {});
 
-    await answering;
+    if (!answered) return 'answered'; // finally libera o busy — próxima campainha atende
+
     log.info({ ms: Date.now() - t0, caller: ev.caller }, 'fastpath: CHAMADA ATENDIDA — preparo do Operador em paralelo');
 
     let tab;

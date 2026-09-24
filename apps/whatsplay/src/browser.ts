@@ -1001,43 +1001,44 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const decline = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
           visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
         if (!accept && !decline) return null;
-        // quem liga: título do header se um chat está aberto, senão o texto do
-        // popup — MAS sem os rótulos/ícones dos botões (bug 2026-09-24: o
-        // textContent bruto do popup vinha "ic-call-end-filledRechazaric-call-
-        // filledAceptar" e TODO caller caía como desconhecido → recusa em loop).
+        // Quem liga: PRIMEIRO o texto do POPUP (sobe a partir do botão e
+        // extrai texto NÃO-botão de cada ancestral). O título do chat aberto
+        // é SÓ fallback — bug ao vivo 2026-09-24 13:37: com um chat aberto no
+        // painel, TODO caller caía como o título desse chat ("HDM - Industrial
+        // (SBD) - 26") mesmo quem ligando sendo outra pessoa/número. O nome de
+        // quem liga mora no popup da chamada, não no painel.
         let caller = '';
-        const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
-        if (titleEl && visible(titleEl)) caller = (titleEl.textContent || '').trim();
+        const collect = (root) => {
+          const parts = [];
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+          let node;
+          while ((node = walker.nextNode())) {
+            const p = node.parentElement;
+            if (p && p.closest('button, [role="button"]')) continue; // exclui rótulos dos botões
+            const t = (node.textContent || '').trim();
+            if (t) parts.push(t);
+          }
+          return parts
+            .join(' ')
+            .replace(/\\bic-[a-z0-9-]+\\b/gi, ' ') // ícones Material ("ic-call-end-filled")
+            .replace(/\\b(aceptar|atender|answer|accept|responder|rechazar|recusar|decline|reject|colgar)\\b/gi, ' ')
+            .replace(/\\s+/g, ' ')
+            .trim()
+            .slice(0, 60);
+        };
+        const btn = accept || decline;
+        let lvl = btn ? btn.parentElement : null;
+        for (let i = 0; i < 8 && lvl; i++) {
+          caller = collect(lvl);
+          if (caller) break;
+          lvl = lvl.parentElement;
+        }
         if (!caller) {
-          const btn = accept || decline;
-          // sobe até o container do popup: menor ancestral cujo texto tem AMBOS
-          // os rótulos (aceitar + recusar) — assim não pegamos só o <div> do botão.
-          let popup = btn ? btn.parentElement : null;
-          for (let i = 0; i < 10 && popup && popup.parentElement; i++) {
-            const t = popup.textContent || '';
-            if (/aceptar|atender|answer|accept|responder/i.test(t) && /rechazar|recusar|decline|reject|colgar/i.test(t)) break;
-            popup = popup.parentElement;
-          }
-          if (popup) {
-            // só nós de texto FORA de botões: exclui "Aceptar"/"Rechazar" e
-            // textos de ícone (fonte Material: "ic-call-end-filled" etc.).
-            const parts = [];
-            const walker = document.createTreeWalker(popup, NodeFilter.SHOW_TEXT, null);
-            let node;
-            while ((node = walker.nextNode())) {
-              const p = node.parentElement;
-              if (p && p.closest('button, [role="button"]')) continue;
-              const t = (node.textContent || '').trim();
-              if (t) parts.push(t);
-            }
-            caller = parts
-              .join(' ')
-              .replace(/\\bic-[a-z0-9-]+\\b/gi, ' ') // ícones Material ("ic-call-end-filled")
-              .replace(/\\b(aceptar|atender|answer|accept|responder|rechazar|recusar|decline|reject|colgar)\\b/gi, ' ')
-              .replace(/\\s+/g, ' ')
-              .trim()
-              .slice(0, 60);
-          }
+          // fallback: título do chat aberto (regressão 2026-09-24 v1: o
+          // textContent bruto do popup vinha "ic-call-end-filledRechazaric-
+          // call-filledAceptar" e TODO caller caía como desconhecido).
+          const titleEl = document.querySelector('[data-testid="conversation-info-header-chat-title"]');
+          if (titleEl && visible(titleEl)) caller = (titleEl.textContent || '').trim();
         }
         return JSON.stringify({ caller });
       }`,
@@ -1052,33 +1053,62 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
   }
 
-  /** Atende a chamada recebida (clique em Aceptar, verificado). */
+  /** Atende a chamada recebida (clique no botão de aceitar, verificado).
+   *  O clique é feito NA PÁGINA com o MESMO matcher do detectIncomingCall —
+   *  bug ao vivo 2026-09-24 13:37: o seletor CSS cobria só "Aceptar/Atender/
+   *  Answer" mas o popup veio com aria-label "Accept" — a DETECÇÃO achou (e
+   *  enfileirou o evento) mas o CLIQUE falhou e a ligação NUNCA foi atendida.
+   *  Detecção e clique agora usam a mesma regex; divergência impossível. */
   async acceptCall(): Promise<void> {
     const page = this.requirePage();
-    this.config.log?.info({}, 'voice-call: atendendo chamada recebida (Aceptar)');
-    const ok = await page
-      .locator('button[aria-label="Aceptar" i], button[aria-label="Atender" i], button[aria-label="Answer" i], [role="button"][aria-label="Aceptar" i]')
-      .first()
-      .click({ timeout: 3_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!ok) throw new Error('botão Aceptar não encontrado — não consegui atender');
+    this.config.log?.info({}, 'voice-call: atendendo chamada recebida (aceitar)');
+    const ok = await evalWithArg(
+      page,
+      `(_) => {
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const btn = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
+          visible(b) && /^(aceptar|atender|answer|accept|responder)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+        if (!btn) return false;
+        btn.click();
+        return true;
+      }`,
+      null,
+    ).catch(() => false);
+    if (ok !== true) throw new Error('botão de atender não encontrado — não consegui atender');
     await page.waitForTimeout(1_500);
     const obs = await this.observePanel();
     this.config.log?.info({}, `voice-call: pós-atender → ${this.describeObservation(obs)}`);
   }
 
-  /** Recusa a chamada recebida (clique em Rechazar, verificado). */
+  /** Recusa a chamada recebida (mesmo matcher do detectIncomingCall). */
   async declineCall(): Promise<void> {
     const page = this.requirePage();
-    this.config.log?.info({}, 'voice-call: recusando chamada recebida (Rechazar)');
-    const ok = await page
-      .locator('button[aria-label="Rechazar" i], button[aria-label="Recusar" i], button[aria-label="Decline" i], [role="button"][aria-label="Rechazar" i]')
-      .first()
-      .click({ timeout: 3_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!ok) throw new Error('botão Rechazar não encontrado — não consegui recusar');
+    this.config.log?.info({}, 'voice-call: recusando chamada recebida (recusar)');
+    const ok = await evalWithArg(
+      page,
+      `(_) => {
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const btn = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
+          visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+        if (!btn) return false;
+        btn.click();
+        return true;
+      }`,
+      null,
+    ).catch(() => false);
+    if (ok !== true) throw new Error('botão de recusar não encontrado — não consegui recusar');
     await page.waitForTimeout(1_000);
   }
 
