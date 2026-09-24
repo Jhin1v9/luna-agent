@@ -45,6 +45,21 @@ interface OutboundMessageRow {
   reply_to_query: string | null;
 }
 
+/** BUG 1 (P1, incidente 2026-09-24): dois envios concorrentes digitavam no
+ * MESMO campo de composição e os caracteres se intercalavam ("msg esquisita").
+ * Há UM page por perfil — então há UMA fila FIFO global: um envio por vez,
+ * na ordem de chegada (a espera humana fica FORA da trava; a trava cobre
+ * limpar+digitar+enviar dentro da transport). */
+let sendChain: Promise<unknown> = Promise.resolve();
+function withSendLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = sendChain.then(fn, fn); // segue a fila mesmo se o anterior falhou
+  sendChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export function createOutboundListener(deps: OutboundDeps) {
   const { pool, transport, log } = deps;
   const allowlist = parseAllowlist(deps.allowlist?.join(','));
@@ -204,12 +219,14 @@ export function createOutboundListener(deps: OutboundDeps) {
         // nunca degrada pra envio sem citação.
         if (row.reply_to_query && transport.replyToMessage) {
           deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60) }, 'entrega com CITAÇÃO (reply_to_query)');
-          return transport.replyToMessage(target, row.reply_to_query, texto);
+          return withSendLock(() => transport.replyToMessage!(target, row.reply_to_query!, texto));
         }
-        return transport.sendMessage(
-          target,
-          texto,
-          opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
+        return withSendLock(() =>
+          transport.sendMessage(
+            target,
+            texto,
+            opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
+          ),
         );
       };
       if (deps.adapter) {

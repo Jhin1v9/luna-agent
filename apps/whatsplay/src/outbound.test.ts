@@ -141,3 +141,31 @@ describe('REGRESSÃO: envelope ANSWER cru não chega ao transporte (bug ao vivo 
     expect(sent[0]).toContain('TOOL_CALL');
   });
 });
+
+describe('REGRESSÃO BUG 1 (P1, incidente 2026-09-24): envios concorrentes NUNCA se intercalam', () => {
+  it('dois deliverOne simultâneos → sendMessage executa UM DE CADA VEZ no page', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const { pool } = stubPool({ address: 'Pai', contact_name: 'Pai' });
+    const transport = {
+      ...fakeTransport([]),
+      async sendMessage(_t: string, _x: string) {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 15)); // janela de interleaving
+        active--;
+        return 'ok';
+      },
+    };
+    const listener = createOutboundListener({
+      pool,
+      transport,
+      log,
+      humanDelayMs: 0,
+      allowlist: ['Pai'],
+      enforceAllowlist: true,
+    });
+    await Promise.all([listener.deliverOne('mA'), listener.deliverOne('mB')]);
+    expect(maxActive).toBe(1); // com a fila FIFO: nunca 2 digitando no mesmo campo
+  });
+});
