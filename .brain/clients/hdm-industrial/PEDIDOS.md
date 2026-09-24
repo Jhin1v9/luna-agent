@@ -39,3 +39,17 @@ Animação de scroll reveal implementada. Fotos da equipe: cliente ainda não te
 
 ---
 data + autor: Luna · 2026-09-24 · fonte: GET /nexo/api/admin/requests/<id> (HTTP 200)
+
+## STATUS 2026-09-24 22:13 — IMPLEMENTADO (branch luna/hdm-pedidos-matheus, commit 2a5fd84)
+
+- [x] Carrossel automático só na primeira parte — HeroRotator (Ken Burns,
+      crossfade 1.4s, 4 fotos licenciadas registradas, reduced-motion OK)
+- [x] Profissões eletromecânico + mecânico industrial — perfis, pictogramas
+      proprietários novos, descrições OFICIAIS do Matheus em 4 idiomas, schema,
+      blurbs. npm run verify COMPLETO (156 páginas, SEO OK)
+- [ ] Logo final — PDF não está no repo (aguardando arquivo; Matheus avisado
+      no painel, comment cmug39bs4000o114rin6kb2hn)
+- [ ] Fotos próprias do cliente — placeholders licenciados até envio (combinado)
+- DECISÃO ARQUITETURA: implementado na PLATAFORMA NOVA (Next.js, ainda não
+  publicada); publicação = ação manual do owner (deploy hook). Site antigo em
+  www.hdmindustrial.es continua no ar até lá.

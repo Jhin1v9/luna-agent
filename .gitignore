@@ -21,3 +21,10 @@ backups/*.dump
 .brain/.vps_cookie
 .brain/.vps_solicitacoes.txt
 apps/whatsplay/daemon-restart*.err
+.brain/.nexo-workspace-src/
+landing-sabadell/
+site-luna-sabadell/
+turnos.txt
+scripts/tmp-*.mjs
+.brain/.tmp_*.json
+worker-restart.err
