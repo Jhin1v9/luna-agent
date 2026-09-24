@@ -73,12 +73,18 @@ export class KimiWorkAdapter implements KimiLiveAdapter {
 
   async sendTurn(request: TurnRequest): Promise<TurnResult> {
     const idem = `kw:${request.session_key}:${this.now()}`;
+    // ROTEADOR DE CHAT (decreto owner 2026-09-24): turnos de voz
+    // (conductora da chamada + pré-voo do Operador) têm resposta na
+    // automação "Luna — Voz"; o restante na "Luna — Geral". Derivação por
+    // prefixo da session_key — quem programa contra o adapter não precisa
+    // saber que chats existem (migração 011 criou a coluna channel).
+    const channel = /^(conductor|operator):/.test(request.session_key) ? 'voice' : 'geral';
     const ins = await this.pool.query(
-      `INSERT INTO kimiwork_llm_turns (session_key, prompt, image_base64, idempotency_key)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO kimiwork_llm_turns (session_key, prompt, image_base64, idempotency_key, channel)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (idempotency_key) DO NOTHING
        RETURNING id`,
-      [request.session_key, request.prompt, request.image_base64 ?? null, idem],
+      [request.session_key, request.prompt, request.image_base64 ?? null, idem, channel],
     );
     let turnId: string;
     if (ins.rows[0] && typeof ins.rows[0] === 'object' && 'id' in ins.rows[0]) {

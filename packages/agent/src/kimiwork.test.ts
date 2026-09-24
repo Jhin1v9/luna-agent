@@ -92,4 +92,20 @@ describe('KimiWorkAdapter', () => {
     await expect(adapter.ensureSession('conv-x')).resolves.toEqual({ session_id: 'conv-x', busy: false });
     await expect(adapter.readMessages('conv-x')).resolves.toEqual([]);
   });
+
+  it('roteador de chat (decreto owner 2026-09-24): session_key de voz grava channel=voice, demais channel=geral', async () => {
+    const channels: unknown[] = [];
+    const pool = fakePool((sql, params) => {
+      if (sql.includes('INSERT')) {
+        channels.push(params[4]); // 5º param = channel
+        return { rows: [{ id: 'turn-ch' }] };
+      }
+      return { rows: [{ status: 'answered', response: 'ok', error: null }] };
+    });
+    const adapter = new KimiWorkAdapter({ mode: 'kimiwork' }, { pool, sleep: async () => {} });
+    await adapter.sendTurn({ session_key: 'conductor:corr_1', prompt: 'x' });
+    await adapter.sendTurn({ session_key: 'operator:prompt:Pai', prompt: 'x' });
+    await adapter.sendTurn({ session_key: 'repair:chat-1', prompt: 'x' });
+    expect(channels).toEqual(['voice', 'voice', 'geral']);
+  });
 });
