@@ -77,16 +77,14 @@ describe('migrator (integração)', () => {
     try {
       const scratchUrl = TEST_URL.replace(TEST_DB_NAME, scratch);
       const applied = await migrate(scratchUrl);
-      expect(applied).toEqual([
+      // Ordem importa (append-only); o total tem que bater com o diretório
+      // de migrações — lista aberta pra não quebrar a cada migração nova.
+      expect(applied.slice(0, 2)).toEqual([
         '001_foundation.sql',
         '002_events_outbox_dlq_audit.sql',
-        '003_messages_send_tracking.sql',
-        '004_messages_author.sql',
-        '005_service_heartbeats.sql',
-        '006_notifications_delivery.sql',
-        '007_conversations_classification.sql',
-        '008_escalation_sla.sql',
       ]);
+      const migrationFiles = (await import('node:fs')).readdirSync('packages/database/migrations').filter((f) => f.endsWith('.sql')).sort();
+      expect(applied).toEqual(migrationFiles);
 
       const c = new pg.Client({ connectionString: scratchUrl });
       await c.connect();
