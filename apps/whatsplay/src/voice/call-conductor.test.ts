@@ -124,6 +124,30 @@ describe('CallConductor loop', () => {
     h.stop();
     expect(live.prompts.length).toBe(1); // 1 turno só, lido 1x
   });
+
+  it('voice mode (decreto owner 08:16): captions viram turnos, dedupe por conteúdo — caption repetida NÃO reprocessa', async () => {
+    const tab = fakeTab([]); // thread de texto MUDO (é o caso real do voice mode)
+    const live = fakeLive(['{"action":"hold"}', '{"action":"say","text":"Pergunta se é sobre o painel."}']);
+    const op = fakeOperator();
+    let reads = 0;
+    const c = new CallConductor({
+      operator: op as never,
+      live: live as never,
+      log,
+      pollMs: 60,
+      readVoiceTurns: async () => {
+        reads++;
+        return reads === 1 ? [{ speaker: 'participante (voz)', text: 'oi, é a Jess' }] : [{ speaker: 'participante (voz)', text: 'oi, é a Jess' }, { speaker: 'participante (voz)', text: 'queria falar do painel' }];
+      },
+    });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 700));
+    h.stop();
+    expect(live.prompts.length).toBe(2); // 2 captions distintas (a repetida dedupou)
+    expect(live.prompts[0]).toContain('oi, é a Jess');
+    expect(live.prompts[1]).toContain('painel');
+    expect(op.sent).toEqual(['Pergunta se é sobre o painel.']); // 1 say só (do 2º turno)
+  });
 });
 
 describe('GUARDA DE ORDEM EXPLÍCITA (decreto owner: nd de agir sozinha)', () => {

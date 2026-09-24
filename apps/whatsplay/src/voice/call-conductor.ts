@@ -44,6 +44,11 @@ export interface ConductorDeps {
   /** Latência-alvo por turno (poll do chat, default 3s). */
   pollMs?: number;
   correlationId?: string;
+  /** 🆕 (decreto owner 2026-09-24) Leitura das CAPTIONS do voice mode
+   *  (aria-live) — no modo voz a fala NÃO vira mensagem no thread de texto;
+   *  sem isso a conductora é surda durante a chamada real. Dedupe por
+   *  conteúdo (as captions evoluem incrementalmente). */
+  readVoiceTurns?: (tab: Page) => Promise<ConductorTurn[]>;
 }
 
 export interface CallBriefConductor {
@@ -124,6 +129,7 @@ export class CallConductor {
   private failures = 0;
   private readonly history: string[] = [];
   private cursor = 0;
+  private voiceSeen = new Set<string>();
 
   constructor(private readonly deps: ConductorDeps) {}
 
@@ -158,6 +164,24 @@ export class CallConductor {
     return fresh.map((t) => ({ speaker: 'participante', text: t.text }));
   }
 
+  /** Lê captions novas do voice mode (dedupe por conteúdo — evoluem por
+   *  acréscimo, então cada snapshot parcial novo conta como turno; a guarda
+   *  do LLM filtra ruído). */
+  private async readVoiceNew(tab: Page): Promise<ConductorTurn[]> {
+    if (!this.deps.readVoiceTurns) return [];
+    const voice = await this.deps.readVoiceTurns(tab).catch(() => [] as ConductorTurn[]);
+    const fresh: ConductorTurn[] = [];
+    for (const t of voice) {
+      const key = t.text.slice(0, 160);
+      if (this.voiceSeen.has(key)) continue;
+      this.voiceSeen.add(key);
+      if (t.text.trim().length >= 4) fresh.push(t);
+    }
+    // guarda de memória: captions de chamada longa
+    if (this.voiceSeen.size > 400) this.voiceSeen = new Set([...this.voiceSeen].slice(-200));
+    return fresh;
+  }
+
   /** Liga o loop da conductora. Retorna handle com stop(). */
   start(tab: Page, brief: CallBriefConductor): { stop: () => void } {
     this.running = true;
@@ -165,7 +189,7 @@ export class CallConductor {
     const loop = async (): Promise<void> => {
       while (this.running) {
         try {
-          const fresh = await this.readNewTurns(tab);
+          const fresh = [...(await this.readVoiceNew(tab)), ...(await this.readNewTurns(tab))];
           for (const turno of fresh) {
             this.history.push(`- ${turno.speaker}: ${turno.text}`.slice(0, 200));
             if (this.history.length > 12) this.history.shift();

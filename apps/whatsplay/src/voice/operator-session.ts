@@ -96,6 +96,77 @@ export class OperatorSession {
     await page.waitForTimeout(800);
   }
 
+  /**
+   * Injeção INSTANTÂNEA no composer (decreto owner 2026-09-24: "isso dá pra
+   * fazer em 2 segundos"): digitar um prompt de ~2.000 chars com keyboard.type
+   * (delay 3-4ms) leva 6-8s — inaceitável com a pessoa já na linha. Aqui o
+   * texto entra via document.execCommand('insertText') (dispara os eventos
+   * que o React precisa) e o envio segue no clique normal. Teclado físico
+   * fica só de fallback.
+   */
+  async sendTextFast(page: import('playwright-core').Page, text: string): Promise<void> {
+    const composer = page.locator(COMPOSER_SEL).first();
+    await composer.click({ timeout: 4_000 });
+    await page.waitForTimeout(150);
+    const injected = await page
+      .evaluate((t) => {
+        const el = (document.querySelector('#prompt-textarea') as HTMLElement | null) ??
+          document.querySelector('div[contenteditable="true"]');
+        if (!el) return false;
+        el.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false); // cursor no fim (não sobrescreve rascunho)
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        return document.execCommand('insertText', false, t);
+      }, text)
+      .catch(() => false);
+    await page.waitForTimeout(250);
+    if (!injected) {
+      this.say('insertText falhou — caindo no teclado (lento, mas funciona)');
+      await page.keyboard.type(text, { delay: 3 });
+    }
+    const send = page.locator(SEND_SEL).first();
+    const sent = await send.click({ timeout: 3_000 }).then(() => true).catch(() => false);
+    if (!sent) await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+  }
+
+  /**
+   * Lê as CAPTIONS/transcrição ao vivo do voice mode (decreto owner
+   * 2026-09-24: "se assegure de estar lendo as transcrições ativamente").
+   * LIMITAÇÃO conhecida (2ª chamada ao vivo, 2026-09-23): no voice mode a
+   * fala NÃO vira mensagem no thread de texto — vive em aria-live/captions.
+   * Leitura multi-seletor best-effort: aria-live regions + containers com
+   * caption/transcript na classe. Falso-positivo (legendas de vídeo etc.)
+   * é descartado pela conductora com bom senso — melhor ler demais que
+   * continuar surda.
+   */
+  async readVoiceCaptions(
+    page: import('playwright-core').Page,
+  ): Promise<Array<{ source: string; text: string }>> {
+    const r = (await page
+      .evaluate(`(() => {
+        const visible = (e) => !!(e && e.offsetParent !== null && e.getClientRects().length > 0);
+        const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+        const out = [];
+        const seen = new Set();
+        const push = (source, el) => {
+          const t = clean(el.textContent);
+          if (t.length < 4 || seen.has(t)) return;
+          seen.add(t);
+          out.push({ source, text: t.slice(0, 600) });
+        };
+        document.querySelectorAll('[aria-live]').forEach((el) => { if (visible(el)) push('aria-live', el); });
+        document.querySelectorAll('[class*="caption" i], [class*="transcript" i]').forEach((el) => { if (visible(el)) push('caption', el); });
+        return out.slice(-8);
+      })()`)
+      .catch(() => [])) as Array<{ source: string; text: string }>;
+    return Array.isArray(r) ? r : [];
+  }
+
   /** Injeta o prompt do Operador (§26) + contexto da chamada e dispara. */
   async injectContext(page: import('playwright-core').Page, ctx: CallContext): Promise<void> {
     const full = [

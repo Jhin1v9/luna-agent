@@ -2,6 +2,7 @@ import type { Logger } from 'pino';
 import type { Pool } from 'pg';
 import type { WhatsAppTransport } from '../transport.js';
 import { FallbackAdapter, KimiWorkAdapter } from '@luna/agent';
+import type { KimiLiveAdapter } from '@luna/agent';
 import { OperatorSession } from './operator-session.js';
 import { preflightOperator } from './operator-preflight.js';
 import { CallConductor } from './call-conductor.js';
@@ -26,36 +27,45 @@ export interface CallExecutorDeps {
   log: Logger;
 }
 
+/**
+ * Cérebro das chamadas (2026-09-23): FallbackAdapter ADR-039 — Kimi API
+ * primária, Gemini na reserva. Antes era KimiCliAdapter puro: quota do
+ * CLI morta = TODA chamada abortava no pré-voo. Mesmo decreto do
+ * orchestrator: kimi first, fallback explícito no log.
+ * ADR-040: com KIMI_ADAPTER_MODE=kimiwork, a composição do prompt do
+ * Operador também vai pra Luna do Kimi Work (mesma fila, mesmo pool).
+ * Exportado pra reuso no fast path de chamadas RECEBIDAS (incoming-fastpath).
+ */
+export function createVoiceLiveAdapter(pool: Pool, log: Logger): KimiLiveAdapter {
+  return process.env.KIMI_ADAPTER_MODE === 'kimiwork'
+    ? new KimiWorkAdapter(
+        { mode: 'kimiwork' },
+        {
+          pool,
+          timeoutMs: Number(process.env.KIMIWORK_LLM_TIMEOUT_MS ?? 120_000),
+          pollIntervalMs: Number(process.env.KIMIWORK_LLM_POLL_MS ?? 2_500),
+        },
+      )
+    : new FallbackAdapter(
+        {
+          mode: 'kimi-api',
+          apiKey: process.env.LLM_API_KEY,
+          apiBaseUrl: process.env.LLM_BASE_URL,
+          apiModel: process.env.LLM_MODEL,
+          fallbackApiKey: process.env.GEMINI_API_KEY,
+          fallbackBaseUrl: process.env.GEMINI_BASE_URL,
+          fallbackModel: process.env.GEMINI_MODEL,
+        },
+        undefined,
+        { onFallback: ({ from, to, reason }) => log.warn({ from, to, reason: reason.slice(0, 160) }, `voice.call: fallback ${from}→${to}`) },
+      );
+}
+
 export function createCallExecutor(deps: CallExecutorDeps) {
   const { pool, transport, log } = deps;
-  // ADR-040: com KIMI_ADAPTER_MODE=kimiwork, a composição do prompt do
-  // Operador também vai pra Luna do Kimi Work (mesma fila, mesmo pool).
-  const live =
-    process.env.KIMI_ADAPTER_MODE === 'kimiwork'
-      ? new KimiWorkAdapter(
-          { mode: 'kimiwork' },
-          {
-            pool,
-            timeoutMs: Number(process.env.KIMIWORK_LLM_TIMEOUT_MS ?? 120_000),
-            pollIntervalMs: Number(process.env.KIMIWORK_LLM_POLL_MS ?? 2_500),
-          },
-        )
-      : new FallbackAdapter(
-          {
-            mode: 'kimi-api',
-            apiKey: process.env.LLM_API_KEY,
-            apiBaseUrl: process.env.LLM_BASE_URL,
-            apiModel: process.env.LLM_MODEL,
-            fallbackApiKey: process.env.GEMINI_API_KEY,
-            fallbackBaseUrl: process.env.GEMINI_BASE_URL,
-            fallbackModel: process.env.GEMINI_MODEL,
-          },
-          undefined,
-          { onFallback: ({ from, to, reason }) => log.warn({ from, to, reason: reason.slice(0, 160) }, `voice.call: fallback ${from}→${to}`) },
-        );
+  const live = createVoiceLiveAdapter(pool, log);
   const operator = new OperatorSession({ log });
   let busy = false;
-
   return async function executeCallRequest(eventId: string): Promise<void> {
     if (busy) {
       log.warn({ event_id: eventId }, 'voice.call: já estou em uma chamada — pedido ignorado (explícito)');

@@ -4,7 +4,7 @@ import { getPool, closePool, checkConnection, writeHeartbeat } from '@luna/datab
 import { createAdapter } from '@luna/agent';
 import { WhatsAppWebTransport } from './browser.js';
 import { SELECTORS } from './selectors.js';
-import { parseAllowlist } from './allowlist.js';
+import { parseAllowlist, matchesAllowlist } from './allowlist.js';
 import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { createOutboundListener } from './outbound.js';
@@ -185,7 +185,20 @@ async function main(): Promise<void> {
   // 2) LISTEN whatsapp_actions → executa ordens do Kimi Work no Chrome
   //    (call.answer / call.decline hoje; texto segue pela fila messages +
   //    pg_notify('luna_outbound'), com send-safety e allowlist).
+  //
+  // 🆕 FAST PATH (decreto owner 08:16, 2026-09-24): "quando detectar chamada
+  // JÁ abre o ChatGPT, JÁ manda o contexto buildado como prompt, JÁ abre a
+  // chamada — dá pra fazer em 2 segundos." Quem está na allowlist é atendido
+  // NA HORA (clique imediato + preparo do Operador em paralelo + conductora
+  // lendo as captions). Quem NÃO está: segue o fluxo inbox → Kimi Work decide
+  // (fail-closed inalterado). Poll 5s → 2s: a detecção em si era a maior
+  // fatia da latência.
   const { insertKimiWorkEvent } = await import('@luna/database');
+  const { fastAnswerIncoming } = await import('./voice/incoming-fastpath.js');
+  const { createVoiceLiveAdapter } = await import('./voice/call-executor.js');
+  const voiceLive = createVoiceLiveAdapter(pool, log);
+  const callAllowlist = config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim());
+  let fastpathBusy = false;
   let lastIncomingRingAt = 0;
   const incomingTimer = setInterval(async () => {
     try {
@@ -195,8 +208,7 @@ async function main(): Promise<void> {
       if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca
       lastIncomingRingAt = now;
       // Contexto de quem liga (decreto owner): identidade + última conversa +
-      // histórico — o Kimi Work recebe a pessoa JÁ CONTEXTUALIZADA e monta o
-      // prompt do Operador no ChatGPT com isso.
+      // histórico — o prompt do Operador já nasce com a pessoa contextualizada.
       let contexto: string | null = null;
       try {
         const { buildContactContext, formatContactContextText } = await import('@luna/database');
@@ -205,6 +217,39 @@ async function main(): Promise<void> {
       } catch (err) {
         log.warn({ err: String(err).slice(0, 120) }, 'kimiwork inbox: context builder falhou (segue sem contexto)');
       }
+
+      if (matchesAllowlist(callAllowlist, incoming.caller)) {
+        // FAST PATH: atende em ~2s. O evento vai pro inbox já resolvido
+        // (done) — o Kimi Work fica ciente sem disparar segunda ação.
+        await insertKimiWorkEvent(pool, {
+          kind: 'call.incoming',
+          payload: { caller: incoming.caller, contexto, fastpath: true },
+          idempotencyKey: `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`,
+        });
+        await pool.query(
+          `UPDATE kimiwork_inbox SET status='done', processed_at=now(), result=$1::jsonb
+           WHERE idempotency_key=$2 AND status='pending'`,
+          [JSON.stringify({ fastpath: 'answered', contexto_chars: contexto?.length ?? 0 }), `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`],
+        ).catch(() => {});
+        log.info({ caller: incoming.caller }, 'fastpath: chamada de allowlist — atendendo AGORA (Operador em paralelo)');
+        fastAnswerIncoming(
+          {
+            log,
+            live: voiceLive,
+            acceptCall: () => transport.acceptCall?.() ?? Promise.resolve(),
+            observePanel: () => (transport as never as { observePanel: () => Promise<{ state: string }> }).observePanel(),
+            isBusy: () => fastpathBusy,
+            markBusy: (b) => { fastpathBusy = b; },
+          },
+          callAllowlist,
+          { caller: incoming.caller, contexto },
+        ).catch((err) => log.error({ err: String(err).slice(0, 200) }, 'fastpath: fluxo falhou (explícito)'));
+        if (telegramConfig.botToken && telegramConfig.teamChatId) {
+          await sendTeamMessage(`📞 Atendi ${incoming.caller} no fast path (~2s: ChatGPT aberto + contexto injetado + conductora na escuta).`, telegramConfig).catch(() => {});
+        }
+        return;
+      }
+
       await insertKimiWorkEvent(pool, {
         kind: 'call.incoming',
         payload: { caller: incoming.caller, contexto },
@@ -217,7 +262,7 @@ async function main(): Promise<void> {
     } catch (err) {
       log.warn({ err: String(err).slice(0, 140) }, 'kimiwork inbox: detector de chamada falhou (best-effort)');
     }
-  }, 5_000);
+  }, 2_000);
   const actionListen = await pool.connect();
   await actionListen.query("LISTEN whatsapp_actions");
   actionListen.on('notification', (n) => {
