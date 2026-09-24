@@ -126,7 +126,12 @@ async function main(): Promise<void> {
       ingestAllowlist: parseAllowlist(config.WHATSAPP_INGEST_ALLOWLIST),
       enforceIngestAllowlist: config.NODE_ENV !== 'production',
     },
-    { intervalMs: 4_000 },
+    {
+      intervalMs: 4_000,
+      // Decreto owner 2026-09-24: agente não age sozinho em loop — sweep
+      // periódico (abre chats allowlisted a cada ~12s) só sob demanda.
+      sweepEnabled: config.WHATSAPP_SWEEP_ENABLED === 'true',
+    },
   );
   await transport.ensureMainChatList();
   await watcher.tick(); // arma o baseline
@@ -188,11 +193,13 @@ async function main(): Promise<void> {
   //
   // 🆕 FAST PATH (decreto owner 08:16, 2026-09-24): "quando detectar chamada
   // JÁ abre o ChatGPT, JÁ manda o contexto buildado como prompt, JÁ abre a
-  // chamada — dá pra fazer em 2 segundos." Quem está na allowlist é atendido
-  // NA HORA (clique imediato + preparo do Operador em paralelo + conductora
-  // lendo as captions). Quem NÃO está: segue o fluxo inbox → Kimi Work decide
-  // (fail-closed inalterado). Poll 5s → 2s: a detecção em si era a maior
-  // fatia da latência.
+  // chamada — dá pra fazer em 2 segundos."
+  // ATUALIZAÇÃO (decreto owner 09:08, 2026-09-24): "é pra confirmar todas as
+  // chamadas, não é pra recusar" — TODO caller é atendido no fast path,
+  // allowlist ou não (answerAll). O fluxo inbox de decisão (answer/decline)
+  // ficou legado: o whatsapp_actions ainda aceita call.answer/decline, mas
+  // nenhum ramo novo enfileira chamada pra decisão. Poll 5s → 2s: a detecção
+  // em si era a maior fatia da latência.
   const { insertKimiWorkEvent } = await import('@luna/database');
   const { fastAnswerIncoming } = await import('./voice/incoming-fastpath.js');
   const { createVoiceLiveAdapter } = await import('./voice/call-executor.js');
@@ -218,9 +225,11 @@ async function main(): Promise<void> {
         log.warn({ err: String(err).slice(0, 120) }, 'kimiwork inbox: context builder falhou (segue sem contexto)');
       }
 
-      if (matchesAllowlist(callAllowlist, incoming.caller)) {
-        // FAST PATH: atende em ~2s. O evento vai pro inbox já resolvido
-        // (done) — o Kimi Work fica ciente sem disparar segunda ação.
+      // FAST PATH para TODO caller (decreto owner 09:08: atender todas):
+      // atende em ~2s; o evento vai pro inbox já resolvido (done) — o Kimi
+      // Work fica ciente sem disparar segunda ação. answerAll pula o gate da
+      // allowlist dentro do fastpath.
+      {
         await insertKimiWorkEvent(pool, {
           kind: 'call.incoming',
           payload: { caller: incoming.caller, contexto, fastpath: true },
@@ -231,7 +240,7 @@ async function main(): Promise<void> {
            WHERE idempotency_key=$2 AND status='pending'`,
           [JSON.stringify({ fastpath: 'answered', contexto_chars: contexto?.length ?? 0 }), `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`],
         ).catch(() => {});
-        log.info({ caller: incoming.caller }, 'fastpath: chamada de allowlist — atendendo AGORA (Operador em paralelo)');
+        log.info({ caller: incoming.caller, allowlisted: matchesAllowlist(callAllowlist, incoming.caller) }, 'fastpath: atendendo AGORA (Operador em paralelo)');
         fastAnswerIncoming(
           {
             log,
@@ -240,6 +249,7 @@ async function main(): Promise<void> {
             observePanel: () => (transport as never as { observePanel: () => Promise<{ state: string }> }).observePanel(),
             isBusy: () => fastpathBusy,
             markBusy: (b) => { fastpathBusy = b; },
+            answerAll: true,
           },
           callAllowlist,
           { caller: incoming.caller, contexto },
@@ -248,16 +258,6 @@ async function main(): Promise<void> {
           await sendTeamMessage(`📞 Atendi ${incoming.caller} no fast path (~2s: ChatGPT aberto + contexto injetado + conductora na escuta).`, telegramConfig).catch(() => {});
         }
         return;
-      }
-
-      await insertKimiWorkEvent(pool, {
-        kind: 'call.incoming',
-        payload: { caller: incoming.caller, contexto },
-        idempotencyKey: `kimiwork:call:${incoming.caller}:${Math.floor(now / 60_000)}`,
-      });
-      log.info({ caller: incoming.caller }, 'kimiwork inbox: chamada recebida enfileirada');
-      if (telegramConfig.botToken && telegramConfig.teamChatId) {
-        await sendTeamMessage(`📞 Chamada recebida de ${incoming.caller} — Kimi Work decidindo (inbox).`, telegramConfig).catch(() => {});
       }
     } catch (err) {
       log.warn({ err: String(err).slice(0, 140) }, 'kimiwork inbox: detector de chamada falhou (best-effort)');

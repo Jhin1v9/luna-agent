@@ -114,6 +114,12 @@ const envSchema = z.object({
   // gastar tokens (nem Context Builder, nem LLM). Vazia em dev = nada
   // processado (fail-closed).
   WHATSAPP_INGEST_ALLOWLIST: z.string().default(''),
+  // Sweep periódico das conversas allowlisted (decreto owner 2026-09-24):
+  // o agente NÃO fica abrindo chats sozinho em loop — quem orquestra é a
+  // Luna. Sweep só para teste manual do owner: 'true' liga, qualquer outro
+  // valor (default) mantém desligado. O ingest normal (badge/DOM-mutação)
+  // não depende dele.
+  WHATSAPP_SWEEP_ENABLED: z.string().default('false'),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

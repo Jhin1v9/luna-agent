@@ -35,6 +35,16 @@ export interface ChatBadge {
 export interface WatcherOptions {
   intervalMs?: number;
   seedOnly?: boolean;
+  /**
+   * Sweep periódico das conversas allowlisted (decreto owner 2026-09-24):
+   * DESLIGADO por padrão. O sweep ABRE cada chat da lista a cada ~12s pra
+   * reler mensagens — sem cérebro, sozinho, pra sempre (visível ao owner
+   * como "escreve PAI/número no busca, entra e sai de chats em loop").
+   * Quem orquestra é a Luna: ingest segue 100% por badge/DOM-mutação
+   * (reativo a mensagem NOVA). Liga só sob demanda (teste do owner):
+   * WHATSAPP_SWEEP_ENABLED=true.
+   */
+  sweepEnabled?: boolean;
 }
 
 /** Diff puro: quais chats têm mensagem nova desde o snapshot anterior.
@@ -114,6 +124,7 @@ export class IngestWatcher {
   private sweepCount = 0;
   /** Roda o sweep a cada N ticks (4s × 3 = 12s — decreto owner: latência). */
   private readonly sweepEvery = 3;
+  private readonly sweepEnabled: boolean;
   private lastSeenMsg = new Map<string, string>();
 
   constructor(
@@ -121,6 +132,7 @@ export class IngestWatcher {
     opts: WatcherOptions = {},
   ) {
     this.intervalMs = opts.intervalMs ?? 4_000;
+    this.sweepEnabled = opts.sweepEnabled ?? false;
     this.debouncer = new Debouncer({ flushMs: deps.debounceMs });
     this.ingest = deps.ingestFn ?? createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log }).ingestOne;
     this.ingestAllowlist = parseAllowlist(deps.ingestAllowlist?.join(','));
@@ -163,7 +175,7 @@ export class IngestWatcher {
       return { seeded: true, fresh: 0 };
     }
     this.sweepCount++;
-    if (this.enforceIngest && this.ingestAllowlist.length > 0 && this.sweepCount % this.sweepEvery === 0) {
+    if (this.sweepEnabled && this.enforceIngest && this.ingestAllowlist.length > 0 && this.sweepCount % this.sweepEvery === 0) {
       // Sweep periódico dos chats allowlisted: cobre mensagem JÁ LIDA,
       // chat virtualizado fora do DOM e (fora de produção) o gatilho de
       // teste do owner — mensagem dele é OUTBOUND na sessão com @luna.

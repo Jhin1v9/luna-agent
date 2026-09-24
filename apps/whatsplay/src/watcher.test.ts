@@ -134,7 +134,9 @@ describe('SWEEP de chats allowlisted — mensagem do owner (outbound @luna) disp
           return 'published';
         },
       },
-      { intervalMs: 60_000 },
+      // sweep periódico agora é OPT-IN (decreto owner 2026-09-24) — esses
+      // testes exercitam o sweep, então ligam explicitamente.
+      { intervalMs: 60_000, sweepEnabled: true },
     );
     // sweep roda quando sweepCount % 8 === 0; o 1º tick é seed (retorna antes
     // do sweep), então 9 ticks garantem uma janela de sweep por chamada.
@@ -217,7 +219,7 @@ describe('REGRESSÃO roteamento: resposta vai SEMPRE pro chat de origem (bug 202
           return 'published';
         },
       },
-      { intervalMs: 60_000 },
+      { intervalMs: 60_000, sweepEnabled: true },
     );
     for (let i = 0; i < 9; i++) await watcher.tick(); // seed + sweep
     await new Promise((r) => setTimeout(r, 30));
@@ -267,7 +269,7 @@ describe('REGRESSÃO reentrância do tick (bug ao vivo 2026-09-22)', () => {
         enforceIngestAllowlist: true,
         ingestFn: async () => 'published',
       },
-      { intervalMs: 60_000 },
+      { intervalMs: 60_000, sweepEnabled: true },
     );
     const t1 = watcher.tick(); // seed
     await t1;
