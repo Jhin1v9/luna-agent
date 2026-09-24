@@ -20,3 +20,4 @@ backups/*.dump
 .brain/.rel_cookie
 .brain/.vps_cookie
 .brain/.vps_solicitacoes.txt
+apps/whatsplay/daemon-restart*.err
