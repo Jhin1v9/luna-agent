@@ -13,8 +13,32 @@ import type { FastTool, ToolContext, ToolResult } from './tools.js';
 
 export function createVoiceCallTool(db: Sql): FastTool {
   return async (_db: Sql, ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> => {
+    // CONTENÇÃO P0 (incidente 2026-09-23: chamada foi parar em contato fora do
+    // escopo porque o destino era nome solto, sem identidade verificada). A
+    // tool fica DESLIGADA por padrão até o Chat Registry existir
+    // (identidade por número + blocklist deny-first). Liga de novo só com
+    // VOICE_CALL_ENABLED=true no .env — e mesmo assim o alvo passa pela
+    // outbound allowlist abaixo.
+    if (process.env.VOICE_CALL_ENABLED !== 'true') {
+      return {
+        ok: false,
+        data: null,
+        error: 'voice.call_place DESLIGADO (contenção pós-incidente 2026-09-23: alvo sem identidade verificada). Aguardando Chat Registry.',
+      };
+    }
     const contato = String(args.contato ?? '').trim();
     if (!contato) return { ok: false, data: null, error: 'voice.call_place: arg "contato" é obrigatório' };
+    // Contenção mínima de escopo: alvo tem que estar na outbound allowlist
+    // (match exato por nome/jid — as mesmas regras do whatsplay). O Chat
+    // Registry substituirá isso por identidade por número.
+    const lista = (process.env.WHATSAPP_OUTBOUND_ALLOWLIST ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (lista.length > 0 && !lista.includes(contato)) {
+      return {
+        ok: false,
+        data: null,
+        error: `voice.call_place: '${contato}' fora da outbound allowlist (${lista.join(', ')}) — recusado`,
+      };
+    }
     const motivo = String(args.motivo ?? 'chamada solicitada pela Luna (fast brain)').trim();
     const objetivo = String(args.objetivo ?? motivo).trim();
     const idem = `voicecall:${contato}:${new Date().toISOString().slice(0, 13)}`;
