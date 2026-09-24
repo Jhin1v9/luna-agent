@@ -41,6 +41,8 @@ export interface KimiAdapterConfig {
   fallbackApiKey?: string;
   fallbackBaseUrl?: string;
   fallbackModel?: string;
+  /** 2ª key da MESMA API primária (elo 2 da cadeia de quota, antes do Gemini). */
+  fallbackKimiApiKey?: string;
 }
 
 /** Um turno de conversa: prompt montado (persona + contexto) + mensagem do cliente. */
