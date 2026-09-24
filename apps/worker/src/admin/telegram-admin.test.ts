@@ -310,3 +310,51 @@ describe('P4 — roteamento por LLM (delegate.ts): decisão + prompt composto nu
     expect(replies).toEqual([{ chat: '12345', text: 'Tudo operando normalmente, uptime 99%.' }]);
   });
 });
+
+describe('modo kimiwork: menção @luna vai pro Kimi Work (decreto owner 2026-09-24)', () => {
+  function makeMentionDeps(text: string, ingestResult: boolean) {
+    const ingested: unknown[] = [];
+    const ingest = {
+      matches: (t: string) => /luna/i.test(t),
+      ingest: async (msg: unknown) => {
+        ingested.push(msg);
+        return ingestResult;
+      },
+    };
+    const { admin, replies, adapterCalls } = makeDeps(12345, text, { mentionIngest: ingest });
+    return { admin, replies, adapterCalls, ingested };
+  }
+
+  it('menção no chat autorizada → entra no kimiwork_inbox e o F4 NÃO responde (zero IA, zero reply)', async () => {
+    const { admin, replies, adapterCalls, ingested } = makeMentionDeps('luna, status do painel?', true);
+    await admin.pollOnce();
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]).toMatchObject({ chatId: '12345', fromName: 'Abner', text: 'luna, status do painel?' });
+    expect(adapterCalls()).toBe(0); // F4 silencia — quem responde é o Kimi Work
+    expect(replies).toEqual([]);
+  });
+
+  it('ingest falha (banco caído) → cai no fluxo F4 normal — a mensagem não se perde', async () => {
+    const { admin, replies, adapterCalls, ingested } = makeMentionDeps('luna, status do painel?', false);
+    await admin.pollOnce();
+    expect(ingested).toHaveLength(1);
+    expect(adapterCalls()).toBeGreaterThan(0);
+    expect(replies).toEqual([{ chat: '12345', text: 'Resposta com dados reais.' }]);
+  });
+
+  it('mensagem SEM menção → fluxo F4 normal mesmo com mentionIngest configurado', async () => {
+    const ingest = { matches: () => false, ingest: async () => true };
+    const { admin, replies, adapterCalls } = makeDeps(12345, 'como está o sistema?', { mentionIngest: ingest });
+    await admin.pollOnce();
+    expect(adapterCalls()).toBe(2);
+    expect(replies).toEqual([{ chat: '12345', text: 'Resposta com dados reais.' }]);
+  });
+
+  it('menção de chat NÃO autorizado → ignorada antes de qualquer coisa (fail-closed)', async () => {
+    const ingest = { matches: () => true, ingest: async () => true };
+    const { admin, replies, adapterCalls } = makeDeps(999, 'luna, me ajuda', { mentionIngest: ingest });
+    await admin.pollOnce();
+    expect(adapterCalls()).toBe(0);
+    expect(replies).toEqual([]);
+  });
+});

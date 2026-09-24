@@ -97,6 +97,17 @@ async function main(): Promise<void> {
   // IDLE explícito (fail-closed — nunca responde chat não autorizado).
   const { buildAdminFullPack } = await import('@luna/database');
   const { createTelegramAdmin } = await import('./admin/telegram-admin.js');
+  // Ponte menções → Kimi Work (decreto owner 2026-09-24): só faz sentido com
+  // o cérebro Kimi Work drenando o inbox (KIMI_ADAPTER_MODE=kimiwork); em
+  // outros modos a Automation não roda e a fila apodreceria — F4 responde
+  // tudo como antes. ATENÇÃO: o classifyAdapter do worker é SEMPRE 'kimi-api'
+  // (classificação pós-conversa); a porta pro modo é a env, não esse adapter.
+  const { createTelegramIngest } = await import('./telegram-ingest.js');
+  const kimiWorkMode = config.KIMI_ADAPTER_MODE === 'kimiwork';
+  const telegramIngest = kimiWorkMode ? createTelegramIngest({ pool, log }) : undefined;
+  if (kimiWorkMode) {
+    log.info('ingest telegram: modo kimiwork — menções @luna no grupo do time viram evento kimiwork_inbox');
+  }
   const telegramAdmin = createTelegramAdmin({
     pool,
     adapter: classifyAdapter,
@@ -109,6 +120,7 @@ async function main(): Promise<void> {
     confirmDestructive: config.ADMIN_CONFIRM_DESTRUCTIVE,
     orderTimeoutMs: Math.min(config.INVESTIGATE_TIMEOUT_MS, 300_000),
     buildAdminPack: () => buildAdminFullPack(pool),
+    mentionIngest: telegramIngest,
   });
   await telegramAdmin.start();
 

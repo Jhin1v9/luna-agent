@@ -20,6 +20,7 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 const updateSchema = z.object({
   update_id: z.number(),
   message: z.object({
+    message_id: z.number().optional(),
     chat: z.object({ id: z.number() }),
     text: z.string().optional(),
     from: z.object({ id: z.number().optional(), first_name: z.string().optional() }).optional(),
@@ -46,6 +47,14 @@ export interface TelegramAdminDeps {
   fetchImpl?: FetchLike;
   replyImpl?: (chatId: string, text: string) => Promise<void>;
   pollIntervalMs?: number;
+  /** Modo kimiwork (decreto owner 2026-09-24): menções à Luna no chat do
+   *  time são enfileiradas no kimiwork_inbox e o loop F4 NÃO responde —
+   *  quem responde é o cérebro Kimi Work (Automation). Ausente = todo
+   *  texto segue o fluxo F4 normal. */
+  mentionIngest?: {
+    matches: (text: string) => boolean;
+    ingest: (msg: { chatId: string; messageId: number; fromId: string | null; fromName: string; text: string }) => Promise<boolean>;
+  };
 }
 
 export function createTelegramAdmin(deps: TelegramAdminDeps) {
@@ -189,6 +198,24 @@ export function createTelegramAdmin(deps: TelegramAdminDeps) {
       } else if (!whitelistWarned) {
         whitelistWarned = true;
         deps.log.warn('admin telegram: ADMIN_TELEGRAM_IDS vazia — qualquer membro do chat autorizado pode dar ordens');
+      }
+
+      // ── Modo kimiwork (decreto owner 2026-09-24): menção à Luna → inbox ──
+      // O Kimi Work (Automation "Luna — Cérebro 24/7") responde pelo Bot API;
+      // o F4 NÃO responde (duas bocas = duplicata). Falha de ingest cai no
+      // fluxo F4 normal — a mensagem nunca se perde.
+      if (deps.mentionIngest && deps.mentionIngest.matches(text)) {
+        const ingested = await deps.mentionIngest.ingest({
+          chatId: String(u.message.chat.id),
+          messageId: u.message.message_id ?? 0,
+          fromId,
+          fromName: adminName,
+          text,
+        });
+        if (ingested) {
+          deps.log.info({ from: adminName }, 'admin telegram: menção @luna entregue ao Kimi Work (F4 silencia)');
+          continue;
+        }
       }
 
       deps.log.info({ from: adminName, text: text.slice(0, 80) }, 'admin telegram: pergunta recebida');

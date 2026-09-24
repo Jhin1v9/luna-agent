@@ -4,10 +4,10 @@ Fonte: `/nexo/api/admin/requests|organizations|projects` (login NextAuth ADMIN) 
 (MEMORY/OPINIONES por cliente) × mensagens WhatsApp (tabela `messages`).
 Atualizado: 2026-09-24 01:45 (+02:00) · autor: Luna — varredura com reconciliação bidirecional.
 
-> **Brain remoto (NEXO Brain / atlas):** leitura aberta OK (`/brain/api/*` — nodes, search, timeline,
-> synapse/status). Escrita exige `Authorization: Bearer $BRAIN_API_TOKEN` — o token vive SÓ no env do
-> servidor atlas na VPS (não está neste repo, .env ou backups). Sem ele: 401. Não burlar.
-> **Ação humana:** gerar/copiar o token do servidor e colocar no `.env` local como `BRAIN_API_TOKEN`.
+> **Brain remoto (NEXO Brain):** leitura e escrita FUNCIONAIS desde 2026-09-24 — o token do servidor
+> (`/opt/nexo-brain/.env` na VPS) foi validado com escrita real e gravado no `.env` local como
+> `BRAIN_API_TOKEN` (header `Authorization: Bearer`, endpoint de escrita `POST /brain/api/learning/outcomes`
+> com JSON `{type:'positive'|'negative', title, body}`). NUNCA commite o .env.
 
 ## ⚠️ DIVERGÊNCIA ATIVA
 
