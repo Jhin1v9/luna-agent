@@ -18,8 +18,12 @@ const envSchema = z.object({
   // KimiAdapter (§7.3, ADR-010/015/016/018): mock = dev/testes determinístico
   // (proibido em produção — ADR-016); kimi-web = servidor local 127.0.0.1
   // (sendTurn via WS ainda não mapeado — ADR-015); kimi-api = fast brain
-  // oficial (§7.2, ADR-016); gemini = fast brain INTERINO para teste (ADR-018).
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini']).default('mock'),
+  // oficial (§7.2, ADR-016); gemini = fast brain INTERINO para teste (ADR-018);
+  // kimiwork = a Luna do Kimi Work como cérebro (ADR-040, decreto owner
+  // 2026-09-24) — turnos na fila kimiwork_llm_turns, resposta na varredura.
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork']).default('mock'),
+  KIMIWORK_LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
+  KIMIWORK_LLM_POLL_MS: z.coerce.number().int().positive().default(2_500),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
   KIMI_WEB_TOKEN: z.string().optional(),
   KIMI_API_KEY: z.string().optional(),
@@ -56,8 +60,10 @@ const envSchema = z.object({
   LIVE_AUTONOMY: z.enum(['none', 'yolo', 'auto']).default('yolo'),
   // ── BLOCO 2 (ADR-039) — Cérebro Vivo RESERVA: pi-coding-agent (MIT).
   // 'kimi' = Kimi CLI (default, primário); 'pi' = reserva quando o Kimi CLI
-  // está sem quota. Troca = só .env, zero código (mesma interface estável).
-  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi']).default('kimi'),
+  // está sem quota; 'kimiwork' = a Luna do Kimi Work assume o live brain
+  // inteiro (ADR-040, decreto owner 2026-09-24). Troca = só .env, zero
+  // código (mesma interface estável).
+  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork']).default('kimi'),
   PI_BIN: z.string().default('pi'),
   PI_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   PI_ENTRY: z.string().optional(), // override do caminho do cli.js do pi

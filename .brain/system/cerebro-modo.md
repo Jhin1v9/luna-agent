@@ -27,10 +27,18 @@ Ressalva de arquitetura: a latência depende da cadência do agente Kimi Work (v
 poucos minutos) — ok pro live brain e pra respostas com HUMAN_RESPONSE_DELAY, ruim pra
 interação de voz em tempo real; pra voz, a conductora segue no Operador (ChatGPT) e o
 kimiwork cobre o fast brain + composição de prompts.
-## Estado
-- [x] Decreto registrado · [x] Skill criada e testada · [ ] Adapter kimiwork.ts implementado
-- [ ] zod `loadConfig` aceitar 'kimiwork' no enum de KIMI_ADAPTER_MODE
-- [ ] FallbackAdapter: encadear kimiwork como meio da cadeia (kimi-api → kimiwork → gemini)
+## Estado (2026-09-24 ~02:15 — IMPLEMENTADO e ATIVO)
+- [x] Decreto registrado · [x] Skill `cerebro` criada e testada
+- [x] Adapter `packages/agent/src/kimiwork.ts` (KimiLiveAdapter: fila kimiwork_llm_turns
+  migração 010 + poll; timeout explícito, nunca mock) — 5 testes unitários
+- [x] zod: 'kimiwork' em KIMI_ADAPTER_MODE e LIVE_BRAIN_PROVIDER (+ KIMIWORK_LLM_TIMEOUT_MS/POLL_MS)
+- [x] worker live brain branch kimiwork · voice call-executor usa KimiWorkAdapter no modo
+- [x] E2E real passou: adapter → Postgres → "varredura" → resposta (provider kimiwork)
+- [x] MODO KIMIWORK ATIVO no .env local (quota kimi 403 + gemini 429 — cenário real do decreto)
+- [x] Automation "Luna — Cérebro 24/7": passo 1.5 responde kimiwork_llm_turns; should_fire.py
+  dispara com turno LLM pendente (condition 2min)
+- [ ] Cadeia automática num só adapter (kimi-api → kimiwork → gemini) — evolução futura
+- [ ] Latência: resposta depende da cadência da varredura (min) — tradeoff aceito pelo owner
 
 *2026-09-24 · autor: Luna (decreto verbal do owner Abner, ~01:52)*
 

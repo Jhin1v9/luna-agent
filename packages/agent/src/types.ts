@@ -14,7 +14,14 @@
  *   · Modo 'mock' (default dev/test): determinístico, sem rede.
  */
 
-export type KimiAdapterMode = 'mock' | 'kimi-web' | 'kimi-api' | 'kimi-cli' | 'gemini' | 'pi';
+export type KimiAdapterMode =
+  | 'mock'
+  | 'kimi-web'
+  | 'kimi-api'
+  | 'kimi-cli'
+  | 'gemini'
+  | 'pi'
+  | 'kimiwork';
 
 export interface KimiAdapterConfig {
   mode: KimiAdapterMode;

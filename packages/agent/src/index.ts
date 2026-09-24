@@ -5,6 +5,7 @@ import { KimiApiAdapter } from './kimi-api.js';
 import { KimiCliAdapter } from './kimi-cli.js';
 import { GeminiAdapter } from './gemini.js';
 import { PiAdapter } from './pi.js';
+import { KimiWorkAdapter } from './kimiwork.js';
 import { FallbackAdapter } from './fallback.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
@@ -26,6 +27,10 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
       return new GeminiAdapter(config);
     case 'pi':
       return new PiAdapter(config);
+    case 'kimiwork':
+      // ADR-040 — Kimi Work como cérebro (decreto owner 2026-09-24): turnos
+      // na fila kimiwork_llm_turns; a Luna do Kimi Work responde na varredura.
+      return new KimiWorkAdapter(config);
   }
 }
 
@@ -67,6 +72,8 @@ export { FallbackAdapter } from './fallback.js';
 export type { FallbackHooks } from './fallback.js';
 export { PiAdapter } from './pi.js';
 export type { PiAdapterDeps } from './pi.js';
+export { KimiWorkAdapter } from './kimiwork.js';
+export type { KimiWorkAdapterDeps, PoolLike } from './kimiwork.js';
 export { probeVisionSupport } from './vision-probe.js';
 export type { VisionProbeResult } from './vision-probe.js';
 export {
