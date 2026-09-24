@@ -83,18 +83,25 @@ export function createCallExecutor(deps: CallExecutorDeps) {
       const inner = stored && typeof stored === 'object' && 'payload' in stored ? (stored.payload ?? {}) : stored;
       const brief = inner as CallBrief;
       if (!brief.destinatario) throw new Error('voice.call: evento sem destinatário — ABORTO (envelope malformado)');
-      // CONTENÇÃO P0 (incidente 2026-09-23): o executor é o PONTO ÚNICO de
-      // enforce — ligação só sai com VOICE_CALL_ENABLED=true E alvo na
-      // outbound allowlist (match exato por nome/jid). Antes disso, o destino
-      // era nome solto e a chamada foi parar em contato fora do escopo. O Chat
-      // Registry substituirá este check por identidade por número + blocklist.
+      // CONTENÇÃO P0 (incidente 2026-09-23) + FIX DEFINITIVO (Chat Registry,
+      // migração 012): ligação só sai com VOICE_CALL_ENABLED=true E alvo
+      // RESOLVIDO pelo registry. Blocked = recusa eterna; fora do registry =
+      // recusa + pede registro (fail-closed). O nome canônico do registro é a
+      // única fonte — nunca mais nome solto decidindo destino.
       if (process.env.VOICE_CALL_ENABLED !== 'true') {
         throw new Error(`voice.call DESLIGADO (contenção pós-incidente 2026-09-23, VOICE_CALL_ENABLED≠true) — pedido para '${brief.destinatario}' recusado`);
       }
-      const lista = (process.env.WHATSAPP_OUTBOUND_ALLOWLIST ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-      if (lista.length > 0 && !lista.includes(brief.destinatario)) {
-        throw new Error(`voice.call: '${brief.destinatario}' fora da outbound allowlist (${lista.join(', ')}) — ABORTO antes de discar`);
+      const { registryCheck } = await import('@luna/database');
+      const decision = await registryCheck(pool, brief.destinatario, 'ligar');
+      if (!decision.ok) {
+        log.error({ destinatario: brief.destinatario, reason: decision.reason }, 'voice.call: recusado pelo Chat Registry');
+        throw new Error(`voice.call: ${decision.reason}`);
       }
+      log.info(
+        { destinatario: decision.entry.canonicalName, chat_key: decision.entry.chatKey, kind: decision.entry.kind, correlation_id: correlationId },
+        'voice.call: destino resolvido pelo Chat Registry',
+      );
+      brief.destinatario = decision.entry.canonicalName;
       log.info({ brief, correlation_id: correlationId }, 'voice.call: pedido recebido — pré-voo');
 
       const tab = await preflightOperator({ operator, live, log, timeoutMs: 30_000 }, brief);

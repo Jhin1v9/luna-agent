@@ -75,3 +75,5 @@ export type {
   BrainMemoryFact,
   SolicitationFact,
 } from './context-builder.js';
+export { registryLookup, registryCheck, registryUpsert } from './registry.js';
+export type { RegistryEntry, RegistryDecision } from './registry.js';

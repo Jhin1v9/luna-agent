@@ -14,11 +14,9 @@ import type { FastTool, ToolContext, ToolResult } from './tools.js';
 export function createVoiceCallTool(db: Sql): FastTool {
   return async (_db: Sql, ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> => {
     // CONTENÇÃO P0 (incidente 2026-09-23: chamada foi parar em contato fora do
-    // escopo porque o destino era nome solto, sem identidade verificada). A
-    // tool fica DESLIGADA por padrão até o Chat Registry existir
-    // (identidade por número + blocklist deny-first). Liga de novo só com
-    // VOICE_CALL_ENABLED=true no .env — e mesmo assim o alvo passa pela
-    // outbound allowlist abaixo.
+    // escopo porque o destino era nome solto, sem identidade verificada).
+    // Liga só com VOICE_CALL_ENABLED=true no .env E alvo RESOLVIDO pelo
+    // Chat Registry (deny-first, fail-closed — migração 012).
     if (process.env.VOICE_CALL_ENABLED !== 'true') {
       return {
         ok: false,
@@ -28,26 +26,25 @@ export function createVoiceCallTool(db: Sql): FastTool {
     }
     const contato = String(args.contato ?? '').trim();
     if (!contato) return { ok: false, data: null, error: 'voice.call_place: arg "contato" é obrigatório' };
-    // Contenção mínima de escopo: alvo tem que estar na outbound allowlist
-    // (match exato por nome/jid — as mesmas regras do whatsplay). O Chat
-    // Registry substituirá isso por identidade por número.
-    const lista = (process.env.WHATSAPP_OUTBOUND_ALLOWLIST ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    if (lista.length > 0 && !lista.includes(contato)) {
-      return {
-        ok: false,
-        data: null,
-        error: `voice.call_place: '${contato}' fora da outbound allowlist (${lista.join(', ')}) — recusado`,
-      };
+    // Chat Registry — deny-first: blocked = nunca; fora do registry = recusa +
+    // pede registro (fail-closed). A tool NUNCA enfileira destino sem
+    // identidade resolvida (incidente 2026-09-23).
+    const { registryCheck } = await import('@luna/database');
+    const decision = await registryCheck(db, contato, 'ligar');
+    if (!decision.ok) {
+      return { ok: false, data: null, error: `voice.call_place: ${decision.reason}` };
     }
+    const alvo = decision.entry.canonicalName;
     const motivo = String(args.motivo ?? 'chamada solicitada pela Luna (fast brain)').trim();
     const objetivo = String(args.objetivo ?? motivo).trim();
-    const idem = `voicecall:${contato}:${new Date().toISOString().slice(0, 13)}`;
+    const idem = `voicecall:${alvo}:${new Date().toISOString().slice(0, 13)}`;
     try {
       const job = await enqueueJob(db, {
         job_type: 'voice.call',
         payload: {
           brief: {
-            destinatario: contato,
+            destinatario: alvo,
+            chat_key: decision.entry.chatKey,
             autorizador: 'fast-brain',
             motivo,
             objetivo,
@@ -65,7 +62,8 @@ export function createVoiceCallTool(db: Sql): FastTool {
           enfileirado: true,
           job_id: job.id,
           duplicado: !job.created,
-          mensagem: `Chamada de voz para '${contato}' enfileirada — o sistema vai fazer o pré-voo (operador ativo) e discar.`,
+          destino: { nome: alvo, chat_key: decision.entry.chatKey },
+          mensagem: `Chamada de voz para '${alvo}' (identidade verificada no Chat Registry) enfileirada — o sistema vai fazer o pré-voo (operador ativo) e discar.`,
         },
       };
     } catch (err) {
