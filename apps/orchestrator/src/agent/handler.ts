@@ -15,6 +15,7 @@ import {
 } from './context.js';
 import { transitionConversation, getConversationState } from './attention.js';
 import { runFastRoute, selectRoute } from './router/router.js';
+import { isExplicitHumanRequest } from './router/structured.js';
 
 /**
  * Handler de mensagens de cliente — o ciclo vivo com MODEL ROUTER
@@ -246,6 +247,42 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         correlation_id: event.correlation_id,
       });
       return;
+    }
+
+    // PONTE KIMI WORK (decreto owner 2026-09-24, fix double-send 2026-09-24):
+    // mensagem de WhatsApp já entregue ao cérebro Kimi Work via kimiwork_inbox
+    // (mesma correlation_id). Lá é a via canônica de resposta — a varredura
+    // dedicada (Kimi Work) responde por INSERT em messages + luna_outbound.
+    // Se o model router responder também, o cliente recebe a MESMA resposta
+    // DUAS vezes (bug ao vivo: "Por nada, Enoque!" duplicada no painel).
+    // EXCEÇÃO §8.1: pedido explícito de humano NUNCA é skipado — a escalación
+    // imediata é prioridade, zero tentativas de IA.
+    // Skip apenas do caminho de IA: coordenação de HUMAN_HANDLING (acima) e
+    // trilha de audit continuam valendo.
+    if (
+      event.event_type === 'whatsapp.message.received' &&
+      !isExplicitHumanRequest(text)
+    ) {
+      const bridged = await db.query(
+        `SELECT id FROM kimiwork_inbox
+         WHERE kind = 'whatsapp.message' AND status <> 'error'
+           AND payload->>'correlation_id' = $1 LIMIT 1`,
+        [event.correlation_id],
+      );
+      if (bridged.rowCount) {
+        log.info({ event_id: event.event_id, correlation_id: event.correlation_id, kimiwork_event_id: bridged.rows[0].id },
+          'ponte Kimi Work: mensagem já na inbox dedicada — model router NÃO responde (anti double-send)');
+        await recordAudit(db, {
+          actor: 'orchestrator',
+          action: 'agent.reply.bridge_kimiwork_skipped',
+          tool: 'message_handler',
+          client_id: event.client_id,
+          correlation_id: event.correlation_id,
+          result: 'success',
+          metadata: { event_id: event.event_id, kimiwork_event_id: (bridged.rows[0] as { id: string }).id },
+        });
+        return;
+      }
     }
 
     const runStartedAt = new Date();

@@ -21,16 +21,32 @@ export interface KimiWorkAdapterDeps {
   pool?: PoolLike;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  /** Intervalo entre avisos de progresso enquanto espera a varredura (default 2 min). */
+  progressIntervalMs?: number;
+  /** Hook de progresso (decreto Jhino 2026-09-24: "vai avisando conforme, de pouco em pouco"). */
+  onProgress?: (info: { turnId: string; elapsedMs: number; polls: number }) => void;
   /** Sleep injetável (testes). */
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 }
+
+/**
+ * Sem hard-fail por timeout (decreto Jhino 2026-09-24): o turno fica
+ * aguardando a varredura e VAI AVISANDO de pouco em pouco (log estruturado +
+ * hook onProgress — o orchestrator pode plugar aviso ao time). O cap de 12h é
+ * só segurança anti-lock eterno (um turno preso segura o client lock §19);
+ * na prática nunca é atingido.
+ */
+const SAFETY_CAP_MS = 43_200_000; // 12h — segurança, não é "timeout de operação"
+const PROGRESS_DEFAULT_MS = 120_000; // aviso a cada 2 min
 
 export class KimiWorkAdapter implements KimiLiveAdapter {
   readonly mode = 'kimiwork' as const;
   private pool: PoolLike;
   private pollIntervalMs: number;
   private timeoutMs: number;
+  private progressIntervalMs: number;
+  private onProgress?: (info: { turnId: string; elapsedMs: number; polls: number }) => void;
   private sleep: (ms: number) => Promise<void>;
   private now: () => number;
   private ownPool: { end(): Promise<void> } | null = null;
@@ -38,7 +54,9 @@ export class KimiWorkAdapter implements KimiLiveAdapter {
   constructor(_config: KimiAdapterConfig = { mode: 'kimiwork' }, deps: KimiWorkAdapterDeps = {}) {
     this.pool = deps.pool ?? this.createOwnPool();
     this.pollIntervalMs = deps.pollIntervalMs ?? Number(process.env.KIMIWORK_LLM_POLL_MS ?? 2500);
-    this.timeoutMs = deps.timeoutMs ?? Number(process.env.KIMIWORK_LLM_TIMEOUT_MS ?? 180_000);
+    this.timeoutMs = deps.timeoutMs ?? Number(process.env.KIMIWORK_LLM_TIMEOUT_MS ?? SAFETY_CAP_MS);
+    this.progressIntervalMs = deps.progressIntervalMs ?? Number(process.env.KIMIWORK_LLM_PROGRESS_MS ?? PROGRESS_DEFAULT_MS);
+    this.onProgress = deps.onProgress;
     this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.now = deps.now ?? Date.now;
   }
@@ -99,7 +117,10 @@ export class KimiWorkAdapter implements KimiLiveAdapter {
     }
 
     const t0 = this.now();
+    let polls = 0;
+    let lastProgressAt = t0;
     while (this.now() - t0 < this.timeoutMs) {
+      polls += 1;
       const res = await this.pool.query(
         `SELECT status, response, error FROM kimiwork_llm_turns WHERE id = $1`,
         [turnId],
@@ -117,13 +138,23 @@ export class KimiWorkAdapter implements KimiLiveAdapter {
       if (row?.status === 'failed') {
         throw new KimiAdapterError(`kimiwork: turno marcado como failed${row.error ? `: ${row.error}` : ''}`);
       }
+      // Decreto Jhino 2026-09-24: sem silêncio longo — avisa de pouco em pouco.
+      if (this.now() - lastProgressAt >= this.progressIntervalMs) {
+        lastProgressAt = this.now();
+        const info = { turnId, elapsedMs: this.now() - t0, polls };
+        this.onProgress?.(info);
+        console.warn(
+          JSON.stringify({ level: 'warn', msg: 'kimiwork: turno aguardando varredura', turn_id: turnId, elapsed_ms: info.elapsedMs, polls }),
+        );
+      }
       await this.sleep(this.pollIntervalMs);
     }
+    // Cap de segurança (12h) — lock do client não pode ficar preso eternamente.
     await this.pool
-      .query(`UPDATE kimiwork_llm_turns SET status = 'failed', error = 'timeout do adapter' WHERE id = $1 AND status = 'pending'`, [turnId])
+      .query(`UPDATE kimiwork_llm_turns SET status = 'failed', error = 'cap de segurança atingido (12h) aguardando a varredura' WHERE id = $1 AND status = 'pending'`, [turnId])
       .catch(() => {});
     throw new KimiAdapterError(
-      `kimiwork: resposta não chegou em ${Math.round(this.timeoutMs / 1000)}s — a varredura Kimi Work não atendeu o turno (falha explícita, sem mock)`,
+      `kimiwork: cap de segurança de 12h atingido aguardando a varredura (turno ${turnId}) — investigar varredura/sweep`,
     );
   }
 

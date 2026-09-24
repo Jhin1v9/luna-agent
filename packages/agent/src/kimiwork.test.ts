@@ -61,18 +61,24 @@ describe('KimiWorkAdapter', () => {
       return { rows: [{ status: 'pending', response: null, error: null }] };
     });
     let t = 0;
+    const progress: Array<{ turnId: string; elapsedMs: number; polls: number }> = [];
     const adapter = new KimiWorkAdapter(
       { mode: 'kimiwork' },
       {
         pool,
         timeoutMs: 100,
         pollIntervalMs: 25,
+        progressIntervalMs: 50,
+        onProgress: (info) => progress.push(info),
         sleep: async () => {},
         now: () => (t += 50),
       },
     );
-    await expect(adapter.sendTurn(TURN)).rejects.toThrow(/não chegou/);
+    // Decreto Jhino 2026-09-24: sem "timeout de operação" — o cap (aqui 100ms
+    // injetado) é só segurança anti-lock eterno, com progresso avisando.
+    await expect(adapter.sendTurn(TURN)).rejects.toThrow(/cap de segurança/);
     expect(updates).toBe(1);
+    expect(progress.length).toBeGreaterThan(0); // avisou de pouco em pouco
   });
 
   it('INSERT com idempotency duplicada reusa o turno existente', async () => {

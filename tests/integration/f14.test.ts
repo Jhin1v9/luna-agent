@@ -114,6 +114,12 @@ describe('pipeline WhatsApp end-to-end (ingest → brain → entrega)', () => {
     expect(await ingest.ingestOne(msg)).toBe('published');
     expect(await ingest.ingestOne(msg)).toBe('skipped'); // idempotência §7.6
 
+    // Fix anti double-send 2026-09-24: com a ponte Kimi Work na inbox, o model
+    // router faz SKIP (a resposta canônica é da varredura dedicada — testada em
+    // f21). Este teste exercita o caminho do ROUTER, então removemos a ponte
+    // (equivale a um cenário legado sem varredura ativa).
+    await pool.query(`DELETE FROM kimiwork_inbox WHERE kind = 'whatsapp.message'`);
+
     // 2. Orchestrator despacha: brain gera, resposta fica queued
     await bus.dispatchOnce();
     const queued = await pool.query<{ body: string; send_state: string }>(
