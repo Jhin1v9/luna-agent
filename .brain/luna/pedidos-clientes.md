@@ -3,6 +3,8 @@
 Fonte: `/nexo/api/admin/requests|organizations|projects` (login NextAuth ADMIN) × relatórios do Brain
 (MEMORY/OPINIONES por cliente) × mensagens WhatsApp (tabela `messages`).
 Atualizado: 2026-09-24 01:45 (+02:00) · autor: Luna — varredura com reconciliação bidirecional.
+**Base viva no brain remoto:** `learning/outcomes/positive/2026-09-24-clientes-base-viva-luna.md`
+(consolidado completo: solicitações × relatórios × WhatsApp × pendências — gravado 2026-09-24, reindexado).
 
 > **Brain remoto (NEXO Brain):** leitura e escrita FUNCIONAIS desde 2026-09-24 — o token do servidor
 > (`/opt/nexo-brain/.env` na VPS) foi validado com escrita real e gravado no `.env` local como
