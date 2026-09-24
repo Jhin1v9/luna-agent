@@ -13,13 +13,13 @@ Atualizado: 2026-09-24 09:45 (+02:00) · autor: Luna — reconciliação + verif
 
 ## ⚠️ DIVERGÊNCIAS ATIVAS
 
-**1) Ona Dance — slider → vídeo: IMPLEMENTADO em pre2 (24/09), mas FORA do painel.**
-Verificação ao vivo 24/09 09:40: pre2.onadance.com já serve o vídeo da Jess no hero
-(`hero-onadance.mp4`, wp-content/uploads/2026/09, autoplay/muted/loop). Ou seja: a tarefa mais
-quente da Jess **foi executada**, mas o painel nunca teve a solicitação registrada — quem olha o
-workspace não vê. → **Ação humana:** criar a solicitação em /nexo/pt/solicitacoes (projeto
-"Ona Dance web"), status CLIENT_REVIEWING, com o texto sugerido enviado no grupo productions
-(msg Telegram 5478). API REST de escrita indisponível (POST → 405, só server action).
+**1) Ona Dance — slider → vídeo: RESOLVIDO em 24/09 11:30.** ✅ Nova API admin
+(`POST /nexo/api/admin/requests`, commit cf139af) criada e deployada; solicitação criada pela
+Luna em 24/09 09:30 (id `cmufc0h7v0001114r1v7ylito`, status CLIENT_REVIEWING, externalSource
+`admin-workspace`) registrando: vídeo IMPLEMENTADO em pre2.onadance.com (hero-onadance.mp4,
+ uploads/2026/09), aguardando aprovação da Jess + publicação. Histórico: antes o painel só
+permitia criar solicitação pelo app do cliente (org da sessão), então a tarefa executada pelo
+time ficava invisível no workspace.
 
 **2) Ona Dance — hero em desktop renderiza o vídeo vertical como card em pé** (fundo blur nas
 laterais; screenshot do Abner 09:38). Ideia do Abner: hero full-bleed com o vídeo cobrindo a
@@ -47,7 +47,7 @@ tela toda no desktop. → Tarefa interna repassada ao Nonoke via grupo productio
 ### Status atual
 | Pedido | Status painel | No relatório? |
 |---|---|---|
-| Slider → vídeo vertical (41s) | ❌ AUSENTE do painel — ⚠️ mas IMPLEMENTADO em pre2.onadance.com em 24/09 (aguarda aprovação da Jess + publicação) | Sim (diz que existe) |
+| Slider → vídeo vertical (41s) | ✅ CRIADA 24/09 via API admin (cmufc0h7…) — CLIENT_REVIEWING; IMPLEMENTADA em pre2 | Sim (diz que existe) |
 | Trustpilot wp-admin | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora neste relatório |
 | "Avísame cuando vuelva" | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
 | Home só disponíveis | CLIENT_REVIEWING (desde 10/09) | Não — incluído agora |
@@ -69,6 +69,18 @@ Cliente opera via painel/e-mail (sem WhatsApp na base Luna — nada a cruzar com
 | 21/09 17:40 | Carrossel/slider móvel + profissões (eletromecânico, mecânico industrial) + logo própria — PDF recebido 21/09 via chat, guardado em documentos/brand/ (1 comentário) | ANALYZING |
 
 Tudo quadra entre painel e relatório. Nenhuma solicitação nova desde 21/09 17:40.
+
+**Auditoria 24/09 (Luna, a pedido do Abner — "já fiz tudo, coloca pra revisar e revisa você também"):**
+comparado produção hdmindustrial.es × preview hdm-six.vercel.app.
+- Scroll reveal ✅ rodando (animações de entrada presentes na produção)
+- Carrossel ✅ no hero da produção (GIFs industriais + setas)
+- Logo própria ✅ aplicada (logo HDM branca no header)
+- Aba currículos ✅ ("Trabaja con nosotros", form → e-mail rrhh@hdmindustrial.es)
+- ⚠️ Profissões novas (eletromecânico, mecânico industrial) ❌ AUSENTES em ambos os ambientes — conferir deploy
+- Cores: paleta coesa (escuro industrial + azul); sugestão — clarear sobreposição do hero (imagem muito escura)
+- Painel (Nexo Workspace): mover os 3 cards p/ revisão do Matheus — **ação humana** (sem integração daqui)
+- Divergência: preview (hdm-six) ≠ produção — previews com builds diferentes, alinhar qual branch reflete o trabalho
+- **24/09 ~10:50:** mensagem enviada ao Matheus no chat do workspace (sala do projeto HDM, conta do Abner, identificando como Luna) perguntando como ele quer o carrossel (hero só ou mais páginas) e pedido site de referência. Aguardando resposta dele. (Nota: a 1ª cópia saiu com encoding corrompido, foi apagada e reenviada íntegra.)
 
 ## Itens internos Nexo (não são pedidos de cliente)
 
