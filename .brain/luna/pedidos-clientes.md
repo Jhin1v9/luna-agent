@@ -118,3 +118,11 @@ Novas divergências de reconciliação: relatório HDM × painel (desatualizado)
 **Orgs no painel:** HDM-Industrial (cmtldsn6), JR Reformas (cmtinm4v), Ona Dance/Jess (cmshyy4n), Enoquelandia (cms8td2b), Nexo interno (cms4zb3y + test-cliente).
 
 Ação humana removida da lista: ~~senha do painel~~. Restam: card/relatório da Jess; imagens do carrossel HDM (Matheus).
+
+## Atualização 2026-09-25 00:20 (varredura — Luna cron)
+
+- **HDM (cmtldsn65 / Main WebSite):** pedido do carrossel (c6kjmmku, ANALYZING) ganhou 4º comentário em 24/09 22:13 UTC — **interno** (Abner/Luna passando status: carrossel autoplay no hero implementado no novo site; profissões eletromecânico/mecânico industrial adicionadas com descrições exatas do cliente em todos os idiomas). Detalhes já em `.brain/clients/hdm-industrial/PEDIDOS.md`. Nenhum pedido novo do cliente; painel continua com 17 requests íntegros.
+- Painel relido com sucesso (login corrigido estável); resto do painel sem mudanças vs sweep 23:58.
+- Sessão paralela criou `.brain/clients/jess-onadance/FICHA.md` (Jess formalizada como cliente).
+
+autor: Luna (cron de varredura)
