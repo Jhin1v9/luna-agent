@@ -190,9 +190,13 @@ export class IngestWatcher {
         this.deps.log.debug({ chat: b.chat_name }, 'watcher: fora do escopo de ingestão — ignorado (zero tokens)');
         continue;
       }
-      if (this.enforceIngest) {
-        // chats allowlisted são responsabilidade do sweep — evita corrida
-        // badge-path × sweep-path (dupla resposta no mesmo chat).
+      if (this.enforceIngest && this.sweepEnabled) {
+        // Com sweep ligado, chats allowlisted são responsabilidade dele —
+        // evita corrida badge-path × sweep-path (dupla resposta no chat).
+        // Com sweep DESLIGADO (padrão, decreto owner 2026-09-24), o badge-path
+        // É o caminho de ingestão desses chats — sem esse ramo, desligar o
+        // sweep calava a ingestão de TODA a allowlist (bug ao vivo 24/09:
+        // owner marcou a Luna no grupo e nada foi respondido).
         this.deps.log.debug({ chat: b.chat_name }, 'watcher: chat no escopo (sweep processa) — badge-path ignora');
         continue;
       }

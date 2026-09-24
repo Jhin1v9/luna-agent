@@ -43,7 +43,7 @@ describe('diffBadges — novidade só quando o preview muda (seed anti-disparo)'
 });
 
 describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-020)', () => {
-  function makeWatcher(allowlist: string[], enforce: boolean) {
+  function makeWatcher(allowlist: string[], enforce: boolean, sweepEnabled = false) {
     const readCalls: string[] = [];
     const ingested: string[] = [];
     let sample = 0;
@@ -77,17 +77,26 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
           return 'published';
         },
       },
-      { intervalMs: 60_000 },
+      { intervalMs: 60_000, sweepEnabled },
     );
     return { watcher, readCalls, ingested };
   }
 
-  it('escopo em dev: badge-path ignora TODOS os chats allowlisted (sweep é o dono) e fora do escopo nem abre', async () => {
-    const { watcher, readCalls, ingested } = makeWatcher(['Pai'], true);
+  it('sweep DESLIGADO (padrão, decreto 2026-09-24): badge-path INGERE chats allowlisted — é o único caminho', async () => {
+    const { watcher, readCalls, ingested } = makeWatcher(['Pai'], true, false);
     await watcher.tick(); // seed
     await watcher.tick(); // diff
     await new Promise((r) => setTimeout(r, 30)); // debounce flush
-    expect(readCalls).toEqual([]); // badge-path não abre nada em dev (sweep cuida)
+    expect(readCalls).toEqual(['c1']); // badge-path abre o allowlisted
+    expect(ingested).toEqual(['c1']);
+  });
+
+  it('sweep LIGADO: badge-path ignora chats allowlisted (sweep é o dono — sem corrida)', async () => {
+    const { watcher, readCalls, ingested } = makeWatcher(['Pai'], true, true);
+    await watcher.tick(); // seed
+    await watcher.tick(); // diff
+    await new Promise((r) => setTimeout(r, 30)); // debounce flush
+    expect(readCalls).toEqual([]); // sweep cuida; badge-path não abre
     expect(ingested).toEqual([]);
   });
 
