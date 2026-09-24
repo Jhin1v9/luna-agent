@@ -20,3 +20,7 @@
 ## Notas
 
 - Ficha nova (24/09) — histórico de pedidos ainda não consolidado aqui; ver painel Nexo Workspace (projeto Juninho web JR) e `.brain/luna/pedidos-clientes.md`.
+
+## Lead 2026-09-24
+- **IA no Instagram:** no grupo do WhatsApp, Júnior perguntou se dá pra fazer "isso" (a Luna) no Instagram dele — interesse declarado em automação/IA pras redes do negócio de reformas. Lead repassado ao Abner no Production; aguardando retorno comercial.
+- **24/09 16:15 UTC:** Júnior pediu o VALOR da IA pras redes ("So pra saber valor disso, depois voces me passam porfa"). Luna nao inventou preco; respondeu que o Abner passa os valores. Aguardando retorno comercial do Abner.
