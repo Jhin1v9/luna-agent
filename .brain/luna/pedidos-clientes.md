@@ -2,7 +2,9 @@
 
 Fonte: `/nexo/api/admin/requests|organizations|projects` (login NextAuth ADMIN) × relatórios do Brain
 (MEMORY/OPINIONES por cliente) × mensagens WhatsApp (tabela `messages`).
-Atualizado: 2026-09-24 09:45 (+02:00) · autor: Luna — reconciliação + verificação ao vivo em pre2.onadance.com.
+Atualizado: 2026-09-24 16:00 (+02:00) · autor: Luna — reconciliação + verificação ao vivo em pre2.onadance.com.
+Varredura 16:00: comentário do Matheus (24/09 10:45) registrado no card do carrossel HDM — escopo
+confirmado (auto, hero só; imagens próprias a enviar), descrições das profissões recebidas, logo final confirmado.
 **Base viva no brain remoto:** `learning/outcomes/positive/2026-09-24-clientes-base-viva-luna.md`
 (consolidado completo: solicitações × relatórios × WhatsApp × pendências — gravado 2026-09-24, reindexado).
 
@@ -67,6 +69,8 @@ Cliente opera via painel/e-mail (sem WhatsApp na base Luna — nada a cruzar com
 | 14/09 | Animação scroll reveal | COMPLETED 21/09 |
 | 21/09 13:23 | Seção/aba de envio de currículos → rrhh@hdmindustrial.es (3 comentários, último 21/09) | CLIENT_REVIEWING |
 | 21/09 17:40 | Carrossel/slider móvel + profissões (eletromecânico, mecânico industrial) + logo própria — PDF recebido 21/09 via chat, guardado em documentos/brand/ (1 comentário) | ANALYZING |
+| 24/09 09:13 | Comentário Luna no painel (ambos os cards): pergunta ao Matheus escopo do carrossel + site de referência; no card de currículos, confirmação de publicação | — |
+| 24/09 10:45 | **Comentário do Matheus (cliente) no card do carrossel** — responde TUDO: (1) carrossel com passagem automática de imagens, só na primeira parte (hero); enviará imagens próprias quando tiver; (2) descrições das profissões fornecidas por escrito (Eletromecânico + Mecânico industrial); (3) confirma que o logótipo é a versão final | ANALYZING (aguardando imagens do cliente p/ finalizar carrossel; profissões já têm texto) |
 
 Tudo quadra entre painel e relatório. Nenhuma solicitação nova desde 21/09 17:40.
 
