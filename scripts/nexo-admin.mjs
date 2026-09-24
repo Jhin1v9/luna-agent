@@ -64,12 +64,12 @@ async function main() {
         'content-type': 'application/x-www-form-urlencoded',
         cookie: cookieHeader(csrfJar),
       },
-      body: new URLSearchParams({ csrfToken, username: USER, password: PASS, callbackUrl: `${BASE}/nexo/admin` }),
+      body: new URLSearchParams({ csrfToken, email: USER, password: PASS, callbackUrl: `${BASE}/nexo/admin`, json: 'true' }),
       redirect: 'manual',
     });
     const loginCookies = parseCookies(loginResp.headers.getSetCookie?.() ?? []);
     const loc = loginResp.headers.get('location') ?? '';
-    if (!loginCookies['next-auth.session-token'] && !loginCookies['__Secure-next-auth.session-token']) {
+    if (!loginCookies['next-auth.session-token'] && !loginCookies['__Secure-next-auth.session-token'] && !loginCookies['nexo.session-token']) {
       const err = await loginResp.text().catch(() => '');
       console.error(`LOGIN FALHOU (${loginResp.status}) location=${loc} body=${err.slice(0, 200)}`);
       process.exit(2);

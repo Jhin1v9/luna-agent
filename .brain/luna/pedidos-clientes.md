@@ -106,3 +106,15 @@ Regra do owner (decreto 2026-09-24): **cliente ativo = relatório obrigatório; 
 | Ona Dance (Jess) | — | ❌ **sem acesso, sem card, sem relatório** — e é quem tem mais pedidos abertos |
 
 Novas divergências de reconciliação: relatório HDM × painel (desatualizado); Jess sem relatório (regra violada).
+
+## Reconciliação 2026-09-24 ~23:50 (pós-desbloqueio do painel)
+
+**Causa raiz do bloqueio (~6h30, 17:00→23:48):** o NextAuth do painel autentica por **email**, mas `scripts/nexo-admin.mjs` enviava o campo `username`. Fix: enviar `email` (+ aceitar cookie `nexo.session-token`, prefixo personalizado do painel). Credenciais do `.env` locais estavam corretas (`abner@nexo-digital.app`) — descoberta validada pelo Kimi Code no VPS (build DeepSeek V4 Pro) e confirmada por mim aqui. Sessão paralela já tinha ajustado o campo email; complementei o check do cookie.
+
+**Painel íntegro pós-login:** 17 requests, mesmos counts de comentários do último snapshot bom (~16:42): Jess slider cmufc0h7 CLIENT_REVIEWING (0 com); HDM carrossel c6kjmmku ANALYZING (3 com); HDM currículos cmub9zxn CLIENT_REVIEWING (4 com). Nenhum updatedAt posterior a 14:42 UTC — **nada novo acumulou durante o bloqueio**.
+
+**Relatórios (/relatorios/):** cards Jr-Reformas ✅, HDM ✅, Santafe "em breve", **Jess (Ona Dance) segue sem card** — pendência já registrada e avisada na baseline; não repetir aviso.
+
+**Orgs no painel:** HDM-Industrial (cmtldsn6), JR Reformas (cmtinm4v), Ona Dance/Jess (cmshyy4n), Enoquelandia (cms8td2b), Nexo interno (cms4zb3y + test-cliente).
+
+Ação humana removida da lista: ~~senha do painel~~. Restam: card/relatório da Jess; imagens do carrossel HDM (Matheus).
