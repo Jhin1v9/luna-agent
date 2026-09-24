@@ -1001,6 +1001,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         const decline = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
           visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
         if (!accept && !decline) return null;
+        // BUG 2 (P2, ruído ao vivo 2026-09-24): o matcher achava botões
+        // aceitar/rechazar FORA do popup real de chamada (5 ocorr. em 15 min) —
+        // o popup de chamada ENTRANTE monta fora do painel de chat; botões com
+        // esses rótulos dentro de #main/.two são UI de chat, não chamada.
+        let mount = (accept || decline) as Element | null;
+        while (mount && mount !== document.body) {
+          if ((mount as HTMLElement).id === 'main' || (mount as HTMLElement).classList?.contains('two')) return null;
+          mount = mount.parentElement;
+        }
+        if (!mount) return null; // nem ligado ao body = algo estranho — não é popup
         // Quem liga: PRIMEIRO o texto do POPUP (sobe a partir do botão e
         // extrai texto NÃO-botão de cada ancestral). O título do chat aberto
         // é SÓ fallback — bug ao vivo 2026-09-24 13:37: com um chat aberto no

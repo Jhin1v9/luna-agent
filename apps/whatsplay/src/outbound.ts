@@ -91,6 +91,36 @@ export function createOutboundListener(deps: OutboundDeps) {
     );
     const replyTo = msg.rows[0]?.reply_to_event;
     if (!replyTo) {
+      // P2 (auditoria do incidente 2026-09-24): envio manual bypassava TODA
+      // verificação de destino. A BLOCKLIST do Chat Registry vale SEMPRE
+      // (deny-first) — mesmo sem reply_to_event. Alvo fora do registry segue
+      // (clientes não registrados), mas BLOCKED para na hora.
+      const alvoRow = await pool.query<{ address: string | null; name: string | null }>(
+        `SELECT ct.address, ct.name FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1`,
+        [conversationId],
+      );
+      const alvoNome = alvoRow.rows[0]?.address ?? alvoRow.rows[0]?.name;
+      if (alvoNome) {
+        const { registryCheck } = await import('@luna/database');
+        const decision = await registryCheck(pool, alvoNome, 'mandar mensagem');
+        if (!decision.ok && /BLOCKED/i.test(decision.reason)) {
+          await mark(messageId, 'failed', `BLOCKLIST: ${decision.reason}`);
+          await recordAudit(pool, {
+            actor: 'whatsplay', action: 'send_safety.blocked', tool: 'send_safety',
+            result: 'failed', metadata: { message_id: messageId, alvo: alvoNome, motivo: 'registry_blocked', detail: decision.reason },
+          });
+          const alerta =
+            `🚨 BLOCKLIST: envio manual para '${alvoNome}' BLOQUEADO pelo Chat Registry.\n` +
+            `Nada foi enviado. — Luna`;
+          if (deps.telegram?.botToken && deps.telegram.teamChatId) {
+            try { await sendTeamMessage(alerta, deps.telegram); } catch (err) { log.error({ err }, 'blocklist: alerta Telegram falhou'); }
+          } else {
+            log.error({ alerta }, 'blocklist: TELEGRAM não configurado — alerta NÃO enviado');
+          }
+          log.error({ message_id: messageId, alvo: alvoNome }, 'BLOCKLIST: envio manual bloqueado (registry deny-first)');
+          throw new Error('send_safety_blocked');
+        }
+      }
       await recordAudit(pool, {
         actor: 'whatsplay', action: 'send_safety.skipped', tool: 'send_safety',
         result: 'success', metadata: { message_id: messageId, motivo: 'sem reply_to_event (envio manual)' },
