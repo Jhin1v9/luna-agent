@@ -33,11 +33,35 @@ export interface FallbackHooks {
 
 type Reserva = { nome: string; adapter: KimiApiAdapter | GeminiAdapter };
 
+/** Cooldown pós-quota (owner 2026-09-25): elo que voltou 403/quota N vezes
+ *  seguidas descansa 15 min — sem isso, TODO turno da semana inteira queima
+ *  tentativas num elo morto antes de cair pro reserva (latência burra). */
+const QUOTA_COOLDOWN_MS = 15 * 60_000;
+const QUOTA_COOLDOWN_AFTER = 3;
+
 export class FallbackAdapter implements KimiLiveAdapter {
   readonly mode = 'kimi-api' as const;
   private primary: KimiApiAdapter;
   private reservas: Reserva[] = [];
   private quebradas = new Set<string>();
+  private quotaFails = new Map<string, number>();
+  private quotaCooldownUntil = new Map<string, number>();
+
+  private inQuotaCooldown(nome: string): boolean {
+    return (this.quotaCooldownUntil.get(nome) ?? 0) > Date.now();
+  }
+  private noteQuotaFail(nome: string): void {
+    const n = (this.quotaFails.get(nome) ?? 0) + 1;
+    this.quotaFails.set(nome, n);
+    if (n >= QUOTA_COOLDOWN_AFTER) {
+      this.quotaCooldownUntil.set(nome, Date.now() + QUOTA_COOLDOWN_MS);
+      this.quotaFails.set(nome, 0);
+    }
+  }
+  private noteQuotaOk(nome: string): void {
+    this.quotaFails.set(nome, 0);
+    this.quotaCooldownUntil.delete(nome);
+  }
 
   constructor(
     private readonly config: KimiAdapterConfig,
@@ -79,47 +103,54 @@ export class FallbackAdapter implements KimiLiveAdapter {
   }
 
   async sendTurn(request: TurnRequest): Promise<TurnResult> {
-    try {
-      const r = await this.primary.sendTurn(request);
-      return { ...r, provider: 'kimi-api' };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!QUOTA_RE.test(msg)) throw err;
-      if (this.reservas.length === 0) {
-        throw new Error(
-          `quota da Kimi esgotada e cadeia de reserva vazia (sem KIMI_API_KEY_2 nem GEMINI_API_KEY) — ${msg}`,
-        );
+    if (!this.inQuotaCooldown('kimi-api')) {
+      try {
+        const r = await this.primary.sendTurn(request);
+        this.noteQuotaOk('kimi-api');
+        return { ...r, provider: 'kimi-api' };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!QUOTA_RE.test(msg)) throw err;
+        this.noteQuotaFail('kimi-api');
       }
-      // Cadeia: tenta cada elo em ordem (kimi-2 → gemini). Por elo:
-      //  - UMA tentativa normal; erro TRANSITÓRIO (timeout/rede/5xx) repete 1x.
-      //  - 401/400/403: key inválida — marca o elo quebrado e passa pro próximo.
-      //  - 429/quota da reserva: não repete o elo, passa pro próximo.
-      const erros: string[] = [];
-      for (const reserva of this.reservas) {
-        if (this.quebradas.has(reserva.nome)) continue;
-        let lastErr: unknown;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const r = await reserva.adapter.sendTurn(request);
-            // Sem fallback silencioso: hook vira log explícito +
-            // evento router.provider.unavailable no orchestrator.
-            this.hooks.onFallback?.({ from: 'kimi-api', to: reserva.nome, reason: msg });
-            return { ...r, provider: reserva.nome === 'gemini-api' ? 'gemini-api' : 'kimi-api' };
-          } catch (err2) {
-            lastErr = err2;
-            const msg2 = err2 instanceof Error ? err2.message : String(err2);
-            if (/401|400|403/i.test(msg2)) {
-              this.quebradas.add(reserva.nome); // key inválida: não insiste
-              break;
-            }
-            if (QUOTA_RE.test(msg2)) break; // 429/quota da reserva: próximo elo
-            if (!TRANSIENT_RE.test(msg2)) break; // erro de cliente/parse: próximo elo
-          }
-        }
-        erros.push(`${reserva.nome}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
-      }
-      throw new Error(`cadeia de quota esgotada (kimi → kimi-2 → gemini) — [${erros.join(' | ')}] (original: ${msg})`);
     }
+    if (this.reservas.length === 0) {
+      throw new Error('quota da Kimi esgotada e cadeia de reserva vazia (sem KIMI_API_KEY_2 nem GEMINI_API_KEY)');
+    }
+    // Cadeia: tenta cada elo em ordem (kimi-2 → gemini). Por elo:
+    //  - UMA tentativa normal; erro TRANSITÓRIO (timeout/rede/5xx) repete 1x.
+    //  - 401/400/403: key inválida — marca o elo quebrado e passa pro próximo.
+    //  - 429/quota: cooldown de 15 min após 3 falhas seguidas (não queima
+    //    tentativa em elo morto a semana inteira).
+    const erros: string[] = [];
+    for (const reserva of this.reservas) {
+      if (this.quebradas.has(reserva.nome) || this.inQuotaCooldown(reserva.nome)) continue;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await reserva.adapter.sendTurn(request);
+          this.noteQuotaOk(reserva.nome);
+          // Sem fallback silencioso: hook vira log explícito +
+          // evento router.provider.unavailable no orchestrator.
+          this.hooks.onFallback?.({ from: 'kimi-api', to: reserva.nome, reason: 'quota/cooldown da primária' });
+          return { ...r, provider: reserva.nome === 'gemini-api' ? 'gemini-api' : 'kimi-api' };
+        } catch (err2) {
+          lastErr = err2;
+          const msg2 = err2 instanceof Error ? err2.message : String(err2);
+          if (/401|400|403/i.test(msg2)) {
+            this.quebradas.add(reserva.nome); // key inválida: não insiste
+            break;
+          }
+          if (QUOTA_RE.test(msg2)) {
+            this.noteQuotaFail(reserva.nome);
+            break;
+          }
+          if (!TRANSIENT_RE.test(msg2)) break; // erro de cliente/parse: próximo elo
+        }
+      }
+      erros.push(`${reserva.nome}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+    }
+    throw new Error(`cadeia de quota esgotada (kimi → kimi-2 → gemini) — [${erros.join(' | ')}]`);
   }
 
   async readMessages(sessionKey: string, afterSeq?: number): Promise<unknown[]> {
