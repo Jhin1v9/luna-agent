@@ -1058,7 +1058,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         return JSON.stringify({ caller });
       }`,
       null,
-    ).catch(() => null);
+    ).catch((e) => { this.config.log?.warn({ err: String(e).slice(0, 250) }, "voice-call: detectIncomingCall ERRO REAL"); return null; });
     if (typeof r !== 'string' || !r) return null;
     try {
       const parsed = JSON.parse(r) as { caller: string };
