@@ -1009,9 +1009,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         // ⚠️ NÃO usar .two — é o wrapper do APP INTEIRO (o P2 v1 quebrava
         // TODA a detecção ao vivo 2026-09-25: callBtns=2 visíveis e o detector
         // cego porque o popup também mora dentro de .two).
-        let mount = (accept || decline) as Element | null;
+        let mount = accept || decline;
         while (mount && mount !== document.body) {
-          const el = mount as HTMLElement;
+          const el = mount;
           if (el.id === 'main' || el.id === 'pane-side') return null;
           mount = mount.parentElement;
         }
