@@ -263,12 +263,12 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       event.event_type === 'whatsapp.message.received' &&
       !isExplicitHumanRequest(text)
     ) {
-      const bridged = await db.query(
+      const bridged = process.env.KIMI_ADAPTER_MODE === 'kimiwork' ? await db.query(
         `SELECT id FROM kimiwork_inbox
          WHERE kind = 'whatsapp.message' AND status <> 'error'
            AND payload->>'correlation_id' = $1 LIMIT 1`,
         [event.correlation_id],
-      );
+      ) : ({ rowCount: 0, rows: [] } as never);
       if (bridged.rowCount) {
         log.info({ event_id: event.event_id, correlation_id: event.correlation_id, kimiwork_event_id: bridged.rows[0].id },
           'ponte Kimi Work: mensagem já na inbox dedicada — model router NÃO responde (anti double-send)');

@@ -996,10 +996,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           const s = getComputedStyle(e);
           return s.display !== 'none' && s.visibility !== 'hidden';
         };
-        const accept = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
-          visible(b) && /^(aceptar|atender|answer|accept|responder)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
-        const decline = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) =>
-          visible(b) && /^(rechazar|recusar|decline|reject|colgar)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+        const foraChat = (el) => { let m = el; while (m && m !== document.body) { if (m.id === 'main' || m.id === 'pane-side') return false; m = m.parentElement; } return !!m; };
+        const callBtns = Array.from(document.querySelectorAll('button, [role="button"]')).filter((b) => visible(b) && foraChat(b));
+        const lbl = (b) => (b.getAttribute('aria-label') || b.textContent || '').trim();
+        const accept = callBtns.find((b) => /^aceptar|^atender|^answer|^accept|^responder/i.test(lbl(b)));
+        const decline = callBtns.find((b) => /^rechazar|^recusar|^decline|^reject|^colgar/i.test(lbl(b)));
         if (!accept && !decline) return null;
         // BUG 2 (P2, ruído ao vivo 2026-09-24): o matcher achava botões
         // aceitar/rechazar FORA do popup real de chamada. Discriminador
