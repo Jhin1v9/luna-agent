@@ -207,6 +207,33 @@ async function main(): Promise<void> {
     if (n.payload) callExecutor(n.payload).catch((err) => log.error({ err }, 'voice.call: executor falhou'));
   });
   log.info('ouvindo NOTIFY voice_call_requests (chamadas de voz)');
+  // ChatGPT (Operador) SEMPRE aberto (decreto owner 2026-09-25): o chrome-voice
+  // sobe headed no boot com a aba do ChatGPT pronta — zero latência de abrir
+  // na hora da chamada. Se já estiver no ar (CDP :9340), não faz nada.
+  {
+    const { spawn } = await import('node:child_process');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const voiceDir = path.join(os.homedir(), '.luna', 'chrome-voice');
+    const cdpCheck = await fetch('http://127.0.0.1:9340/json/version', { signal: AbortSignal.timeout(2500) }).then(() => true).catch(() => false);
+    if (!cdpCheck) {
+      const chromePath = process.env.WHATSAPP_CHROME_PATH?.trim() || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+      try {
+        spawn(chromePath, [
+          `--remote-debugging-port=9340`,
+          `--user-data-dir=${voiceDir}`,
+          '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
+          '--use-fake-ui-for-media-stream',
+          'https://chatgpt.com/',
+        ], { detached: true, stdio: 'ignore' }).unref();
+        log.info('chrome-voice: Operador (ChatGPT) abrindo no boot — aba pronta pra chamadas');
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 120) }, 'chrome-voice: falha ao abrir no boot (não bloqueia — abre sob demanda na chamada)');
+      }
+    } else {
+      log.info('chrome-voice: já no ar (CDP :9340) — nada a fazer');
+    }
+  }
 
   // PONTE KIMI WORK (decreto owner 2026-09-24) — DUAS pontes:
   // 1) detector de chamada RECEBIDA → kimiwork_inbox (o Kimi Work decide:
@@ -230,11 +257,28 @@ async function main(): Promise<void> {
   const voiceLive = createVoiceLiveAdapter(pool, log);
   const callAllowlist = config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim());
   let fastpathBusy = false;
+  let diagCounter = 0;
+  let lastDiagKey = "";
   let lastIncomingRingAt = 0;
   const incomingTimer = setInterval(async () => {
     try {
       const incoming = await transport.detectIncomingCall?.();
-      if (!incoming) return;
+      if (!incoming) {
+        // Diagnóstico periódico (a cada ~10s): se o matcher exato não casou
+        // mas botões de chamada existem, loga os rótulos reais (calibração).
+        diagCounter++;
+        if (diagCounter % 5 === 0) {
+          const diag = await (transport as never as { probeCallPopupDiag?: () => Promise<string[]> }).probeCallPopupDiag?.().catch(() => [] as string[]) ?? [];
+          if (diag.length > 0) {
+            const key = diag.join('|');
+            if (key !== lastDiagKey) {
+              lastDiagKey = key;
+              log.warn({ botoes: diag }, 'fastpath: botões de chamada EXISTEM mas o matcher exato não casou — CALIBRAR (probeCallPopupDiag)');
+            }
+          }
+        }
+        return;
+      }
       log.info({ caller: incoming.caller }, 'fastpath: RING DETECTADO no Chrome dedicado');
       const now = Date.now();
       if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca

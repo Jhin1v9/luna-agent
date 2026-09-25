@@ -1067,6 +1067,46 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     }
   }
 
+  /** Diagnóstico do popup (observabilidade 2026-09-25): quando o detector
+   *  EXATO não casa mas botões de chamada EXISTEM (loose match visível fora
+   *  de #main/#pane-side), devolve os rótulos reais — pra calibrar o matcher
+   *  com o que o WA renderiza de verdade. Nunca dispara atendimento. */
+  async probeCallPopupDiag(): Promise<string[]> {
+    const page = this.requirePage();
+    const r = await evalWithArg(
+      page,
+      `(_) => {
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const foraDoChat = (el) => {
+          let m = el;
+          while (m && m !== document.body) {
+            if (m.id === 'main' || m.id === 'pane-side') return false;
+            m = m.parentElement;
+          }
+          return !!m;
+        };
+        const hits = Array.from(document.querySelectorAll('button, [role="button"]'))
+          .filter((b) => visible(b) && foraDoChat(b))
+          .map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim())
+          .filter((t) => /aceptar|rechazar|atender|colgar|answer|decline|reject|responder|recusar/i.test(t));
+        return JSON.stringify(hits.slice(0, 8));
+      }`,
+      null,
+    ).catch(() => null);
+    if (typeof r !== 'string' || !r) return [];
+    try {
+      return JSON.parse(r) as string[];
+    } catch {
+      return [];
+    }
+  }
+
   /** Atende a chamada recebida (clique no botão de aceitar, verificado).
    *  O clique é feito NA PÁGINA com o MESMO matcher do detectIncomingCall —
    *  bug ao vivo 2026-09-24 13:37: o seletor CSS cobria só "Aceptar/Atender/
