@@ -235,6 +235,7 @@ async function main(): Promise<void> {
     try {
       const incoming = await transport.detectIncomingCall?.();
       if (!incoming) return;
+      log.info({ caller: incoming.caller }, 'fastpath: RING DETECTADO no Chrome dedicado');
       const now = Date.now();
       if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca
       lastIncomingRingAt = now;
