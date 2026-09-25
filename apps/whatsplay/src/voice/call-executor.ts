@@ -61,9 +61,22 @@ export function createVoiceLiveAdapter(pool: Pool, log: Logger): KimiLiveAdapter
       );
 }
 
-export function createCallExecutor(deps: CallExecutorDeps) {
+export async function createCallExecutor(deps: CallExecutorDeps) {
   const { pool, transport, log } = deps;
   const live = createVoiceLiveAdapter(pool, log);
+  // Conductora = sessão DEDICADA Kimi Web (decreto owner 2026-09-25): é ela
+  // que entende a intenção e EXECUTE com tools (brain/painel/arquivos) — a API
+  // chain fica só como fallback se o servidor local estiver fora.
+  const { KimiWebLocalAdapter } = await import('@luna/agent');
+  const conductorLive =
+    process.env.KIMIWEB_LOCAL_URL && process.env.KIMIWEB_LOCAL_TOKEN && process.env.KIMIWEB_SESSION_ID
+      ? new KimiWebLocalAdapter({
+          baseUrl: process.env.KIMIWEB_LOCAL_URL,
+          token: process.env.KIMIWEB_LOCAL_TOKEN,
+          sessionId: process.env.KIMIWEB_SESSION_ID,
+          timeoutMs: 120_000,
+        })
+      : live;
   const operator = new OperatorSession({ log });
   let busy = false;
   return async function executeCallRequest(eventId: string): Promise<void> {
@@ -128,7 +141,7 @@ export function createCallExecutor(deps: CallExecutorDeps) {
       }
       const conductor = new CallConductor({
         operator,
-        live,
+        live: conductorLive,
         log,
         pool,
         correlationId,

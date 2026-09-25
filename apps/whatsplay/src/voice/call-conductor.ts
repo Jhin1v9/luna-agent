@@ -142,6 +142,7 @@ export class CallConductor {
   private failures = 0;
   private readonly history: string[] = [];
   private cursor = 0;
+  private lastRelayKey = '';
   private voiceSeen = new Set<string>();
 
   constructor(private readonly deps: ConductorDeps) {}
@@ -213,64 +214,40 @@ export class CallConductor {
               this.history.push(`- ${turno.speaker}: ${turno.text}`.slice(0, 200));
               if (this.history.length > 12) this.history.shift();
             }
-            // Guarda de ordem explícita olha a fala MAIS RECENTE do lote.
-            const ultimo = fresh[fresh.length - 1]!;
-            const decision = await this.deps.live.sendTurn({
+            // RELAY DIRETO (decreto owner 2026-09-25): TODA a transcript vai
+            // crua pra sessão Kimi Web (tools + brain + painel). Ela entende a
+            // intenção — ORDENS executa com tools, PERGUNTAS consulta quando
+            // preciso (ex.: "último pedido da Jess" = olhar o brain/painel) — e
+            // responde no formato de instrução pro Operador. Zero regex, zero
+            // protocolo JSON no meio.
+            const transcript = fresh.map((t) => `${t.speaker}: ${t.text}`).join('\n');
+            // COALESCE: captions de voz evoluem por acréscimo entre polls — só
+            // relay quando a fala mais recente MUDOU (uma fala = um relay).
+            const relayKey = fresh[fresh.length - 1]!.text.slice(0, 120);
+            if (relayKey !== this.lastRelayKey) {
+            this.lastRelayKey = relayKey;
+            const reply = await this.deps.live.sendTurn({
               session_key: `conductor:${this.deps.correlationId ?? 'call'}`,
-              prompt: DECIDE_PROMPT(brief, this.history.join('\n'), fresh),
-            }).then((t) => parseDecision(t.reply_text)).catch((err) => {
+              prompt: [
+                '[CHAMADA AO VIVO — novas falas na transcrição, em tempo real]',
+                transcript,
+                '',
+                "Regras deste turno: se a fala pede algo (ORDEM), EXECUTE com suas tools agora e responda com o resultado.",
+                "Se é uma PERGUNTA cuja resposta exige dado (brain/painel/arquivos), CONSULTE com as tools antes de responder.",
+                "Responda SEMPRE no formato de instrução pro Operador (ele é a voz do Abner):",
+                '"Fale para o Abner que <resultado/ resposta>." — curto, PT-BR, personalidade Luna.',
+              ].join('\n'),
+            }).catch((err) => {
               this.failures++;
-              this.say(`Kimi Live falhou no turno (${String(err).slice(0, 120)}) — Operador segue com o que tem`, { failures: this.failures });
-              return { kind: 'hold' } as Decision;
+              this.say(`Kimi Web fora (${String(err).slice(0, 80)}) — segue sem copiloto`);
+              return null;
             });
-            // GUARDA DE ORDEM EXPLÍCITA (decreto owner): act sem ordem direta
-            // no turno vira pergunta — nunca ação por conta própria.
-            // ATALHO DETERMINÍSTICO (decreto owner, call ao vivo 2026-09-25):
-            // ordem de mensagem explícita é executada DIRETO — sem rodada de LLM
-            // (latência zero, confiabilidade total pro caso mais comum).
-            const RE_MSG_GRUPO = /no grupos+([^,.\"\"“]+?)(?:s+(?:dizendo|escrito|falando|com o texto|ques+diga))?s*["“]?([^"”]{2,})?["”]?$/i;
-            const RE_MSG_PARA = /(?:para|pra|pro)s+([^,.\"\"“]+?)(?:s+(?:dizendo|escrito|falando|com o texto|ques+diga))?s*["“]?([^"”]{2,})?["”]?$/i;
-            const ordemMsg = /mandw*|enviw*/i.test(ultimo.text) && /mensagem|msg/i.test(ultimo.text)
-              ? (RE_MSG_GRUPO.exec(ultimo.text) ?? RE_MSG_PARA.exec(ultimo.text))
-              : null;
-            if (ordemMsg && ordemMsg[1] && (ordemMsg[2] || /teste|oi|ol[aá]/i.test(ultimo.text))) {
-              const alvo = ordemMsg[1].trim();
-              const texto = (ordemMsg[2] || 'Testando voz um dois três').trim();
-              const acao = { kind: 'act', name: 'wa_msg', detail: `para=${alvo} | texto=${texto}` } as const;
-              this.say(`ORDEM DIRETA detectada — executando wa_msg sem LLM (${alvo})`);
-              const evidencia = await this.deps.executeAction?.(acao.name, acao.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
-              await this.audit('conductor.act', { name: 'wa_msg', evidence: evidencia, ordem_citada: ultimo.text.slice(0, 120) });
-              if (evidencia) await this.deps.operator.sendText(tab, `📟 Luna → Operador: Fale para o Abner que ${evidencia}.`).catch(() => {});
-              continue;
+            if (reply && reply.reply_text && reply.reply_text.trim()) {
+              const texto = reply.reply_text.trim().replace(/^📟s*Luna → Operador:s*/i, '');
+              this.say(`relay: "${texto.slice(0, 90)}"`);
+              await this.deps.operator.sendText(tab, `📟 Luna → Operador: ${texto}`).catch(() => {});
+              await this.audit('conductor.relay', { texto: texto.slice(0, 160), turnos: fresh.length });
             }
-            const guarded = guardAction(decision, ultimo);
-            if (guarded.decision.kind === 'say' && decision.kind === 'act') {
-              this.say(`SEM ORDEM EXPLÍCITA — act '${decision.name}' virou pergunta ao owner`);
-            }
-            const final = guarded.decision;
-            if (final.kind === 'say') {
-              // BARRAMENTO INTERNO (fix arquitetura 2026-09-25): o texto vai ao
-              // chat como INSTRUÇÃO pro Operador com prefixo 📟 — nunca como fala
-              // direta pro Abner. O prefixo também marca a mensagem p/ proteção
-              // de eco (a conductora ignora os próprios relays ao ler o thread).
-              const barramento = `📟 Luna → Operador: ${final.text.replace(/^📟\s*Luna → Operador:\s*/i, '')}`;
-              this.say(`digita pro Operador: "${barramento.slice(0, 100)}"`);
-              await this.deps.operator.sendText(tab, barramento);
-              await this.audit('conductor.say', { text: barramento.slice(0, 150), turno: ultimo.text.slice(0, 100) });
-            } else if (final.kind === 'act') {
-              this.say(`ação: ${final.name} — ${final.detail.slice(0, 100)} (ordem: "${guarded.ordemCitada}")`);
-              let evidence = 'sem executor';
-              if (this.deps.executeAction) {
-                evidence = await this.deps.executeAction(final.name, final.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
-              }
-              await this.audit('conductor.act', { name: final.name, evidence, ordem_citada: guarded.ordemCitada ?? null, turno: ultimo.text.slice(0, 100) });
-              // ação também vira fala quando couber
-              if (evidence && evidence !== 'sem executor') {
-                await this.deps.operator.sendText(tab, `📟 Luna → Operador: Fale para o Abner que ${evidence}.`).catch(() => {});
-              }
-            } else {
-              this.say('segura (hold)');
-              if (this.failures > 0) await this.deps.operator.sendText(tab, HOLD_TEXT).catch(() => {});
             }
           }
         } catch (err) {

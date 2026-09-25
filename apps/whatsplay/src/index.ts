@@ -200,7 +200,7 @@ async function main(): Promise<void> {
   // Chamadas de voz (decreto owner: a FAST Luna pode fazer ligações):
   // pg_notify('voice_call_requests') → pré-voo + placeVoiceCall + conductora.
   const { createCallExecutor } = await import('./voice/call-executor.js');
-  const callExecutor = createCallExecutor({ pool, transport, log });
+  const callExecutor = await createCallExecutor({ pool, transport, log });
   const callListen = await pool.connect();
   await callListen.query("LISTEN voice_call_requests");
   callListen.on('notification', (n) => {

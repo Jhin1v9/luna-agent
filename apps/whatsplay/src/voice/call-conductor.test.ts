@@ -61,7 +61,7 @@ describe('CallConductor loop', () => {
   it('turno do participante → Kimi decide say → texto digitado no chat do Operador + audit', async () => {
     const tab = fakeTab([[{ role: 'user', text: 'quem é a cliente?' }]]);
     const op = fakeOperator();
-    const live = fakeLive(['{"action":"say","text":"É a Jess — ela quer falar contigo direto."}']);
+    const live = fakeLive(['Fale para o Abner que é a Jess — ela quer falar contigo direto.']);
     const audits: string[] = [];
     const c = new CallConductor({
       operator: op as never,
@@ -75,9 +75,9 @@ describe('CallConductor loop', () => {
     await new Promise((r) => setTimeout(r, 400));
     h.stop();
     expect(live.prompts[0]).toContain('quem é a cliente?');
-    expect(live.prompts[0]).toContain('Jess');
-    expect(op.sent).toEqual(['📟 Luna → Operador: É a Jess — ela quer falar contigo direto.']);
-    expect(audits).toContain('conductor.say');
+    expect(live.prompts[0]).toContain('quem é a cliente?');
+    expect(op.sent).toEqual(['📟 Luna → Operador: Fale para o Abner que é a Jess — ela quer falar contigo direto.']);
+    expect(audits).toContain('conductor.relay');
   });
 
   it('ação → executeAction com evidência + audit; Kimi caindo degrada SEM derrubar o loop', async () => {
@@ -90,7 +90,7 @@ describe('CallConductor loop', () => {
     const live = {
       async sendTurn() {
         n++;
-        if (n === 1) return { reply_text: '{"action":"act","name":"wa_msg","detail":"Jess: retorna ligação"}', session_id: 's', duration_ms: 1 };
+        if (n === 1) return { reply_text: 'Fale para o Abner que mensagem enviada para a Jess.', session_id: 's', duration_ms: 1 };
         throw new Error('kimi-cli: exit 1');
       },
     };
@@ -108,8 +108,8 @@ describe('CallConductor loop', () => {
     const h = c.start(tab, brief);
     await new Promise((r) => setTimeout(r, 500));
     h.stop();
-    expect(actions[0]).toContain('wa_msg');
-    expect(op.sent.some(m => m.includes('msg enfileirada com sucesso'))).toBe(true); // evidência vai com o barramento
+    // (executor agora é a própria sessão Kimi Web — o relay só transmite a resposta)
+    expect(op.sent.some(m => m.includes('mensagem enviada para a Jess'))).toBe(true); // resposta da sessão vai no barramento
     // Kimi caiu no 2º turno — o loop sobreviveu (sem exceção)
     expect(op.sent.length).toBeGreaterThanOrEqual(1);
   });
@@ -127,7 +127,7 @@ describe('CallConductor loop', () => {
 
   it('voice mode (decreto owner 08:16): captions viram turnos, dedupe por conteúdo — caption repetida NÃO reprocessa', async () => {
     const tab = fakeTab([]); // thread de texto MUDO (é o caso real do voice mode)
-    const live = fakeLive(['{"action":"hold"}', '{"action":"say","text":"Pergunta se é sobre o painel."}']);
+    const live = fakeLive(['', 'Pergunta se é sobre o painel.']);
     const op = fakeOperator();
     let reads = 0;
     const c = new CallConductor({
@@ -153,7 +153,7 @@ describe('CallConductor loop', () => {
     // Cenário real: a resposta anterior demorou e 3 falas acumularam. Antes do
     // batch eram 3 roundtrips seriais (3x a latência); agora é 1 só.
     const tab = fakeTab([[{ role: 'user', text: 'primeira' }, { role: 'user', text: 'segunda' }, { role: 'user', text: 'terceira' }]]);
-    const live = fakeLive(['{"action":"say","text":"Resposta ao estado atual."}']);
+    const live = fakeLive(['Resposta ao estado atual.']);
     const op = fakeOperator();
     const c = new CallConductor({ operator: op as never, live: live as never, log, pollMs: 60 });
     const h = c.start(tab, brief);
@@ -163,7 +163,7 @@ describe('CallConductor loop', () => {
     expect(live.prompts[0]).toContain('primeira');
     expect(live.prompts[0]).toContain('segunda');
     expect(live.prompts[0]).toContain('terceira');
-    expect(live.prompts[0]).toContain('Novos turnos');
+    expect(live.prompts[0]).toContain('novas falas na transcrição');
     expect(op.sent).toEqual(['📟 Luna → Operador: Resposta ao estado atual.']);
   });
 });
