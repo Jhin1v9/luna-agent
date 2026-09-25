@@ -27,6 +27,17 @@ export async function redriveDeadLetter(pool: Pool, eventId: string): Promise<bo
     [eventId],
   );
   const envelope = original.rows[0]?.payload ?? dlq.rows[0]!.payload;
+  // Eventos legados podem ter sido limpos de `events` (FK outbox→events) —
+  // recria a linha mínima do evento a partir do payload guardado na DLQ.
+  if (!original.rowCount) {
+    const env = envelope as { correlation_id?: string } | null;
+    await pool.query(
+      `INSERT INTO events (event_id, event_type, version, occurred_at, priority, payload, correlation_id, recorded_at)
+       VALUES ($1, $2, 1, $3, 0, $4, $5, now())
+       ON CONFLICT (event_id) DO NOTHING`,
+      [eventId, dlq.rows[0]!.event_type, new Date(), envelope, env?.correlation_id ?? `corr_dlq_${eventId.slice(0, 28)}`],
+    );
+  }
   await pool.query(
     `INSERT INTO outbox (event_id, event_type, payload, occurred_at)
      VALUES ($1, $2, $3, $4)`,

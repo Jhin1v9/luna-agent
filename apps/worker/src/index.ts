@@ -37,12 +37,32 @@ async function main(): Promise<void> {
   // Brain (OPINIONES do cliente + sinapse + memory_index).
   const { createAdapter } = await import('@luna/agent');
   const { createClassifyHandler } = await import('./jobs/classify.js');
-  const classifyAdapter = createAdapter({
+  // P3 (decreto owner): classify NUNCA morre por quota de UM provider. Em modo
+  // kimiwork, a cadeia é kimiwork → API (kimi → kimi-2 → gemini). Noutros
+  // modos, o adapter do modo já embute sua reserva (FallbackAdapter).
+  const apiChainAdapter = createAdapter({
+    mode: 'kimi-api',
+    apiKey: config.LLM_API_KEY,
+    apiBaseUrl: config.LLM_BASE_URL,
+    apiModel: config.LLM_MODEL,
+  });
+  const modeAdapter = createAdapter({
     mode: config.KIMI_ADAPTER_MODE,
     apiKey: config.LLM_API_KEY,
     apiBaseUrl: config.LLM_BASE_URL,
     apiModel: config.LLM_MODEL,
   });
+  let classifyAdapter = modeAdapter;
+  if (config.KIMI_ADAPTER_MODE === 'kimiwork') {
+    const { ChainAdapter } = await import('@luna/agent');
+    classifyAdapter = new ChainAdapter(
+      [
+        { nome: 'kimiwork', adapter: modeAdapter },
+        { nome: 'kimi-api-chain', adapter: apiChainAdapter },
+      ],
+      { onElo: (i) => log.warn(i, 'classify: caiu pro elo reserva (quota/lentidão do primário)') },
+    );
+  }
   runner.register('conversation.classify', createClassifyHandler({ pool, adapter: classifyAdapter, log }));
   const { createSummarizeHandler } = await import('./jobs/summarize.js');
   runner.register('memory.summarize', createSummarizeHandler({ pool, adapter: classifyAdapter, log }));

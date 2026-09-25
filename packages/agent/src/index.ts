@@ -81,3 +81,4 @@ export {
   ApiKeyMissing,
   ChatCompletionsError,
 } from './openai-compat.js';
+export { ChainAdapter } from "./chain.js";

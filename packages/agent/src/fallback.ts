@@ -23,7 +23,8 @@ import { GeminiAdapter } from './gemini.js';
  *  - Kimi key 1 continua primária em TODA chamada seguinte.
  */
 
-const QUOTA_RE = /403|401|429|quota|rate.?limit|insufficient|exceeded/i;
+export const QUOTA_RE = /403|401|429|quota|rate.?limit|insufficient|exceeded/i;
+export const TRANSIENT_RE = /timeout|inacessível|rede\/DNS|econnreset|etimedout|socket|HTTP 5\d\d/i;
 
 /** Hook de observabilidade do fallback (log + evento router.provider.unavailable). */
 export interface FallbackHooks {
@@ -93,7 +94,6 @@ export class FallbackAdapter implements KimiLiveAdapter {
       //  - UMA tentativa normal; erro TRANSITÓRIO (timeout/rede/5xx) repete 1x.
       //  - 401/400/403: key inválida — marca o elo quebrado e passa pro próximo.
       //  - 429/quota da reserva: não repete o elo, passa pro próximo.
-      const TRANSIENT_RE = /timeout|inacessível|rede\/DNS|econnreset|etimedout|socket|HTTP 5\d\d/i;
       const erros: string[] = [];
       for (const reserva of this.reservas) {
         if (this.quebradas.has(reserva.nome)) continue;
