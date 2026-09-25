@@ -109,7 +109,7 @@ describe('CallConductor loop', () => {
     await new Promise((r) => setTimeout(r, 500));
     h.stop();
     expect(actions[0]).toContain('wa_msg');
-    expect(op.sent).toContain('msg enfileirada com sucesso'); // evidência vira fala
+    expect(op.sent.some(m => m.includes('msg enfileirada com sucesso'))).toBe(true); // evidência vai com o barramento
     // Kimi caiu no 2º turno — o loop sobreviveu (sem exceção)
     expect(op.sent.length).toBeGreaterThanOrEqual(1);
   });

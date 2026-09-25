@@ -134,8 +134,29 @@ export function createCallExecutor(deps: CallExecutorDeps) {
         correlationId,
         pollMs: 3_000,
         executeAction: async (name, detail) => {
-          log.info({ name, detail }, 'voice.call: ação pedida pela conductora (sem executor no daemon ainda)');
-          return `ação ${name} registrada (sem executor) — ${detail.slice(0, 80)}`;
+          if (name === 'wa_msg') {
+            // detail: "para=<alvo> | texto=<conteúdo>" — envia pela fila normal
+            // (messages + pg_notify luna_outbound); notify_send=1 habilita o
+            // destino via registry (allowlist de dev não bloqueia notificação).
+            const para = /para=([^|]+)/.exec(detail)?.[1]?.trim() ?? '';
+            const texto = /texto=(.*)$/s.exec(detail)?.[1]?.trim() ?? '';
+            if (!para || !texto) return 'falhou: detalhe incompleto (para/texto)';
+            const conv = await pool.query(
+              `SELECT id FROM conversations WHERE external_id ILIKE $1 OR contact_name ILIKE $1 ORDER BY updated_at DESC LIMIT 1`,
+              ['%' + para + '%'],
+            );
+            if (!conv.rowCount) return `falhou: conversa '${para}' não encontrada`;
+            const ins = await pool.query(
+              `INSERT INTO messages (conversation_id, direction, channel, sender, body, author_name, metadata, send_state)
+               VALUES ($1, 'outbound', 'whatsapp', 'luna', $2, 'Luna', jsonb_build_object('notify_send','1','reply_source','voice_call'), 'queued') RETURNING id`,
+              [conv.rows[0].id, texto],
+            );
+            await pool.query('SELECT pg_notify($1, $2)', ['luna_outbound', ins.rows[0].id]);
+            log.info({ para, texto: texto.slice(0, 60) }, 'voice.call: wa_msg enfileirada pela conductora');
+            return `mensagem enviada para ${para}`;
+          }
+          log.warn({ name, detail }, 'voice.call: ação sem executor conhecido');
+          return `ação ${name} sem executor — ${detail.slice(0, 80)}`;
         },
       });
       const handle = conductor.start(tab, {

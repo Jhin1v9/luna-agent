@@ -225,6 +225,24 @@ export class CallConductor {
             });
             // GUARDA DE ORDEM EXPLÍCITA (decreto owner): act sem ordem direta
             // no turno vira pergunta — nunca ação por conta própria.
+            // ATALHO DETERMINÍSTICO (decreto owner, call ao vivo 2026-09-25):
+            // ordem de mensagem explícita é executada DIRETO — sem rodada de LLM
+            // (latência zero, confiabilidade total pro caso mais comum).
+            const RE_MSG_GRUPO = /no grupos+([^,.\"\"“]+?)(?:s+(?:dizendo|escrito|falando|com o texto|ques+diga))?s*["“]?([^"”]{2,})?["”]?$/i;
+            const RE_MSG_PARA = /(?:para|pra|pro)s+([^,.\"\"“]+?)(?:s+(?:dizendo|escrito|falando|com o texto|ques+diga))?s*["“]?([^"”]{2,})?["”]?$/i;
+            const ordemMsg = /mandw*|enviw*/i.test(ultimo.text) && /mensagem|msg/i.test(ultimo.text)
+              ? (RE_MSG_GRUPO.exec(ultimo.text) ?? RE_MSG_PARA.exec(ultimo.text))
+              : null;
+            if (ordemMsg && ordemMsg[1] && (ordemMsg[2] || /teste|oi|ol[aá]/i.test(ultimo.text))) {
+              const alvo = ordemMsg[1].trim();
+              const texto = (ordemMsg[2] || 'Testando voz um dois três').trim();
+              const acao = { kind: 'act', name: 'wa_msg', detail: `para=${alvo} | texto=${texto}` } as const;
+              this.say(`ORDEM DIRETA detectada — executando wa_msg sem LLM (${alvo})`);
+              const evidencia = await this.deps.executeAction?.(acao.name, acao.detail).catch((e) => `falhou: ${String(e).slice(0, 100)}`);
+              await this.audit('conductor.act', { name: 'wa_msg', evidence: evidencia, ordem_citada: ultimo.text.slice(0, 120) });
+              if (evidencia) await this.deps.operator.sendText(tab, `📟 Luna → Operador: Fale para o Abner que ${evidencia}.`).catch(() => {});
+              continue;
+            }
             const guarded = guardAction(decision, ultimo);
             if (guarded.decision.kind === 'say' && decision.kind === 'act') {
               this.say(`SEM ORDEM EXPLÍCITA — act '${decision.name}' virou pergunta ao owner`);
@@ -248,7 +266,7 @@ export class CallConductor {
               await this.audit('conductor.act', { name: final.name, evidence, ordem_citada: guarded.ordemCitada ?? null, turno: ultimo.text.slice(0, 100) });
               // ação também vira fala quando couber
               if (evidence && evidence !== 'sem executor') {
-                await this.deps.operator.sendText(tab, evidence).catch(() => {});
+                await this.deps.operator.sendText(tab, `📟 Luna → Operador: Fale para o Abner que ${evidence}.`).catch(() => {});
               }
             } else {
               this.say('segura (hold)');
