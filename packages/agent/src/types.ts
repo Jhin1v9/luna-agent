@@ -19,6 +19,7 @@ export type KimiAdapterMode =
   | 'kimi-web'
   | 'kimi-api'
   | 'kimi-cli'
+  | 'kimi-web-local'
   | 'gemini'
   | 'pi'
   | 'kimiwork';
@@ -43,6 +44,10 @@ export interface KimiAdapterConfig {
   fallbackModel?: string;
   /** 2ª key da MESMA API primária (elo 2 da cadeia de quota, antes do Gemini). */
   fallbackKimiApiKey?: string;
+  /** Kimi Web LOCAL (ADR-038): sessão dedicada do live brain. */
+  KIMIWEB_LOCAL_URL?: string;
+  KIMIWEB_LOCAL_TOKEN?: string;
+  KIMIWEB_SESSION_ID?: string;
 }
 
 /** Um turno de conversa: prompt montado (persona + contexto) + mensagem do cliente. */

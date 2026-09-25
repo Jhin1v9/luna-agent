@@ -63,7 +63,10 @@ const envSchema = z.object({
   // está sem quota; 'kimiwork' = a Luna do Kimi Work assume o live brain
   // inteiro (ADR-040, decreto owner 2026-09-24). Troca = só .env, zero
   // código (mesma interface estável).
-  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork']).default('kimi'),
+  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork', 'kimi-web-local']).default('kimi'),
+  KIMIWEB_LOCAL_URL: z.string().default('http://127.0.0.1:58629'),
+  KIMIWEB_LOCAL_TOKEN: z.string().default(''),
+  KIMIWEB_SESSION_ID: z.string().default(''),
   PI_BIN: z.string().default('pi'),
   PI_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   PI_ENTRY: z.string().optional(), // override do caminho do cli.js do pi

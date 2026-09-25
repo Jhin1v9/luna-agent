@@ -7,6 +7,7 @@ import { GeminiAdapter } from './gemini.js';
 import { PiAdapter } from './pi.js';
 import { KimiWorkAdapter } from './kimiwork.js';
 import { FallbackAdapter } from './fallback.js';
+import { KimiWebLocalAdapter } from './kimi-web-local.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
   switch (config.mode) {
@@ -21,6 +22,13 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
       return config.fallbackApiKey ?? process.env.GEMINI_API_KEY
         ? new FallbackAdapter(config)
         : new KimiApiAdapter(config);
+    case 'kimi-web-local':
+      return new KimiWebLocalAdapter({
+        baseUrl: config.KIMIWEB_LOCAL_URL ?? process.env.KIMIWEB_LOCAL_URL ?? 'http://127.0.0.1:58629',
+        token: config.KIMIWEB_LOCAL_TOKEN ?? process.env.KIMIWEB_LOCAL_TOKEN ?? '',
+        sessionId: config.KIMIWEB_SESSION_ID ?? process.env.KIMIWEB_SESSION_ID ?? '',
+        timeoutMs: config.apiTimeoutMs,
+      });
     case 'kimi-cli':
       return new KimiCliAdapter(config);
     case 'gemini':
@@ -82,3 +90,4 @@ export {
   ChatCompletionsError,
 } from './openai-compat.js';
 export { ChainAdapter } from "./chain.js";
+export { KimiWebLocalAdapter } from "./kimi-web-local.js";

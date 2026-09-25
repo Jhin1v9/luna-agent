@@ -78,20 +78,30 @@ async function main(): Promise<void> {
           { mode: 'pi' },
           { timeoutMs: liveTimeoutMs, entry: config.PI_ENTRY },
         )
-      : config.LIVE_BRAIN_PROVIDER === 'kimiwork'
-        ? // ADR-040 — live brain na Luna do Kimi Work: mesmo pool, timeout de
-          // parede do live; a resposta vem da varredura/cron do Kimi Work.
-          new (await import('@luna/agent')).KimiWorkAdapter(
-            { mode: 'kimiwork' },
-            { pool, timeoutMs: liveTimeoutMs, pollIntervalMs: config.KIMIWORK_LLM_POLL_MS },
-          )
-        : new (await import('@luna/agent')).KimiCliAdapter(
-            { mode: 'kimi-cli' },
-            {
-              timeoutMs: liveTimeoutMs,
-              autonomy: config.LIVE_AUTONOMY,
-            },
-          );
+      : config.LIVE_BRAIN_PROVIDER === 'kimi-web-local'
+        ? // ADR-038 — live brain na sessão DEDICADA do kimi web local:
+          // ferramentas completas (o -p do CLI subia sem escrita), personalidade
+          // bootstrapada uma vez, todos os turnos na MESMA sessão.
+          new (await import('@luna/agent')).KimiWebLocalAdapter({
+            baseUrl: config.KIMIWEB_LOCAL_URL,
+            token: config.KIMIWEB_LOCAL_TOKEN,
+            sessionId: config.KIMIWEB_SESSION_ID,
+            timeoutMs: liveTimeoutMs,
+          })
+        : config.LIVE_BRAIN_PROVIDER === 'kimiwork'
+          ? // ADR-040 — live brain na Luna do Kimi Work: mesmo pool, timeout de
+            // parede do live; a resposta vem da varredura/cron do Kimi Work.
+            new (await import('@luna/agent')).KimiWorkAdapter(
+              { mode: 'kimiwork' },
+              { pool, timeoutMs: liveTimeoutMs, pollIntervalMs: config.KIMIWORK_LLM_POLL_MS },
+            )
+          : new (await import('@luna/agent')).KimiCliAdapter(
+              { mode: 'kimi-cli' },
+              {
+                timeoutMs: liveTimeoutMs,
+                autonomy: config.LIVE_AUTONOMY,
+              },
+            );
   log.info({ live_brain: config.LIVE_BRAIN_PROVIDER }, 'cérebro vivo selecionado (LIVE_BRAIN_PROVIDER)');
   const { createInvestigateHandler } = await import('./jobs/investigate.js');
   // Chamada de voz (decreto owner): o job só publica o evento — quem liga é o daemon do whatsplay.

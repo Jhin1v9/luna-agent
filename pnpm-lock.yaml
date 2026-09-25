@@ -79,6 +79,28 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.13.6)(tsx@4.23.15)
 
+  apps/pingline:
+    dependencies:
+      '@luna/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@luna/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
+      '@luna/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.6
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.15
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   apps/watchdog:
     dependencies:
       '@luna/agent':
@@ -179,6 +201,10 @@ importers:
         version: 5.9.3
 
   packages/agent:
+    dependencies:
+      pg:
+        specifier: ^8.13.0
+        version: 8.23.0
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
