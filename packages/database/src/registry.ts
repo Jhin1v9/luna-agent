@@ -45,10 +45,18 @@ export async function registryLookup(db: Sql, mention: string): Promise<Registry
     [],
   );
   const target = normalize(mention).replace(/^meu |^minha |^o |^a /, '');
+  const targetDigits = mention.replace(/\D/g, '');
   for (const r of rows.rows as Array<Record<string, unknown>>) {
     const canon = normalize(String(r.canonical_name));
     const hint = r.display_hint ? normalize(String(r.display_hint)) : null;
-    if (canon === target || hint === target || canon.includes(target) || (hint && hint.includes(target))) {
+    const keyDigits = String(r.chat_key).replace(/\D/g, '');
+    if (
+      canon === target ||
+      hint === target ||
+      canon.includes(target) ||
+      (hint && hint.includes(target)) ||
+      (targetDigits.length >= 8 && keyDigits === targetDigits)
+    ) {
       return {
         chatKey: String(r.chat_key),
         kind: r.kind as RegistryEntry['kind'],

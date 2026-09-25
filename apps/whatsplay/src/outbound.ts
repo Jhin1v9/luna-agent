@@ -74,6 +74,25 @@ export function createOutboundListener(deps: OutboundDeps) {
       : `destinatário fora da allowlist de teste [${allowlist.join(', ')}]`;
   }
 
+  /** Exceção de NOTIFICAÇÕES A CLIENTES (decreto owner 2026-09-25): envio
+   *  marcado como notify_send com destino ALLOWED no Chat Registry (telefone
+   *  que o próprio cliente colocou no perfil do workspace) passa pela
+   *  allowlist de dev — é canal de notificação, não conversa de teste. */
+  async function notifySendExempt(messageId: string, target: string): Promise<boolean> {
+    const flagged = await pool.query<{ is_notify: string | null }>(
+      `SELECT metadata->>'notify_send' AS is_notify FROM messages WHERE id = $1`,
+      [messageId],
+    );
+    if (flagged.rows[0]?.is_notify !== '1') return false;
+    const { registryCheck } = await import('@luna/database');
+    const decision = await registryCheck(pool, target.replace(/^whatsapp:/, ''), 'notificar');
+    if (!decision.ok) {
+      log.warn({ message_id: messageId, target, reason: decision.reason }, 'notify_send: destino não permitido pelo registry');
+      return false;
+    }
+    return true;
+  }
+
   /**
    * SEND-SAFETY (decreto owner, pós-incidente 2026-09-21): a resposta tem que
    * ir SEMPRE pro mesmo chat de onde veio a pergunta. Antes de entregar,
@@ -200,7 +219,9 @@ export function createOutboundListener(deps: OutboundDeps) {
       if (String(err).includes('send_safety_blocked')) return; // já auditado/alertado/bloqueado
       throw err;
     }
-    const refusal = refusedByAllowlist(target);
+    const refusal = (await refusedByAllowlist(target)) && !(await notifySendExempt(messageId, target))
+      ? refusedByAllowlist(target)
+      : null;
     if (refusal) {
       // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.
       await mark(messageId, 'failed', refusal);
