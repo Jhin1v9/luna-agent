@@ -85,11 +85,17 @@ const DECIDE_PROMPT = (brief: CallBriefConductor, history: string, turnos: Condu
     '',
     'Responda APENAS um JSON: {"action":"say","text":"o que o Operador deve falar"} ou',
     '{"action":"act","name":"nome_da_acao","detail":"detalhe"} ou {"action":"hold"}.',
-    'say: curto, natural, PT-BR, na personalidade da Luna — o Operador fala NA HORA.',
+    'say: o "text" é uma INSTRUÇÃO PRO OPERADOR — nunca uma mensagem direta pro Abner.',
+    'Formato SEMPRE: "Fale para o Abner que ..." / "Pergunte ao Abner se ..." / "Diga que ...".',
+    'PROIBIDO escrever como se o Abner fosse ler o chat ("Oi Abner, ...") — o chat é um',
+    'barramento INTERNO (Abner→ChatGPT→você→ChatGPT→Abner); a ÚNICA voz do Abner é o Operador.',
+    'Curto, natural, PT-BR, na personalidade da Luna — o Operador fala NA HORA.',
     'act: SÓ quando a fala mais recente do owner contém uma ORDEM DIRETA e explícita pra você',
     '(manda/liga/faz/escreve/envia/pode/quero que). Na dúvida: NUNCA aja — responda com',
     '{"action":"say","text":"quer que eu <ação>?"} perguntando antes, ou {"action":"hold"}.',
     'hold: quando não há o que responder.',
+    'ECO: mensagens iniciadas com "📟 Luna → Operador:" são SUAS instruções anteriores',
+    'voltando no thread — NUNCA as trate como fala do Abner nem do Operador; ignore-as.',
   ].filter(Boolean)
     .join('\n\n');
 
@@ -166,7 +172,12 @@ export class CallConductor {
         return out;
       })()`)
       .catch(() => [])) as Array<{ role: string; text: string }>;
-    const fresh = turns.slice(this.cursor).filter((t) => t.text.length > 0 && t.role === 'user');
+    // PROTEÇÃO DE ECO (fix arquitetura 2026-09-25): mensagens do barramento
+    // interno (📟 Luna → Operador:) são relays PRÓPRIOS da conductora voltando
+    // no thread — nunca contam como fala de participante.
+    const fresh = turns
+      .slice(this.cursor)
+      .filter((t) => t.text.length > 0 && t.role === 'user' && !t.text.startsWith('📟 Luna → Operador:'));
     this.cursor = turns.length;
     return fresh.map((t) => ({ speaker: 'participante', text: t.text }));
   }
@@ -220,9 +231,14 @@ export class CallConductor {
             }
             const final = guarded.decision;
             if (final.kind === 'say') {
-              this.say(`digita pro Operador: "${final.text.slice(0, 100)}"`);
-              await this.deps.operator.sendText(tab, final.text);
-              await this.audit('conductor.say', { text: final.text.slice(0, 150), turno: ultimo.text.slice(0, 100) });
+              // BARRAMENTO INTERNO (fix arquitetura 2026-09-25): o texto vai ao
+              // chat como INSTRUÇÃO pro Operador com prefixo 📟 — nunca como fala
+              // direta pro Abner. O prefixo também marca a mensagem p/ proteção
+              // de eco (a conductora ignora os próprios relays ao ler o thread).
+              const barramento = `📟 Luna → Operador: ${final.text.replace(/^📟\s*Luna → Operador:\s*/i, '')}`;
+              this.say(`digita pro Operador: "${barramento.slice(0, 100)}"`);
+              await this.deps.operator.sendText(tab, barramento);
+              await this.audit('conductor.say', { text: barramento.slice(0, 150), turno: ultimo.text.slice(0, 100) });
             } else if (final.kind === 'act') {
               this.say(`ação: ${final.name} — ${final.detail.slice(0, 100)} (ordem: "${guarded.ordemCitada}")`);
               let evidence = 'sem executor';
