@@ -76,7 +76,7 @@ describe('CallConductor loop', () => {
     h.stop();
     expect(live.prompts[0]).toContain('quem é a cliente?');
     expect(live.prompts[0]).toContain('Jess');
-    expect(op.sent).toEqual(['É a Jess — ela quer falar contigo direto.']);
+    expect(op.sent).toEqual(['📟 Luna → Operador: É a Jess — ela quer falar contigo direto.']);
     expect(audits).toContain('conductor.say');
   });
 
@@ -146,7 +146,7 @@ describe('CallConductor loop', () => {
     expect(live.prompts.length).toBe(2); // 2 captions distintas (a repetida dedupou)
     expect(live.prompts[0]).toContain('oi, é a Jess');
     expect(live.prompts[1]).toContain('painel');
-    expect(op.sent).toEqual(['Pergunta se é sobre o painel.']); // 1 say só (do 2º turno)
+    expect(op.sent).toEqual(['📟 Luna → Operador: Pergunta se é sobre o painel.']); // 1 say só (do 2º turno)
   });
 
   it('BATCH (decreto owner 14:28 "ao vivo"): vários turnos no MESMO poll viram UM SÓ pedido à Luna', async () => {
@@ -164,7 +164,7 @@ describe('CallConductor loop', () => {
     expect(live.prompts[0]).toContain('segunda');
     expect(live.prompts[0]).toContain('terceira');
     expect(live.prompts[0]).toContain('Novos turnos');
-    expect(op.sent).toEqual(['Resposta ao estado atual.']);
+    expect(op.sent).toEqual(['📟 Luna → Operador: Resposta ao estado atual.']);
   });
 });
 
