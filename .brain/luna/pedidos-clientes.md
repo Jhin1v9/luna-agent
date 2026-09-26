@@ -148,10 +148,13 @@ slider da Jess, por mim). **Jess NÃO pediu nada novo.** Nenhum updatedAt poster
 | Pedido | Status painel | REALIDADE (verificado em hdm-six.vercel.app) |
 |---|---|---|
 | Carrossel + profissões + logo (c6kjmmku, 21/09) | ANALYZING | ✅ **FEITO no preview** — marca Ken Burns no hero (carrossel) + eletromecânicos/mecânicos industriais no sitemap (136 rotas, 4 idiomas) e na página personal-industrial. ⏳ Falta: publicação (deploy) + logo (PDF não consta no repo) + imagens próprias do carrossel (Matheus enviará) |
-| Seção currículos → rrhh@ (cmub9zxn, 21/09) | CLIENT_REVIEWING | ⚠️ **DIVERGÊNCIA: página NÃO está no ar** — /trabaja-con-nosotros dá 404 no preview E no site antigo (com e sem trailing slash), zero links no homepage antigo. Relatório do portal diz "entregue e publicado" (21/09) e auditoria de 24/09 marcou ✅ — realidade atual: 404. Provável perda em redeploy. AÇÃO: dev reenvia/deploya a página; relatório HDM precisa de correção de status |
+| Seção currículos → rrhh@ (cmub9zxn, 21/09) | CLIENT_REVIEWING | ⚠️ **DIVERGÊNCIA: página NÃO está no ar** — /trabaja-con-nosotros dá 404 no preview. Relatório do portal dizia "entregue e publicado" — **corrigido por mim em 26/09 14:15** (banner de atenção + entrada "Correção de status" no changelog do relatório HDM, backup .bak-20260926-2, verificado servido HTTP 200). Pendente: dev reenvia/deploya a página (motivo provável: produção roda branch luna/hdm-pedidos-matheus; trabalho de CVs ficou na main — merge cuidadoso) |
 | Scroll reveal (14/09) | COMPLETED 21/09 | ✅ feito |
 
 **Produção HDM:** SSL do apex **confirmado quebrado** (https://hdmindustrial.es sem www não conecta) —
 Noke já designado; é config DNS/dominio, não código. Site antigo www.hdmindustrial.es no ar (200).
+**NOVO (26/09 14:10):** o domínio NOVO `hdm-industrial.es` (com hífen) **não existe no DNS público** —
+NXDOMAIN tanto no apex quanto no www (testado 8.8.8.8 + 1.1.1.1). Registro/configuração de DNS do
+domínio pendente no registrador (ação humana — credencial do registrar).
 
 autor: Luna
