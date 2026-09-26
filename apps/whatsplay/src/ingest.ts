@@ -21,18 +21,6 @@ export function createIngest(deps: IngestDeps) {
 
   /** Uma mensagem inbound (já pós-debounce). */
   async function ingestOne(msg: UnreadMessage): Promise<'published' | 'skipped'> {
-    if (
-      !shouldRespond({
-        is_group: msg.is_group,
-        text: msg.text,
-        mentioned_luna: msg.mentioned_luna,
-        reply_to_luna: msg.quoted_from_luna ?? false,
-      })
-    ) {
-      log.debug({ chat: msg.chat_name }, 'grupo sem menção/reply — silêncio absoluto (§5)');
-      return 'skipped';
-    }
-
     const identity = await resolveIngressIdentity(pool, {
       client_name: msg.chat_name,
       contact_name: msg.chat_name,
@@ -40,10 +28,49 @@ export function createIngest(deps: IngestDeps) {
       address: msg.chat_id,
     });
 
+    // 🆕 CITAÇÃO (owner 26/09): detectar de verdade se a mensagem citada é
+    // NOSSA. O transporte não sabe (hardcoded false) — casamos o texto citado
+    // contra as últimas mensagens outbound da Luna nesta conversa. Sem isso,
+    // responder a msg da Luna com um emoji chegava como "chat inteiro" e o
+    // reply/cita (regra de grupo §5) nunca disparava.
+    let quotedFromLuna = msg.quoted_from_luna ?? false;
+    if (!quotedFromLuna && msg.quoted_text) {
+      const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+      const q = norm(msg.quoted_text);
+      const probe = q.slice(0, 60);
+      const tail = q.slice(-60);
+      const recent = await pool.query<{ body: string }>(
+        `SELECT body FROM messages
+         WHERE conversation_id = $1 AND direction = 'outbound' AND channel = 'whatsapp'
+         ORDER BY created_at DESC LIMIT 20`,
+        [identity.conversation_id],
+      );
+      quotedFromLuna = recent.rows.some((r) => {
+        const b = norm(r.body ?? '');
+        return b.length > 0 && (b.includes(probe) || (tail.length >= 20 && b.includes(tail)));
+      });
+    }
+
+    // Foto pura (sem legenda) não menciona ninguém — no grupo segue o silêncio
+    // absoluto (§5); no privado sempre responde (regra fixa).
+    const effectiveText = msg.text || (msg.image_path ? '[imagem]' : '');
+
+    if (
+      !shouldRespond({
+        is_group: msg.is_group,
+        text: msg.text,
+        mentioned_luna: msg.mentioned_luna,
+        reply_to_luna: quotedFromLuna,
+      })
+    ) {
+      log.debug({ chat: msg.chat_name }, 'grupo sem menção/reply — silêncio absoluto (§5)');
+      return 'skipped';
+    }
+
     const messageId = await insertInboundMessage(pool, {
       conversation_id: identity.conversation_id,
       channel: 'whatsapp',
-      text: msg.text,
+      text: effectiveText,
       external_id: msg.external_id,
       author_name: msg.author_name ?? msg.chat_name,
     });
@@ -65,6 +92,9 @@ export function createIngest(deps: IngestDeps) {
         is_group: msg.is_group,
         deliver: true,
         chat_id: msg.chat_id,
+        quoted_text: msg.quoted_text ?? null,
+        quoted_from_luna: quotedFromLuna,
+        image_path: msg.image_path ?? null,
       },
       idempotency_key: `wa:msg:${msg.external_id}`,
     });
@@ -93,7 +123,9 @@ export function createIngest(deps: IngestDeps) {
         text: msg.text,
         is_group: msg.is_group,
         mentioned_luna: msg.mentioned_luna,
-        quoted_from_luna: msg.quoted_from_luna ?? false,
+        quoted_from_luna: quotedFromLuna,
+        quoted_text: msg.quoted_text ?? null,
+        image_path: msg.image_path ?? null,
         correlation_id: event.correlation_id,
       },
       idempotencyKey: `kimiwork:wa:msg:${msg.external_id}`,

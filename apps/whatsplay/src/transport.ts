@@ -27,6 +27,8 @@ export interface UnreadMessage {
   /** Texto da mensagem citada, se a nova msg for reply. */
   quoted_text?: string | null;
   quoted_from_luna?: boolean;
+  /** 🖼️ Caminho local da imagem anexada (baixada do blob: da página), se houver. */
+  image_path?: string | null;
   /** @luna mencionado no texto. */
   mentioned_luna: boolean;
   /** Quem falou (nome do membro no grupo / contato no privado). */

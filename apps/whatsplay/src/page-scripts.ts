@@ -52,7 +52,14 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
   const rows = Array.from(document.querySelectorAll(sel.messageRow)).slice(-30);
   const SELF = /^(tú|você|voce|you|tu)$/i;
   return rows.map((row) => {
-    const textEl = row.querySelector(sel.messageText);
+    // Bloco citado (reply) — quando existe, seus spans selecionáveis são
+    // EXCLUÍDOS do texto da mensagem nova. Antes o textContent puxava o
+    // preview da citação junto: quem respondia a msg da Luna com um emoji
+    // entregava o "chat inteiro" pra ela (bug reportado pelo owner 26/09).
+    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    const textEls = Array.from(row.querySelectorAll(sel.messageText))
+      .filter((el) => !quotedEl || !quotedEl.contains(el));
+    const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');
     // Direção: marcador estrutural tail-in/tail-out (validado ao vivo 2026-09-21);
     // fallback: padrão aria "Remetente:" (Self = Tú/Você/You).
     let direction = row.querySelector('[data-testid="tail-in"]') ? 'inbound'
@@ -69,8 +76,10 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
     // Autor: seletor semântico [data-testid="author"] (grupo); outbound = "Tú".
     const authorEl = row.querySelector('[data-testid="author"]');
     const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
-    const quotedEl = row.querySelector('[data-pre-plain-text]');
-    return { direction, sender, author, text: textEl ? (textEl.textContent || '').trim() : '', quoted: quotedEl ? (quotedEl.textContent || '').trim() : null };
+    // 🖼️ Mídia inbound: imagem do corpo da mensagem (blob:). Avatar fica
+    // fora do msg-container, então não pega falso positivo.
+    const imgEl = direction === 'inbound' ? row.querySelector('img[src^="blob:"]') : null;
+    return { direction, sender, author, text, quoted: quotedEl ? (quotedEl.textContent || '').trim() : null, img: imgEl ? imgEl.src : null };
   });
 }`;
 

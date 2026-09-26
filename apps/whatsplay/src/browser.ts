@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { SELECTORS } from './selectors.js';
 import { extractMention } from './rules.js';
@@ -307,12 +308,28 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           direction: string;
           text: string;
           quoted: string | null;
+          img?: string | null;
         }>;
-        const inboundMsgs = messages.filter((m) => m.direction === 'inbound' && m.text);
+        // Mensagem nova = tem texto OU mídia (foto sem legenda também entra —
+        // decreto owner 26/09: a Luna precisa CONSEGUIR VER as fotos).
+        const inboundMsgs = messages.filter((m) => m.direction === 'inbound' && (m.text || m.img));
         const last = inboundMsgs[inboundMsgs.length - 1];
         if (!last) continue;
+
+        // 🖼️ Download da imagem (blob: só é acessível de dentro da página).
+        let imagePath: string | null = null;
+        if (last.img) {
+          try {
+            imagePath = await this.downloadChatImage(page, last.img, chat.chat_id);
+          } catch (err) {
+            this.config.log?.warn({ err: String(err).slice(0, 120) }, 'foto inbound: download falhou (segue sem imagem)');
+          }
+        }
+
         // Idempotência: não repete a última mensagem já vista do chat.
-        const key = `${chat.chat_id}:${last.text}`;
+        // Foto pura usa hash do arquivo — texto vazio geraria chave constante.
+        const imgHash = imagePath ? imagePath.replace(/.*_([a-f0-9]{8})\.[^.]+$/, '$1') : '';
+        const key = `${chat.chat_id}:${last.text}:${imgHash}`;
         if (this.lastSeenMessageKey.get(chat.chat_id) === key) continue;
         this.lastSeenMessageKey.set(chat.chat_id, key);
 
@@ -323,10 +340,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           chat_name: chat.chat_name,
           is_group: isGroup,
           text: last.text,
-          external_id: `wa:${chat.chat_id}:${Buffer.from(last.text).toString('base64').slice(0, 24)}`,
+          external_id: `wa:${chat.chat_id}:${Buffer.from(last.text || imgHash).toString('base64').slice(0, 24)}`,
           quoted_text: last.quoted,
           quoted_from_luna: false,
           mentioned_luna: extractMention(last.text),
+          image_path: imagePath,
           received_at: new Date().toISOString(),
         });
       } catch {
@@ -334,6 +352,39 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       }
     }
     return unread;
+  }
+
+  /**
+   * 🖼️ Baixa a imagem de uma mensagem inbound (blob: só é fetchável de
+   * dentro da página) e grava em inbound-media/ na raiz do workspace.
+   * Retorna o caminho relativo, ou null em falha (a mensagem segue sem foto).
+   */
+  private async downloadChatImage(page: Page, blobUrl: string, chatId: string): Promise<string | null> {
+    const dataUrl = (await page.evaluate(async (src) => {
+      const r = await fetch(src);
+      if (!r.ok) return null;
+      const blob = await r.blob();
+      if (blob.size > 10 * 1024 * 1024) return null; // teto 10MB
+      return await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = () => reject(new Error('FileReader falhou'));
+        fr.readAsDataURL(blob);
+      });
+    }, blobUrl)) as string | null;
+    if (!dataUrl) return null;
+    const m = dataUrl.match(/^data:image\/(jpeg|jpg|png|webp|gif);base64,(.+)$/s);
+    if (!m) return null;
+    const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+    const buf = Buffer.from(m[2], 'base64');
+    const hash = createHash('sha256').update(buf).digest('hex').slice(0, 8);
+    const dir = join(process.cwd(), 'inbound-media');
+    mkdirSync(dir, { recursive: true });
+    const safeChat = chatId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'chat';
+    const rel = join('inbound-media', `${Date.now()}_${safeChat}_${hash}.${ext}`);
+    writeFileSync(join(process.cwd(), rel), buf);
+    this.config.log?.info({ bytes: buf.length, path: rel }, 'foto inbound salva');
+    return rel;
   }
 
   async readConversation(chatId: string, limit = 20): Promise<ConversationMessage[]> {
