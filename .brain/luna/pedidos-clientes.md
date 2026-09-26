@@ -126,3 +126,32 @@ Ação humana removida da lista: ~~senha do painel~~. Restam: card/relatório da
 - Sessão paralela criou `.brain/clients/jess-onadance/FICHA.md` (Jess formalizada como cliente).
 
 autor: Luna (cron de varredura)
+
+## Atualização 2026-09-26 13:00 (varredura manual a pedido do Abner — Luna)
+
+**Painel (login admin OK): 17 solicitações — ZERO novas desde 24/09 09:30** (a última criada foi a do
+slider da Jess, por mim). **Jess NÃO pediu nada novo.** Nenhum updatedAt posterior ao sweep de 25/09.
+
+### Classificação feito/não-feito (reality-check ao vivo 26/09)
+
+**Ona Dance (Jess) — org cmshyy4n, projeto Ona Dance web:**
+| Pedido | Status painel | REALIDADE (verificado) |
+|---|---|---|
+| Slider → vídeo vertical 41s (cmufc0h7, 24/09) | CLIENT_REVIEWING | ✅ **FEITO** — hero-onadance.mp4 ao vivo em pre2.onadance.com (`<video class="hero-video-bg" autoplay muted loop>`). Falta: aprovação da Jess + publicação + hero desktop full-bleed (tarefa interna pro Noke) |
+| Trustpilot wp-admin (cmtw0230, 10/09) | CLIENT_REVIEWING | ❓ **SEM EVIDÊNCIA DE EXECUÇÃO** — pendente há 16 dias, sem comentário; AVISAR a Jess |
+| "Avísame cuando vuelva" c/ captura de email (cmtw01xh, 10/09) | CLIENT_REVIEWING | ❓ idem — pendente, sem evidência; AVISAR a Jess |
+| Home só produtos disponíveis (cmtw01qf, 10/09) | CLIENT_REVIEWING | ❓ idem — pendente, sem evidência; AVISAR a Jess |
+| Scroll reveal (14/09) | COMPLETED 21/09 | ✅ feito (status painel) |
+| Crear cupón (16/09) | COMPLETED 17/09 | ✅ feito (status painel) |
+
+**HDM (Matheus) — org cmtldsn6, projeto Main WebSite:**
+| Pedido | Status painel | REALIDADE (verificado em hdm-six.vercel.app) |
+|---|---|---|
+| Carrossel + profissões + logo (c6kjmmku, 21/09) | ANALYZING | ✅ **FEITO no preview** — marca Ken Burns no hero (carrossel) + eletromecânicos/mecânicos industriais no sitemap (136 rotas, 4 idiomas) e na página personal-industrial. ⏳ Falta: publicação (deploy) + logo (PDF não consta no repo) + imagens próprias do carrossel (Matheus enviará) |
+| Seção currículos → rrhh@ (cmub9zxn, 21/09) | CLIENT_REVIEWING | ⚠️ **DIVERGÊNCIA: página NÃO está no ar** — /trabaja-con-nosotros dá 404 no preview E no site antigo (com e sem trailing slash), zero links no homepage antigo. Relatório do portal diz "entregue e publicado" (21/09) e auditoria de 24/09 marcou ✅ — realidade atual: 404. Provável perda em redeploy. AÇÃO: dev reenvia/deploya a página; relatório HDM precisa de correção de status |
+| Scroll reveal (14/09) | COMPLETED 21/09 | ✅ feito |
+
+**Produção HDM:** SSL do apex **confirmado quebrado** (https://hdmindustrial.es sem www não conecta) —
+Noke já designado; é config DNS/dominio, não código. Site antigo www.hdmindustrial.es no ar (200).
+
+autor: Luna
