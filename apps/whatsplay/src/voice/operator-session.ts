@@ -376,6 +376,31 @@ export class OperatorSession {
     return typeof replies === 'string' ? replies : null;
   }
 
+  /**
+   * 🔄 RESET da aba do ChatGPT ao fim da chamada (decreto owner 2026-09-26:
+   * "quando desligar a chamada da luna tem que desligar a do chatgpt tb —
+   * só fechar a janela do chat e abrir dnv"). Fechar a aba mata qualquer
+   * estado de chamada/voz pendente do Operador; a nova aba abre limpa.
+   * Best-effort: falha aqui NÃO derruba o encerramento da chamada.
+   */
+  async resetChatTab(): Promise<void> {
+    if (!this.browser) return;
+    const ctx = this.browser.contexts()[0];
+    if (!ctx) return;
+    const page = ctx.pages().find((p) => p.url().includes('chatgpt.com'));
+    if (page) {
+      this.say('fim da chamada — fechando a aba do ChatGPT (Operador desliga junto, decreto owner)');
+      await page.close().catch(() => {});
+    }
+    const fresh = await ctx.newPage().catch(() => null);
+    if (!fresh) {
+      this.say('não consegui reabrir a aba do ChatGPT (best-effort, não crítico)');
+      return;
+    }
+    await fresh.goto('https://chatgpt.com', { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+    this.say('aba do ChatGPT reaberta limpa');
+  }
+
   async close(): Promise<void> {
     await this.browser?.close().catch(() => {});
     this.browser = null;

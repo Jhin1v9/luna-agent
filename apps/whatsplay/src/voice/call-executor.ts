@@ -137,6 +137,7 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
       if (!connected) {
         log.warn('voice.call: ninguém atendeu em ~30s — encerrando');
         await (transport as never as { endCall: () => Promise<void> }).endCall().catch(() => {});
+        await operator.resetChatTab().catch(() => {});
         return;
       }
       const conductor = new CallConductor({
@@ -185,6 +186,9 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
         if (st.state !== 'chamada') break;
       }
       handle.stop();
+      // Decreto owner 2026-09-26: desligou a chamada da Luna → a do Operador
+      // (ChatGPT) desliga junto — fecha a aba e reabre limpa (best-effort).
+      await operator.resetChatTab().catch(() => {});
       log.info('voice.call: chamada encerrada (estado saiu de "chamada")');
     } catch (err) {
       log.error({ err: String(err).slice(0, 300), correlation_id: correlationId }, 'voice.call: FALHA no fluxo — explícita, nada de silêncio');
