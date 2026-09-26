@@ -6,17 +6,30 @@ import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import type { JobHandler, JobRow } from './poller.js';
 
 /**
- * Investigação HANDOFF_LIVE (§6 real — fecha a degradação ADR-023).
+ * Investigação HANDOFF_LIVE — envio ÚNICO (decreto owner 2026-09-26:
+ * "enviar só 1x, depois esquece").
  *
- * O FAST não tinha dado/ferramenta → HANDOFF_LIVE → job `investigate` →
- * Cérebro Vivo (KimiCliAdapter, ADR-033) investiga com tools nativas por
- * até `budget` rondas dentro do timeout de parede → conclusão entregue NO
- * MESMO thread da conversa (messages outbound + NOTIFY luna_outbound — o
- * caminho de send-safety do whatsplay). Budget esgotado/timeout/falha →
- * ESCALATE_HUMAN com resumo das rondas (§6). Eventos do contrato §11.
+ * Por que single-send (contexto do incidente 2026-09-26): o prompt de
+ * investigação estava sendo repetido dezenas de vezes na sessão do Cérebro
+ * Vivo para UM único pedido do owner ("trocar o número dele no brain").
+ * Três multiplicadores se combinaram:
+ *   1. eventos duplicados do mesmo inbound (replay de backlog) → 2 jobs;
+ *   2. LOCK_REAPER_TIMEOUT_MS = 5 min devolve o job 'running' para a fila
+ *      enquanto o turno do live brain ainda aguarda resposta → o poller
+ *      reexecuta o MESMO job → 2º sendTurn idêntico;
+ *   3. budget de rondas reenviava o objetivo a cada ronda.
  *
- * O job roda com max_attempts=1: as rondas já são a estratégia de retry;
- * reexecutar o job inteiro re-investigiria do zero.
+ * Novo contrato:
+ *   · UM único sendTurn por pedido, com a tarefa completa e instrução de
+ *     concluir com "CONCLUSAO_PRONTA:" + resposta final;
+ *   · dedupe por objetivo+conversa (24h): pedido repetido NÃO reenvia;
+ *   · marca de despacho idempotente (inv-dispatch:<job>): re-execução do
+ *     mesmo job (reaper) NÃO reenvia;
+ *   · falha/timeout do turno → ESCALATE_HUMAN com motivo, sem retry e sem
+ *     reenvio (o job completa — nunca propaga erro para re-tentativa).
+ *
+ * Conclusão entregue NO MESMO thread (messages outbound + NOTIFY
+ * luna_outbound — send-safety do whatsplay). Eventos do contrato §11.
  */
 
 export interface InvestigateDeps {
@@ -34,7 +47,7 @@ interface InvestigatePayload {
   correlation_id?: string;
   chat_id?: string;
   author_name?: string;
-  budget?: number;
+  budget?: number; // legado — ignorado (single-send); mantido p/ compat. do payload do router
   timeout_ms?: number;
 }
 
@@ -44,7 +57,7 @@ interface Round {
   duration_ms: number;
 }
 
-const ROUND_PROMPT = (objective: string, context: string, rounds: Round[], last: boolean): string =>
+const SINGLE_PROMPT = (objective: string, context: string): string =>
   [
     'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE). Você tem FERRAMENTAS REAIS,',
     'incluindo ESCRITA: Write, Edit, Read, Grep/Glob e Bash. EXECUTE a tarefa de verdade com',
@@ -53,22 +66,16 @@ const ROUND_PROMPT = (objective: string, context: string, rounds: Round[], last:
     '',
     `TAREFA DESTA INVESTIGAÇÃO: ${objective}`,
     context ? `Contexto do FAST: ${context}` : '',
-    rounds.length
-      ? `Rondas anteriores:\n${rounds.map((r) => `--- ronda ${r.round} ---\n${r.finding}`).join('\n')}`
-      : '',
-    last
-      ? 'ÚLTIMA RONDA: EXECUTE o que falta AGORA e responda em PT-BR com a RESPOSTA FINAL para o cliente ' +
-        '(direta, sem mencionar rondas nem ferramentas). Se de fato não for possível concluir, escreva ' +
-        '"NÃO RESOLVIDO: <motivo>".'
-      : 'EXECUTE a tarefa agora (não peça confirmação, não peça contexto — o objetivo acima é completo). ' +
-        'Responda com o que você EXECUTOU e DESCOBRIU nesta ronda (fatos + evidências), e o que falta na próxima. ' +
-        'SE A TAREFA JÁ ESTÁ RESOLVIDA COM EVIDÊNCIA, não gaste a próxima ronda: termine a resposta com a linha ' +
-        '"CONCLUSAO_PRONTA:" seguida da RESPOSTA FINAL para o cliente (direta, sem mencionar rondas nem ferramentas).',
+    'EXECUTE a tarefa agora (não peça confirmação, não peça contexto — o objetivo acima é completo).',
+    'Esta é a ÚNICA chamada que você vai receber para este pedido: faça tudo nesta resposta.',
+    'Termine a resposta com a linha "CONCLUSAO_PRONTA:" seguida da RESPOSTA FINAL para o cliente',
+    '(direta, em PT-BR, sem mencionar ferramentas). Se de fato não for possível concluir, escreva',
+    '"NÃO RESOLVIDO: <motivo>" no lugar do marcador.',
   ]
     .filter(Boolean)
     .join('\n\n');
 
-/** Early conclusion: marcador do live brain quando resolveu antes do budget. */
+/** Early conclusion: marcador do live brain quando resolveu. */
 const CONCLUSION_MARKER = 'CONCLUSAO_PRONTA:';
 
 export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
@@ -140,81 +147,91 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
 
   return async function investigate(job: JobRow): Promise<void> {
     const payload = job.payload as unknown as InvestigatePayload;
-    const budget = Math.max(1, payload.budget ?? 3);
-    const timeoutMs = payload.timeout_ms ?? 600_000;
-    const deadline = Date.now() + timeoutMs;
-    const sessionKey = `investigate:${job.id}`;
-    const rounds: Round[] = [];
 
-    log.info({ job: job.id, objective: payload.objective, budget }, 'investigate: começando');
+    log.info({ job: job.id, objective: payload.objective }, 'investigate: começando (envio único)');
 
-    for (let round = 1; round <= budget; round++) {
-      if (Date.now() > deadline) {
-        await escalateWithSummary(payload, rounds, 'timeout de parede');
-        return;
-      }
-      const last = round === budget;
-      const startedAt = Date.now();
-      let finding: string;
-      try {
-        const turn = await live.sendTurn({
-          session_key: sessionKey,
-          prompt: ROUND_PROMPT(payload.objective, payload.context_summary ?? '', rounds, last),
-        });
-        finding = turn.reply_text;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.error({ err: msg, round }, 'investigate: ronda falhou');
-        if (rounds.length === 0) throw err; // sem nada: o job falha pra visibilidade
-        await escalateWithSummary(payload, rounds, `ronda ${round} falhou: ${msg.slice(0, 150)}`);
-        return;
-      }
-      rounds.push({ round, finding, duration_ms: Date.now() - startedAt });
-      await publish('router.investigation.round', payload, {
-        round,
-        budget,
-        finding: finding.slice(0, 500),
+    // 1) DEDUPE por objetivo — eventos duplicados (backlog replay, double
+    //    dispatch do mesmo inbound) NÃO geram um segundo envio. Janela de 24h:
+    //    o mesmo pedido reaberto no dia seguinte passa de propósito.
+    const dup = await pool.query<{ id: string }>(
+      `SELECT id FROM jobs
+        WHERE job_type = 'investigate' AND id <> $1
+          AND created_at > now() - interval '24 hours'
+          AND payload->>'objective' = $2
+          AND payload->>'conversation_id' = $3
+        ORDER BY created_at ASC LIMIT 1`,
+      [job.id, payload.objective, payload.conversation_id],
+    );
+    if (dup.rowCount) {
+      const first = dup.rows[0]!.id;
+      await publish('router.investigation.skipped_duplicate', payload, { outcome: 'duplicate', first_job: first });
+      await recordAudit(pool, {
+        actor: 'live_investigation',
+        action: 'router.investigation.skipped_duplicate',
+        tool: 'investigate_job',
+        correlation_id: payload.correlation_id ?? null,
+        result: 'success',
+        metadata: { first_job: first },
       });
-
-      const unresolved = /NÃO RESOLVIDO/i.test(finding);
-      if (!last && unresolved) {
-        await escalateWithSummary(payload, rounds, 'live brain declarou não-resolvido antes do budget');
-        return;
-      }
-      // EARLY CONCLUSION (owner: "sempre vai demorar?"): o live brain pode
-      // resolver antes do budget — marcador CONCLUSAO_PRONTA encerra na hora,
-      // sem esperar as rondas restantes nem o relógio.
-      if (!last && finding.includes(CONCLUSION_MARKER)) {
-        const finalText = finding.split(CONCLUSION_MARKER).slice(1).join(CONCLUSION_MARKER).trim();
-        const messageId = await deliverReply(payload, finalText || finding);
-        await publish('router.investigation.completed', payload, {
-          outcome: 'answered_early',
-          rounds: rounds.length,
-          reply_message_id: messageId,
-        });
-        await recordAudit(pool, {
-          actor: 'live_investigation',
-          action: 'router.investigation.completed',
-          tool: 'investigate_job',
-          correlation_id: payload.correlation_id ?? null,
-          result: 'success',
-          metadata: { rounds: rounds.length, early: true, reply_message_id: messageId },
-        });
-        log.info({ job: job.id, rounds: rounds.length, messageId }, 'investigate: concluído CEDO (marcador do live brain)');
-        return;
-      }
-      if (last && unresolved) {
-        await escalateWithSummary(payload, rounds, 'budget esgotado sem conclusão');
-        return;
-      }
+      log.info({ job: job.id, firstJob: first }, 'investigate: objetivo já enviado nas últimas 24h — skip sem reenvio');
+      return;
     }
 
-    // Conclusão: última ronda (prompt pediu RESPOSTA FINAL)
-    const finalText = rounds[rounds.length - 1]!.finding;
-    const messageId = await deliverReply(payload, finalText);
+    // 2) MARCA DE DESPACHO idempotente: o reaper de locks (5 min) pode devolver
+    //    este job para a fila enquanto o turno ainda aguarda resposta do
+    //    Cérebro Vivo. A re-execução encontra a marca e sai SEM reenviar.
+    const dispatch = await publishEvent(pool, {
+      event_type: 'router.investigation.dispatched',
+      source: 'live_investigation',
+      client_id: payload.client_id ?? null,
+      conversation_id: payload.conversation_id,
+      correlation_id: payload.correlation_id ?? undefined,
+      payload: { objective: payload.objective.slice(0, 200) },
+      idempotency_key: `inv-dispatch:${job.id}`,
+    });
+    if (dispatch.duplicate) {
+      log.info({ job: job.id }, 'investigate: despacho já registrado (reaper double-pick) — skip sem reenvio');
+      return;
+    }
+
+    // 3) ENVIO ÚNICO (decreto owner: "só 1x, depois esquece"). Sem rondas,
+    //    sem retry: falha/timeout → escalate e o job completa.
+    const startedAt = Date.now();
+    let finding: string;
+    try {
+      const turn = await live.sendTurn({
+        session_key: `investigate:${job.id}`,
+        prompt: SINGLE_PROMPT(payload.objective, payload.context_summary ?? ''),
+      });
+      finding = turn.reply_text;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err: msg }, 'investigate: envio único falhou — escalate sem retry');
+      await escalateWithSummary(payload, [], `envio falhou/timeout: ${msg.slice(0, 150)}`);
+      return;
+    }
+    const round: Round = { round: 1, finding, duration_ms: Date.now() - startedAt };
+    await publish('router.investigation.round', payload, {
+      round: 1,
+      budget: 1,
+      finding: finding.slice(0, 500),
+    });
+
+    if (/NÃO RESOLVIDO/i.test(finding)) {
+      await escalateWithSummary(payload, [round], 'live brain declarou não-resolvido');
+      return;
+    }
+
+    let finalText = finding;
+    let outcome = 'answered';
+    if (finding.includes(CONCLUSION_MARKER)) {
+      finalText = finding.split(CONCLUSION_MARKER).slice(1).join(CONCLUSION_MARKER).trim();
+      outcome = 'answered_early';
+    }
+    const messageId = await deliverReply(payload, finalText || finding);
     await publish('router.investigation.completed', payload, {
-      outcome: 'answered',
-      rounds: rounds.length,
+      outcome,
+      rounds: 1,
       reply_message_id: messageId,
     });
     await recordAudit(pool, {
@@ -223,8 +240,8 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
       tool: 'investigate_job',
       correlation_id: payload.correlation_id ?? null,
       result: 'success',
-      metadata: { rounds: rounds.length, reply_message_id: messageId },
+      metadata: { rounds: 1, early: outcome === 'answered_early', reply_message_id: messageId },
     });
-    log.info({ job: job.id, rounds: rounds.length, messageId }, 'investigate: concluído e entregue no thread');
+    log.info({ job: job.id, messageId, outcome }, 'investigate: concluído (envio único) e entregue no thread');
   };
 }
