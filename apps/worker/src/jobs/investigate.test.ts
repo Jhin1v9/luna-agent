@@ -19,6 +19,10 @@ interface Captured {
 interface StubOptions {
   /** devolve uma linha no dedupe por objetivo (simula job anterior nas 24h) */
   duplicateJob?: { id: string };
+  /** devolve linhas na checagem semântica (objetivos de jobs recentes da conversa) */
+  recentObjectives?: string[];
+  /** devolve razões de escalations (objetivos que FALHARAM — re-pedido é legítimo) */
+  escalatedReasons?: string[];
   /** devolve uma linha na checagem de idempotency_keys (simula despacho já feito) */
   dispatchAlreadySeen?: boolean;
 }
@@ -58,6 +62,18 @@ function stubPool(opts: StubOptions = {}) {
               },
             },
           ],
+        };
+      }
+      if (sql.startsWith('SELECT DISTINCT payload')) {
+        return {
+          rowCount: opts.recentObjectives?.length ?? 0,
+          rows: (opts.recentObjectives ?? []).map((objective) => ({ objective })),
+        };
+      }
+      if (sql.startsWith('SELECT reason FROM escalations')) {
+        return {
+          rowCount: opts.escalatedReasons?.length ?? 0,
+          rows: (opts.escalatedReasons ?? []).map((reason) => ({ reason })),
         };
       }
       if (sql.includes('FROM jobs') && opts.duplicateJob) {
@@ -203,5 +219,48 @@ describe('investigate (HANDOFF_LIVE — envio único, decreto owner 2026-09-26)'
 
     expect(live.calls).toHaveLength(0);
     expect(cap.inserts.some((i) => i.sql.startsWith('INSERT INTO messages'))).toBe(false);
+  });
+
+  it('dedupe SEMÂNTICO: paráfrase do mesmo pedido nas 24h → 0 sendTurn (decreto "só 1x")', async () => {
+    const { pool, cap } = stubPool({
+      recentObjectives: ['Registrar e salvar no brain o número de telefone do Abner (owner) como 685093192 (+34 685 09 31 92).'],
+    });
+    const live = fakeLive(['nunca deve ser chamado']);
+    const h = createInvestigateHandler({ pool, live: live as never, log });
+    await h(job({ id: 'job-paraf', payload: {
+      objective: 'Gravar no brain do sistema o número de telefone do Abner (685093192)',
+      conversation_id: '22222222-2222-2222-2222-222222222222',
+    } }), { recordActivity: async () => {} });
+
+    expect(live.calls).toHaveLength(0); // paráfrase reconhecida — nenhum reenvio
+    const skip = cap.inserts.find(
+      (i) => i.sql.startsWith('INSERT INTO events') && String(i.params[1]).includes('skipped_duplicate'),
+    );
+    expect(skip).toBeDefined();
+    expect(JSON.stringify(skip!.params)).toContain('duplicate_semantic');
+  });
+
+  it('dedupe semântico NÃO pega objetivo diferente na mesma conversa', async () => {
+    const { pool } = stubPool({
+      recentObjectives: ['criar relatório mensal de faturamento do workspace'],
+    });
+    const live = fakeLive(['CONCLUSAO_PRONTA: feito']);
+    const h = createInvestigateHandler({ pool, live: live as never, log });
+    await h(job(), { recordActivity: async () => {} });
+
+    expect(live.calls).toHaveLength(1); // intenção distinta passa normalmente
+  });
+
+  it('objetivo que ESCALOU (falhou) não bloqueia re-pedido', async () => {
+    const failed = 'sincronizar relatórios do painel com o VPS';
+    const { pool } = stubPool({
+      recentObjectives: [failed],
+      escalatedReasons: [`handoff_live: ${failed}`],
+    });
+    const live = fakeLive(['CONCLUSAO_PRONTA: refeito com sucesso']);
+    const h = createInvestigateHandler({ pool, live: live as never, log });
+    await h(job({ payload: { objective: 'refazer a sincronização dos relatórios do painel no VPS', conversation_id: '22222222-2222-2222-2222-222222222222' } }), { recordActivity: async () => {} });
+
+    expect(live.calls).toHaveLength(1); // falhou antes → re-pedido executa de novo
   });
 });

@@ -65,8 +65,14 @@ export class KimiWebLocalAdapter implements KimiLiveAdapter {
     }
     const posted = (await post.json().catch(() => null)) as { data?: { user_message_id?: string } } | null;
     const userMsgId = posted?.data?.user_message_id ?? null;
+    const promptHead = request.prompt.slice(0, 80);
 
     // Poll de messages até a resposta do assistente posterior ao user message.
+    // ATENÇÃO à ordenação: a API devolve a página NEWEST-FIRST (verificado
+    // ao vivo 2026-09-26). A resposta do turno está ANTES (índice menor) da
+    // pergunta — não depois. Versões anteriores liam `slice(startIdx+1)`
+    // (só mensagens mais velhas) e devolviam a resposta MAIS ANTIGA da
+    // sessão com texto ("Limpando os temporários..." em vez do ping real).
     while (Date.now() - t0 < this.timeoutMs) {
       await new Promise((r) => setTimeout(r, this.pollMs));
       const list = await this.fetchImpl(`${this.deps.baseUrl}/api/v1/sessions/${this.deps.sessionId}/messages`, { headers: this.hdrs() });
@@ -74,18 +80,28 @@ export class KimiWebLocalAdapter implements KimiLiveAdapter {
       const data = (await list.json().catch(() => null)) as { data?: WebMessage[] } | null;
       const payload = (data as never as { data?: WebMessage[] | { items?: WebMessage[] } })?.data;
       const msgs = Array.isArray(payload) ? payload : (payload?.items ?? []);
-      const startIdx = userMsgId ? msgs.findIndex((m) => m.id === userMsgId) : -1;
-      const candidates = startIdx >= 0 ? msgs.slice(startIdx + 1) : msgs;
-      const assistant = [...candidates].reverse().find((m) => m.role === 'assistant');
-      if (assistant && assistant.id !== userMsgId) {
-        const text = (assistant.content ?? []).map((c) => c.text ?? '').join('\n').trim();
-        if (text) {
-          return { reply_text: text, provider: 'kimi-web-local', session_id: this.deps.sessionId, duration_ms: Date.now() - t0, usage: { input_tokens: 0, output_tokens: 0 } };
+      // localiza o nosso user message (pelo id do POST; fallback: pelo texto)
+      let startIdx = userMsgId ? msgs.findIndex((m) => m.id === userMsgId) : -1;
+      if (startIdx < 0) {
+        startIdx = msgs.findIndex(
+          (m) => m.role === 'user' && (m.content ?? []).some((c) => (c.text ?? '').includes(promptHead)),
+        );
+      }
+      // respostas = mensagens MAIS NOVAS que a pergunta (newest-first: índices menores).
+      // Só aceita se o prompt foi localizado — senão pode pegar resposta velha.
+      if (startIdx > 0) {
+        const candidates = msgs.slice(0, startIdx);
+        const assistant = candidates.find((m) => m.role === 'assistant');
+        if (assistant) {
+          const text = (assistant.content ?? []).map((c) => c.text ?? '').join('\n').trim();
+          if (text) {
+            return { reply_text: text, provider: 'kimi-web-local', session_id: this.deps.sessionId, duration_ms: Date.now() - t0, usage: { input_tokens: 0, output_tokens: 0 } };
+          }
         }
       }
-      // sessão livre de novo sem texto = turno falhou/sem resposta
+      // sessão livre de novo = turno encerrado; se não achou texto, falhou
       const session = await this.fetchImpl(`${this.deps.baseUrl}/api/v1/sessions/${this.deps.sessionId}`, { headers: this.hdrs() }).then((r2) => r2.json().catch(() => null)) as { data?: { busy?: boolean } } | null;
-      if (session?.data && session.data.busy === false && !assistant) {
+      if (session?.data && session.data.busy === false) {
         throw new Error('kimi-web-local: sessão processou o turno mas não devolveu texto de assistente (resposta vazia)');
       }
     }

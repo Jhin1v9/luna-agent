@@ -78,6 +78,45 @@ const SINGLE_PROMPT = (objective: string, context: string): string =>
 /** Early conclusion: marcador do live brain quando resolveu. */
 const CONCLUSION_MARKER = 'CONCLUSAO_PRONTA:';
 
+/**
+ * Dedupe SEMÂNTICO (decreto owner 2026-09-26, parte 2): o mesmo pedido chega
+ * paráfrase ("Registrar e salvar no brain o número..." vs "Gravar no brain do
+ * sistema o número...") e o match exato de `objective` não pega. Comparação
+ * por sobreposição de tokens de conteúdo (Jaccard sobre o menor conjunto):
+ * mesma intenção reenviada na mesma conversa dentro de 24h → NÃO reenvia.
+ * Objetivos cujo job anterior ESCALOU (falhou) ficam de fora da comparação —
+ * re-pedido depois de falha é legítimo.
+ */
+const STOPWORDS = new Set([
+  'o', 'a', 'e', 'de', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'um', 'uma',
+  'pra', 'pro', 'pros', 'pras', 'pelo', 'pela', 'pelos', 'pelas', 'que', 'com', 'sem',
+  'em', 'ou', 'se', 'eu', 'voce', 'meu', 'minha', 'seu', 'sua', 'esse', 'essa', 'este',
+  'esta', 'isto', 'isso', 'ja', 'so', 'mais', 'muito', 'msm', 'mesmo', 'agora', 'aqui',
+]);
+
+export function contentTokens(text: string): Set<string> {
+  const norm = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const tokens = norm.split(/[^a-z0-9]+/).filter((t) => {
+    if (!t) return false;
+    if (STOPWORDS.has(t)) return false;
+    if (t.length >= 3) return true;
+    return /^\d+$/.test(t); // números curtos (ex.: "34") ainda são conteúdo
+  });
+  return new Set(tokens);
+}
+
+export function tokenOverlap(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter++;
+  return inter / Math.min(a.size, b.size);
+}
+
+const SEMANTIC_DUPLICATE_THRESHOLD = 0.6;
+
 export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
   const { pool, live, log, telegram } = deps;
 
@@ -175,6 +214,59 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
       });
       log.info({ job: job.id, firstJob: first }, 'investigate: objetivo já enviado nas últimas 24h — skip sem reenvio');
       return;
+    }
+
+    // 1b) DEDUPE SEMÂNTICO: mesma intenção em PARÁFRASE (o match exato acima
+    //     não pega) já DESPACHADA nesta conversa nas últimas 24h → não reenvia.
+    //     A fonte da verdade são os eventos `router.investigation.dispatched`
+    //     (não a tabela jobs): jobs só ENFILEIRADOS ainda não enviaram nada —
+    //     dois pedidos simultâneos sobre o mesmo tema não podem se cancelar.
+    //     Turnos que escalaram (falharam) são ignorados: re-pedido pós-falha
+    //     é legítimo ("só 1x" vale para o pedido ATENDIDO — depois esquece).
+    const recent = await pool.query<{ objective: string }>(
+      `SELECT DISTINCT payload->'payload'->>'objective' AS objective
+         FROM events
+        WHERE event_type = 'router.investigation.dispatched'
+          AND recorded_at > now() - interval '24 hours'
+          AND conversation_id = $1`,
+      [payload.conversation_id],
+    );
+    if (recent.rowCount) {
+      const escalated = await pool.query<{ reason: string }>(
+        `SELECT reason FROM escalations
+          WHERE created_at > now() - interval '24 hours' AND reason LIKE 'handoff_live:%'`,
+      );
+      const escalatedObjectives = escalated.rows.map((r) => r.reason.replace(/^handoff_live:\s*/, '').trim());
+      const isEscalated = (obj: string): boolean =>
+        escalatedObjectives.some((e) => obj.startsWith(e) || e.startsWith(obj));
+      const tokens = contentTokens(payload.objective);
+      const paraphrase = recent.rows
+        .map((r) => r.objective)
+        .filter((obj): obj is string => typeof obj === 'string' && obj.trim().length > 0)
+        .filter((obj) => !isEscalated(obj.trim()))
+        .map((obj) => ({ obj, score: tokenOverlap(tokens, contentTokens(obj)) }))
+        .filter((x) => x.score >= SEMANTIC_DUPLICATE_THRESHOLD)
+        .sort((a, b) => b.score - a.score)[0];
+      if (paraphrase) {
+        await publish('router.investigation.skipped_duplicate', payload, {
+          outcome: 'duplicate_semantic',
+          similar_objective: paraphrase.obj.slice(0, 200),
+          score: Number(paraphrase.score.toFixed(2)),
+        });
+        await recordAudit(pool, {
+          actor: 'live_investigation',
+          action: 'router.investigation.skipped_duplicate',
+          tool: 'investigate_job',
+          correlation_id: payload.correlation_id ?? null,
+          result: 'success',
+          metadata: { semantic: true, score: Number(paraphrase.score.toFixed(2)) },
+        });
+        log.info(
+          { job: job.id, score: paraphrase.score },
+          'investigate: paráfrase de objetivo já despachado nas 24h — skip sem reenvio',
+        );
+        return;
+      }
     }
 
     // 2) MARCA DE DESPACHO idempotente: o reaper de locks (5 min) pode devolver
