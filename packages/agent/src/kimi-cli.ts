@@ -166,6 +166,8 @@ export class KimiCliAdapter implements KimiLiveAdapter {
   private readonly spawnImpl: CliSpawn;
   private readonly now: () => number;
   private readonly started = new Map<string, boolean>();
+  /** Workspace confiável extra: o repo, para o -p poder escrever nele (cwd é a sessão). */
+  private static readonly repoDir = 'C:/Users/Abner/Documents/Luna cto/luna-agent';
   /** Fila por session_key: turnos do mesmo thread nunca correm em paralelo. */
   private readonly queues = new Map<string, Promise<unknown>>();
 
@@ -205,6 +207,7 @@ export class KimiCliAdapter implements KimiLiveAdapter {
     mkdirSync(dir, { recursive: true });
     const continuing = this.started.get(request.session_key) === true;
     const args = ['-p', request.prompt, '--output-format', 'stream-json'];
+    args.push('--add-dir', KimiCliAdapter.repoDir);
     if (continuing) args.push('-c');
     // -y/--auto são incompatíveis com -p (CLI rejeita) — modo headless já
     // executa sem interagir. Ver KimiCliAdapterDeps.autonomy.

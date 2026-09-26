@@ -46,8 +46,9 @@ interface Round {
 
 const ROUND_PROMPT = (objective: string, context: string, rounds: Round[], last: boolean): string =>
   [
-    'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE). Você tem FERRAMENTAS:',
-    'leitura de arquivos, execução de comandos e busca no repositório.',
+    'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE). Você tem FERRAMENTAS REAIS,',
+    'incluindo ESCRITA: Write, Edit, Read, Grep/Glob e Bash. EXECUTE a tarefa de verdade com',
+    'elas (gravar arquivos, editar código, chamar APIs) — NUNCA alegue que só tem leitura.',
     `O repositório do projeto é C:/Users/Abner/Documents/Luna cto/luna-agent (use caminhos absolutos).`,
     '',
     `TAREFA DESTA INVESTIGAÇÃO: ${objective}`,

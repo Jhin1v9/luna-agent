@@ -34,3 +34,10 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Mantidos: cookies de sessão (.vps_cookie/.cliente_cookie/.rel_cookie), clone do repo nexo-workspace (.brain/.nexo-workspace-src), logs, .last_sweep.json.
 - Chats "Luna — Cron" duplicados na sidebar do Kimi: limpeza visual = ação humana (this chat é o oficial).
 - autor: Luna
+
+## 2026-09-26 · HDM ATUALIZADO — aba "Revisão" criada ao vivo (Luna, via Tailscale)
+- Portal `/relatorios/clientes/hdm/` ganhou a seção `#revisao` ("Análise do site novo, desktop e celular", 26 Set 2026): estética aprovada + 5 achados (prefetch 404, faixa vazia mobile, botão footer com zoom, banner cookies, autorotação do carrossel a verificar) + itens já mapeados (alt text, /cookies). Nav link + entrada no changelog.
+- Backup: `index.html.bak-20260926` no host. Verificado com sessão team HMAC: seção servida OK; sem cookie = 303 pro login (gate intacto).
+- Acesso `hdm-industrial@nexo-digital.app` JÁ existia em `data/users.json` (slug hdm) — confirmado, não precisei criar.
+- Método: `ssh vps` (Tailscale) — skill `vps-tailscale` registrada. Fim da "ação humana" pra editar relatório.
+- autor: Luna

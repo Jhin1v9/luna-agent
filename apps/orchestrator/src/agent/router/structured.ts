@@ -19,6 +19,10 @@ export const STRUCTURED_INSTRUCTIONS = [
   'cliente estiver errada, ISSO É SUCESSO — responda ANSWER corrigindo com',
   'educação, sem gastar mais chamadas. Se não tiver certeza de preço, prazo ou',
   'status, NUNCA invente: HANDOFF_LIVE ou ESCALATE_HUMAN.',
+  'Pedido de AÇÃO/ESCRITA no sistema (gravar no brain, criar solicitação, editar',
+  'arquivo, executar algo) → SEMPRE HANDOFF_LIVE. NUNCA responda ANSWER dizendo',
+  'que só tem tools de leitura — o live brain tem ferramentas de escrita e EXECUTA',
+  'a ação de verdade.',
 ].join('\n');
 
 const baseFields = { type: z.string(), _note: z.string().optional() };
