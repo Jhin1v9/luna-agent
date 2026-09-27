@@ -3,7 +3,7 @@
 **Status:** 🟡 LEAD (pré-venda, reunião inicial agendada)
 **Quem é:** Eduardo — possível cliente, possível app de transporte (frete/caminhoneiros).
 **Origem:** grupo WhatsApp "🏆Production - 2026🙏🏻" (conversation_id `23ad6088-66a9-4ae3-93c1-35f5e59821dc`); reunião pré-marcada a pedido do Abner.
-**Contato:** telefone/e-mail pendentes (capturar na reunião).
+**Contato:** +55 34 99654-4461 (WhatsApp) · dudu@nexo-digital.app (e-mail de acesso ao relatório) — empresa e demais dados pendentes (capturar na reunião).
 **Idioma:** PT-BR (com algum ES informal no grupo).
 **Primeiro contato registrado:** 2026-09-27 (brainstorm no grupo Production).
 **Reunião:** 2026-09-27 15:00 (pré-marcada, pedido do Abner).
@@ -21,7 +21,12 @@ Detalhes: [[luna/leads/eduardo-app-transporte/ENTENDIMENTOS.md]]
 Conversas: [[luna/leads/eduardo-app-transporte/CONVERSAS.md]]
 
 ## Landing page / relatório vivo
-Página interna (equipe Nexo): https://vps.nexo-digital.app/relatorios/clientes/eduardo-transporte/
+Página publicada (VPS): https://vps.nexo-digital.app/relatorios/clientes/eduardo-transporte/
+Acesso cliente: dudu@nexo-digital.app (cadastrado no portal de relatórios, slug eduardo-transporte).
+Card na central de relatórios ✅ (27/09).
+Versão EXTENSA (27/09): sumário executivo, visão, dor do mercado (5 falhas), módulos, 6 pilares,
+ideias do time + 6 ideias novas da Luna, escopo MVP congelado, decisões técnicas, conversa reformulada
+em narrativa, checklist da reunião, riscos, roadmap 4 fases, sentimento, ações.
 Fonte no brain: `landing/index.html` nesta pasta.
 
 ## Ações pendentes
