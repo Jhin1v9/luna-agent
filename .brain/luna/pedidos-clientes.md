@@ -158,3 +158,8 @@ NXDOMAIN tanto no apex quanto no www (testado 8.8.8.8 + 1.1.1.1). Registro/confi
 domínio pendente no registrador (ação humana — credencial do registrar).
 
 autor: Luna
+
+## 2026-09-27 11:33 HVR — [INTERNO, não é pedido de cliente] Nova solicitação no painel
+
+- id cmujmeqjk0002qevocjme0whe · projeto "Projetos Dashboard" · status RECEIVED · urgência ALTA · externalSource admin-workspace (criada pela sessão da Luna/dashboard, não por cliente).
+- Conteúdo: tarefa de segurança GitHub — revisar acessos/visibilidade. Responsável ELIAS. Conta ward-elias a auditar/privar; repos do Abner aguardando lista do Enoque. Checklist pré-privação: varrer histórico de credenciais, rotacionar se vazou, migrar deploys para SSH. Auditoria eliasabner já registrada (18 repos, histórico limpo).
