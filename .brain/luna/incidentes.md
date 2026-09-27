@@ -39,3 +39,11 @@
   Kimi Work desktop OU reiniciar o app (mata os turnos presos). Decisão do owner — reportado.
 - **Update 18:53 HVR:** parada chega a 1h35; fila crescendo (11 >20min, 17 total). Sessão paralela ativa no lead Eduardo (commits), mas o pipeline Geral continua sem processar nada.
 - **Resolvido 19:08 HVR (2ª ocorrência):** fila voltou a processar (last done-process 17:08Z, 0 pending). Causa de fundo registrada pela sessão paralela: quota da automação Geral ESGOTADA no mês (screenshot owner) — explica as paradas em ciclos desde 14:24. Não é só o modo kimi work. Ação humana real: renovar quota/upgrade ou aguardar reset mensal.
+
+## 27/09 21:55 HVR — stack INTENCIONALMENTE offline (luna-off-on)
+- Sweep 21:55: /health e /ready fora do ar, kimiwork_inbox inacessível (luna-postgres Exited 0).
+- Diagnóstico: NÃO é queda — sessão paralela criou skill `luna-off-on` (scripts/luna-stack.bat on/off/status,
+  commits da89071/c8da98e/5ba2c1d, 21:10–21:12) e executou OFF às 21:12:51 para proteger o kimiweb
+  (infra do desktop). pm2: orchestrator/worker/whatsplay/watchdog stopped, kimiweb online.
+- Ação da sweep: NENHUMA recuperação (decisão operacional documentada). Grupo avisado de forma informativa.
+- Stack volta com `luna-stack.bat on` (ação humana ou sessão autorizada).
