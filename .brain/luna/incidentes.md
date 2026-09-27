@@ -17,3 +17,4 @@
 - Orchestrator /health e /ready: 200/200 — o travamento é do pipeline de processamento (automação Geral), não do serviço HTTP
 - Ação: grupo do Telegram alertado (decreto owner: fila >20min → alerta). Não respondi mensagem nenhuma (escopo da Geral)
 - Próximo passo: se na próxima sweep ainda houver pending >20min, verificar logs do worker/orchestrator e pm2
+- **Update 16:48 HVR:** causa raiz confirmada — NÃO é crash. pm2 jlist: unstable_restarts=0 em todos, último start 14:19 HVR. Último done-process 14:18Z (16:18 HVR): turnos kimiwork presos "aguardando varredura" (logs do worker), coerente com cérebro em modo kimi work total desde 14:24 (quota Kimi Code esgotada). Recuperação depende da quota ou da troca de volta ao modo primário. Grupo avisado com causa raiz.
