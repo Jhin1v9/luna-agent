@@ -2,7 +2,9 @@
 
 ## WhatsApp comercial — GRAVADO 2026-09-25 (ordem do Abner: "grava na sua mente")
 
-- **Número COMERCIAL da Nexo (negócio do Abner): +34 685 093 192** → wa.me/34685093192
+- **Número do ABNER (owner) = número COMERCIAL da Nexo: +34 685 093 192** → wa.me/34685093192
+  (CONFIRMADO 2026-09-26 pelo próprio Abner no grupo: "eu sou abner grava meu numero 685093192".
+  O comercial da Nexo É o número pessoal dele — por isso a confusão histórica com o Nonoke.)
 - País: Espanha (Sabadell/Barcelona) — móvel espanhol de 9 dígitos.
 - Uso: CTAs da landing Sabadell (`landing-sabadell/app/src/config.js` → WA_NUMBER)
   e qualquer botão "falar com a Nexo".
@@ -58,3 +60,17 @@
   POST /relatorios/entrar (urlencoded) — sem senha, role client isolado ao próprio slug.
   Clientes em data/users.json (relido por login, sem rebuild).
 - Deploy de edição: editar o index.html no host (mount direto, sem rebuild nem restart).
+
+## Decretos owner — cron adaptativo + Tailscale — GRAVADO 2026-09-27 (ordem direta do Abner nesta conversa)
+1. **Cron adaptativo (sem rodadas à toa)**: tarefa cron só roda quando há mensagem/pendência real.
+   - Menção/msg com @luna no grupo → dispara na hora (a automação Geral já faz isso via condition).
+   - Caso contrário, cadência em escada: base 15 min → 2 runs seguidos sem nada = 30 min → mais 2 = 1h (teto);
+     ao aparecer pendência, reseta pra quente: 2 min → 10 → 15 (rampa de volta à base).
+   - IMPLEMENTADO 27/09 no "Luna — Cron de varredura (negócio + projetos)" (automation_27b0babd):
+     gatilho condition poll 1 min (Python, sem créditos) + conditions/sweep_ladder.py lê
+     .brain/.sweep_cadence.json {sweptAt, quietStreak, nextDelayMin}; o AGENTE escreve o estado ao final de cada run.
+2. **Acesso à VPS = Tailscale, sempre**: ssh alias `vps` (config ~/.ssh/config) → usuário nexo@100.106.140.11
+   (desktop-eteleus ↔ nexudo-mp100). Porta 22 pública bloqueada da rede local — NÃO usar root@IP público.
+   Kimi entra sempre pelo Tailscale. Relatórios estáticos: /home/nexo/Documentos/VPS/VPS/relatorios/public/
+   (bind mount no container nexo_relatorios — atualização live, sem rebuild; auth própria: clientes por e-mail
+   em data/users.json, equipe por e-mail+senha).
