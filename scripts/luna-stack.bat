@@ -75,11 +75,11 @@ echo [luna] pronto — stack no ar (postgres 5433 + pm2 + /ready 200)
 exit /b 0
 
 :OFF
-echo [luna] parando pm2...
-call %PM2% stop all
+echo [luna] parando pm2 (stack de servico)...
+call %PM2% stop luna-orchestrator luna-whatsplay luna-worker luna-watchdog
 echo [luna] parando postgres...
 %DOCKER% stop luna-postgres
-echo [luna] stack desligada. (pm2 save NAO executado de proposito)
+echo [luna] stack desligada. (pm2 save NAO executado; luna-kimiweb mantido — infra do Kimi Work desktop)
 exit /b 0
 
 :STATUS
