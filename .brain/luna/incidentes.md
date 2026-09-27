@@ -19,3 +19,8 @@
 - Próximo passo: se na próxima sweep ainda houver pending >20min, verificar logs do worker/orchestrator e pm2
 - **Update 16:48 HVR:** causa raiz confirmada — NÃO é crash. pm2 jlist: unstable_restarts=0 em todos, último start 14:19 HVR. Último done-process 14:18Z (16:18 HVR): turnos kimiwork presos "aguardando varredura" (logs do worker), coerente com cérebro em modo kimi work total desde 14:24 (quota Kimi Code esgotada). Recuperação depende da quota ou da troca de volta ao modo primário. Grupo avisado com causa raiz.
 - **Resolvido 17:07 HVR:** processamento da fila retomou (last done-process 15:07Z, 0 pending >20min). Duração do incidente: ~49 min (16:18→17:07 HVR). Causa: turnos kimiwork presos durante a janela de quota esgotada do Kimi Code.
+
+## 27/09 17:38 HVR — fila parada novamente (recorrência da quota)
+- Last done-process voltou a estagnar em 15:18:14Z (17:18 HVR); 3 pending >20min às 17:38 (msgs do Elias com as definições do app Eduardo + msg do Enoque).
+- As definições do Elias JÁ foram capturadas pela sessão paralela (commits 5deb736/05f9d8b às 17:06–17:18) — conteúdo não está perdido.
+- Mesma causa raiz dos turnos kimiwork presos (modo kimi work / quota). Grupo já ciente — sem re-alerta para evitar spam; monitorar próxima sweep. Se persistir >1h, re-alertar como recorrência.
