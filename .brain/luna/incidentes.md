@@ -26,3 +26,15 @@
 - Mesma causa raiz dos turnos kimiwork presos (modo kimi work / quota). Grupo já ciente — sem re-alerta para evitar spam; monitorar próxima sweep. Se persistir >1h, re-alertar como recorrência.
 - **Update 17:48 HVR:** parada persiste — 30 min sem processamento, todos os 5 pending agora >20min. Ainda dentro do critério de re-alerta (>1h). Próxima sweep decide.
 - **Update 18:17 HVR:** 1h de parada — recorrência confirmada, NÃO se recuperou sozinha (diferente do incidente 16:18). Fila crescendo: 11 pending, 5 >20min. Grupo re-alertado (prometido no critério >1h).
+
+## 27/09 18:50 HVR — causa raiz definitiva da fila: turnos do kernel kimi-code presos
+- runner.state.json do agente main: 2 kernel_turns ATIVOS há ~2h (started 16:41:55Z e 16:44:16Z),
+  kernel=kimi-code, providerModel=unknown (quota Kimi Code esgotada — turnos nunca completam).
+- Um deles (turno 136, conv ae77d4af) é EXATAMENTE a conversation da automação Geral —
+  por isso todo run da Geral é "deferred: conversation busy (user turn in progress)" e o
+  kimiwork_inbox não drena (last process 15:18Z).
+- Modo kimi work no .env JÁ ESTAVA ATIVO (KIMI_ADAPTER_MODE=kimiwork, LIVE_BRAIN_PROVIDER=kimiwork,
+  desde 14:24). O gargalo não é a env — é a quota do provider Kimi Code segurando turnos no desktop.
+- Destrave depende de: quota voltar (turnos completam sozinhos) OU cancelar os turnos na UI do
+  Kimi Work desktop OU reiniciar o app (mata os turnos presos). Decisão do owner — reportado.
+- **Update 18:53 HVR:** parada chega a 1h35; fila crescendo (11 >20min, 17 total). Sessão paralela ativa no lead Eduardo (commits), mas o pipeline Geral continua sem processar nada.
