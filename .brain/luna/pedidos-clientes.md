@@ -163,3 +163,9 @@ autor: Luna
 
 - id cmujmeqjk0002qevocjme0whe · projeto "Projetos Dashboard" · status RECEIVED · urgência ALTA · externalSource admin-workspace (criada pela sessão da Luna/dashboard, não por cliente).
 - Conteúdo: tarefa de segurança GitHub — revisar acessos/visibilidade. Responsável ELIAS. Conta ward-elias a auditar/privar; repos do Abner aguardando lista do Enoque. Checklist pré-privação: varrer histórico de credenciais, rotacionar se vazou, migrar deploys para SSH. Auditoria eliasabner já registrada (18 repos, histórico limpo).
+- 2026-09-27 10:06 · Eduardo CONFIRMOU reuniao hoje 15:00 (horario Espanha/HVR) · autor: Elias no grupo Production · lembrete automatico 12:00 mantido; pauta: entender ideia do app, escopo, proximos passos; se ele quiser, capturar requisitos no chat
+
+## 2026-09-27 13:42 HVR — [INTERNO, não é pedido de cliente] Nova solicitação no painel
+
+- id cmujr15v5000cqevov11oyol5 · projeto "Reuniões Comerciais" · status RECEIVED · externalSource admin-workspace (sessão paralela da Luna).
+- Conteúdo: registro da reunião comercial com Eduardo (filho do Edio, +55 34 99654-4461) — 27/09 15h Espanha / 10h Brasília. Interesse: app de transporte/encomiendas. Call de descoberta: operação atual, visão de produto, escopo MVP, prazo, orçamento, decisor. Lead tambem criado no dashboard Nexo (lead-1790509215174-7gvt, assignedTo Abner).
