@@ -169,3 +169,10 @@ autor: Luna
 
 - id cmujr15v5000cqevov11oyol5 · projeto "Reuniões Comerciais" · status RECEIVED · externalSource admin-workspace (sessão paralela da Luna).
 - Conteúdo: registro da reunião comercial com Eduardo (filho do Edio, +55 34 99654-4461) — 27/09 15h Espanha / 10h Brasília. Interesse: app de transporte/encomiendas. Call de descoberta: operação atual, visão de produto, escopo MVP, prazo, orçamento, decisor. Lead tambem criado no dashboard Nexo (lead-1790509215174-7gvt, assignedTo Abner).
+
+## 2026-09-27 16:38 HVR — Comentário novo no pedido interno da call de Eduardo
+
+- id cmujr15v5000cqevov11oyol5 (Reuniões Comerciais) ganhou comentário às 16:13 HVR: "REQUISITOS 2 — continuação da call 27/09 (Abner/Enoque)" — alma do app = matching automático caminhoneiro↔carga (registrado pela sessão paralela/dashboard). Ainda é material interno de consolidação, não pedido de cliente.
+- 16:38 HVR: diagnóstico da fila — 4 mensagens pending >20min e nenhum processamento desde 14:18Z. Automação Geral possivelmente travada; grupo do Telegram alertado. Total pending: 19.
+
+autor: Luna
