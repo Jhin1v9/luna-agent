@@ -25,3 +25,4 @@
 - As definições do Elias JÁ foram capturadas pela sessão paralela (commits 5deb736/05f9d8b às 17:06–17:18) — conteúdo não está perdido.
 - Mesma causa raiz dos turnos kimiwork presos (modo kimi work / quota). Grupo já ciente — sem re-alerta para evitar spam; monitorar próxima sweep. Se persistir >1h, re-alertar como recorrência.
 - **Update 17:48 HVR:** parada persiste — 30 min sem processamento, todos os 5 pending agora >20min. Ainda dentro do critério de re-alerta (>1h). Próxima sweep decide.
+- **Update 18:17 HVR:** 1h de parada — recorrência confirmada, NÃO se recuperou sozinha (diferente do incidente 16:18). Fila crescendo: 11 pending, 5 >20min. Grupo re-alertado (prometido no critério >1h).
