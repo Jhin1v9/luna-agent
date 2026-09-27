@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eduardo — App de Transporte · Lead — Nexo Digital</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #16181d;
+      --paper: #f6f4ef;
+      --paper-dark: #ece8df;
+      --accent: #c45f3c;
+      --accent-dark: #a34d2e;
+      --muted: #6b6f76;
+      --line: #d8d3c8;
+      --ok: #3d7a4a;
+      --lead: #b8860b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--paper); color: var(--ink); line-height: 1.65; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; }
+
+    .topbar { background: var(--ink); color: rgba(246,244,239,.75); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; padding: .45rem 0; }
+    .topbar .wrap { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .topbar a { color: rgba(246,244,239,.75); text-decoration: none; }
+    .topbar a:hover { color: #fff; }
+
+    header.masthead { padding: 2.5rem 0 1.25rem; border-bottom: 1px solid var(--line); }
+    .badge-lead { display: inline-block; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; padding: .3rem .8rem; border-radius: 999px; background: #fdf3d8; color: var(--lead); border: 1px solid #e8d9a8; }
+    .masthead h1 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(2.2rem, 6vw, 3.6rem); letter-spacing: -.02em; line-height: 1.05; margin: .8rem 0 .3rem; }
+    .masthead h1 span { color: var(--accent); }
+    .masthead .tagline { color: var(--muted); font-size: .95rem; }
+    .dateline { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; border-top: 3px double var(--ink); border-bottom: 1px solid var(--line); padding: .5rem 0; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+    .kicker { font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+    h2 { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem, 3.5vw, 2rem); margin: .35rem 0 1rem; }
+    h3 { font-family: 'Playfair Display', serif; font-size: 1.15rem; margin-bottom: .3rem; }
+    p.lede { font-size: 1.08rem; color: #33363c; max-width: 70ch; }
+
+    .ficha { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+    .ficha .campo { background: #fff; border: 1px solid var(--line); padding: .9rem 1rem; }
+    .ficha .campo .label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    .ficha .campo .valor { font-size: .95rem; font-weight: 600; margin-top: .2rem; }
+    .ficha .campo .valor.pendente { color: var(--accent-dark); font-weight: 500; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem; }
+    .card { background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--ink); padding: 1.4rem; }
+    .card.accent { border-top-color: var(--accent); }
+    .card p { color: var(--muted); font-size: .9rem; margin-top: .25rem; }
+    .card .num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--accent); font-weight: 700; }
+
+    .mvp { background: var(--ink); color: var(--paper); padding: 2rem; border-radius: .4rem; }
+    .mvp h2 { color: #fff; }
+    .mvp .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+    .mvp h3 { color: var(--accent); font-family: 'Inter', sans-serif; font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; }
+    .mvp ul { list-style: none; margin-top: .5rem; }
+    .mvp li { padding: .35rem 0; border-bottom: 1px solid rgba(246,244,239,.12); font-size: .95rem; }
+    .mvp li:last-child { border-bottom: none; }
+
+    .perguntas { background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--lead); padding: 1.5rem 1.75rem; }
+    .perguntas ol { margin: .75rem 0 0 1.25rem; }
+    .perguntas li { padding: .3rem 0; font-size: .98rem; }
+
+    .sentimento { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+    .sentimento .s { background: #fff; border: 1px solid var(--line); padding: 1rem 1.1rem; font-size: .9rem; color: #33363c; }
+    .sentimento .s strong { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: .3rem; }
+
+    .acoes { background: #fff; border: 1px solid var(--line); padding: 1.5rem 1.75rem; }
+    .acoes li { list-style: none; padding: .45rem 0 .45rem 1.9rem; position: relative; border-bottom: 1px dashed var(--line); font-size: .95rem; }
+    .acoes li:last-child { border-bottom: none; }
+    .acoes li::before { content: '☐'; position: absolute; left: .2rem; color: var(--accent); font-size: 1.1rem; }
+
+    .conversa { background: #fff; border: 1px solid var(--line); padding: 1.5rem 1.75rem; font-size: .92rem; }
+    .conversa .msg { padding: .55rem 0; border-bottom: 1px dashed var(--line); }
+    .conversa .msg:last-child { border-bottom: none; }
+    .conversa .quem { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .conversa .quem.luna { color: var(--accent); }
+    .conversa .texto { margin-top: .15rem; }
+    .conversa .texto em { color: var(--muted); }
+
+    footer { border-top: 1px solid var(--line); padding: 1.5rem 0 3rem; font-size: .8rem; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="wrap">
+      <span>Nexo Digital · Relatórios</span>
+      <span><a href="/relatorios/nexo/">Área da equipe</a> · <a href="/relatorios/">Central</a></span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="masthead">
+      <span class="badge-lead">🟡 Lead · Pré-venda</span>
+      <h1>Eduardo — <span>App de Transporte</span></h1>
+      <p class="tagline">Página viva do lead: ideias, entendimentos, sentimento e próximos passos</p>
+    </header>
+    <div class="dateline">
+      <span>Origem: grupo WhatsApp “🏆Production - 2026🙏🏻”</span>
+      <span>Atualizado em 27 Set 2026 · Luna</span>
+    </div>
+
+    <section id="ficha">
+      <span class="kicker">Ficha do lead</span>
+      <h2>Quem é, de onde veio, para onde vai</h2>
+      <p class="lede">Possível cliente com um possível app de transporte (frete / caminhoneiros). Reunião inicial <strong>27/09 às 15:00</strong>, pré-marcada a pedido do Abner. Esta página é o “relatório vivo” do lead: tudo que capturamos das conversas fica aqui — depois a gente decide o que fica e o que sai.</p>
+      <div class="ficha">
+        <div class="campo"><div class="label">Status</div><div class="valor">🟡 Lead</div></div>
+        <div class="campo"><div class="label">Projeto</div><div class="valor">App de transporte</div></div>
+        <div class="campo"><div class="label">Reunião</div><div class="valor">27/09/2026 · 15:00</div></div>
+        <div class="campo"><div class="label">Origem</div><div class="valor">Grupo Production (WA)</div></div>
+        <div class="campo"><div class="label">Telefone</div><div class="valor pendente">pendente — capturar</div></div>
+        <div class="campo"><div class="label">E-mail</div><div class="valor pendente">pendente — capturar</div></div>
+      </div>
+    </section>
+
+    <section id="ideias">
+      <span class="kicker">Brainstorm 27/09</span>
+      <h2>As ideias, organizadas em pilares</h2>
+      <div class="grid">
+        <article class="card accent">
+          <div class="num">1</div>
+          <h3>Localização viva</h3>
+          <p>Motorista com rota ativa (ex.: Uberlândia→SP) recebe oferta de retorno exatamente onde está. Matching por <strong>raio + direção</strong>, não oferta genérica.</p>
+        </article>
+        <article class="card accent">
+          <div class="num">2</div>
+          <h3>Histórico duplo (regra de ouro)</h3>
+          <p>Caminhoneiro vê tudo dele — corridas, empresa, quanto ganhou, km, rota, paradas. Empresa vê só o básico da corrida, zero dado pessoal. Vitória tranquila na <strong>LGPD</strong>.</p>
+        </article>
+        <article class="card accent">
+          <div class="num">3</div>
+          <h3>Paradas seguras</h3>
+          <p>Camada fixa de POIs sempre no mapa, com prioridade para quem tem melhor nota.</p>
+        </article>
+        <article class="card accent">
+          <div class="num">4</div>
+          <h3>Contato proativo</h3>
+          <p>A plataforma <strong>não espera</strong> o caminhoneiro aceitar: dispara a oferta direto para os melhores da lista, por WhatsApp/push. Motor de matching + notificação outbound.</p>
+        </article>
+        <article class="card accent">
+          <div class="num">5</div>
+          <h3>Precificação preditiva</h3>
+          <p>Média dos últimos aceites do caminhoneiro (7k, 8k, 9k → base ~8k). A empresa chega pronta: “fulano costuma aceitar R$ 8.000 nessa distância — montar proposta?”. Ouro para taxa de fechamento.</p>
+        </article>
+        <article class="card accent">
+          <div class="num">6</div>
+          <h3>Marketing pra empresa</h3>
+          <p>Ideia original do grupo: oferecer o sistema às empresas <strong>ou analisar as propostas atuais delas</strong> → virar o sistema de rotas e preços do mercado.</p>
+        </article>
+        <article class="card">
+          <div class="num">+</div>
+          <h3>Licenças Apple &amp; Google</h3>
+          <p>Pedido explícito do grupo: providenciar as licenças Apple Developer e Google Play para lançar o app. Ação operacional já registrada.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="escopo">
+      <div class="mvp">
+        <span class="kicker">Escopo proposto pela Luna</span>
+        <h2>MVP primeiro, ciclo 2 depois</h2>
+        <div class="cols">
+          <div>
+            <h3>MVP</h3>
+            <ul>
+              <li>Matching por localização (raio + direção)</li>
+              <li>Notificação proativa ao motorista</li>
+              <li>Preço sugerido (base de aceites)</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Ciclo 2</h3>
+            <ul>
+              <li>Histórico duplo (motorista / empresa)</li>
+              <li>Paradas seguras no mapa</li>
+              <li>Portal de análise de propostas p/ empresas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="perguntas">
+      <span class="kicker">Aguardando o time</span>
+      <h2>Perguntas abertas</h2>
+      <div class="perguntas">
+        <ol>
+          <li>Notificação proativa do caminhoneiro: <strong>WhatsApp, push ou os dois?</strong></li>
+          <li>Avaliação: <strong>só a empresa avalia o motorista, ou avaliação mútua?</strong></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="sentimento">
+      <span class="kicker">Leitura da conversa</span>
+      <h2>Sentimento</h2>
+      <div class="sentimento">
+        <div class="s"><strong>Clima</strong>Muito positivo e informal — risadas, “aee sim lunaaaaaaaaa”, “manda aeee”. Energia de descoberta.</div>
+        <div class="s"><strong>Modo</strong>Captura de ideias: “só vou anotando as ideias”, “manda que a Luna vai entendendo e anotando”.</div>
+        <div class="s"><strong>Confiança</strong>O time trata a Luna como membro — pedem explicitamente que ela entenda, anote e documente.</div>
+        <div class="s"><strong>Ambição</strong>Querem documentar “do jeito que os grandes fazem” — esta página é o primeiro passo.</div>
+      </div>
+    </section>
+
+    <section id="acoes">
+      <span class="kicker">Próximos passos</span>
+      <h2>Ações pendentes</h2>
+      <ul class="acoes">
+        <li>Reunião 27/09 15:00 — colher escopo real, budget, prazo e concorrentes que o Eduardo usa</li>
+        <li>Providenciar licenças Apple Developer + Google Play</li>
+        <li>Definir canal de notificação proativa (WhatsApp, push ou ambos)</li>
+        <li>Definir modelo de avaliação (empresa→motorista ou mútua)</li>
+        <li>Capturar contatos do Eduardo (telefone, e-mail, empresa)</li>
+      </ul>
+    </section>
+
+    <section id="conversas">
+      <span class="kicker">Registro fiel</span>
+      <h2>Conversas · 27/09/2026 — grupo Production</h2>
+      <div class="conversa">
+        <div class="msg"><div class="quem">Time</div><div class="texto">“marketing para as empresas: oferecer às empresas ou analisar propostas das empresas atuais, para obter um sistema e meio de informação onde podemos ter um sistema de rota e preços”</div></div>
+        <div class="msg"><div class="quem">Time</div><div class="texto"><em>“noke explica melhor essa ideia skdsks n entendi direito… de boa, depois explico, só vou anotando as ideias”</em></div></div>
+        <div class="msg"><div class="quem">Time</div><div class="texto">“manda aeeeew dai a luna ja vai entendendo — e anotando”</div></div>
+        <div class="msg"><div class="quem">Time</div><div class="texto">“licencia para apple y google para tirar app!” <em>(confirmado: licenças para lançar o app nas lojas)</em></div></div>
+        <div class="msg"><div class="quem luna">Luna</div><div class="texto">Organizou em 6 pilares (acima), propôs MVP = matching por localização + notificação proativa + preço sugerido, e devolveu 2 perguntas de definição.</div></div>
+        <div class="msg"><div class="quem">Time</div><div class="texto">“aee sim lunaaaaaaaaa — anota tudo no lead do eduardo, cria página de relatórios/conversas/entendimentos no brain, separa uma landing page… e sobe no VPS e no dashboard.” <em>(= esta página)</em></div></div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Fonte no Brain: <code>.brain/leads/eduardo-app-transporte/</code> (LEAD.md · CONVERSAS.md · ENTENDIMENTOS.md)</span>
+      <span>Nexo Digital · uso interno da equipe</span>
+    </footer>
+  </div>
+</body>
+</html>
