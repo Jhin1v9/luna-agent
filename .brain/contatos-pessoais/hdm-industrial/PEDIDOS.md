@@ -53,3 +53,7 @@ data + autor: Luna · 2026-09-24 · fonte: GET /nexo/api/admin/requests/<id> (HT
 - DECISÃO ARQUITETURA: implementado na PLATAFORMA NOVA (Next.js, ainda não
   publicada); publicação = ação manual do owner (deploy hook). Site antigo em
   www.hdmindustrial.es continua no ar até lá.
+- [ ] 28/09 — Matheus (grupo HDM) sugeriu usar fotos/vídeos do Instagram no site (mais confiança).
+      Luna respondeu no grupo: viável, com seleção das melhores mídias + tratamento de qualidade;
+      pediu preferencialmente os originais (evita compressão do Instagram). Aguardando envio/decisão.
+      NOTA: inbound do grupo HDM voltou a chegar neste dia (watcher reativo — Enoque fixou o grupo).
