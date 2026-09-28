@@ -56,3 +56,15 @@
   Telegram (msg 5610), mensagens ES/PT no grupo. Recomendado: Júnior testar com a conta dele
   (msg `aa0c648d`). Observação: o tel do site (658 187 071) NÃO bate com o do perfil Maps
   (640 78 62 77) — se surgir divergência, investigar de novo.
+- 28/09 (noite) — **❌ ERRO CONFIRMADO: o "CONFIRMADO" acima estava ERRADO.** Enoque testou o
+  link e ele abre **outra empresa** ("JR iReformas Integrales" — nome quase idêntico, empresa
+  diferente). O perfil REAL do Juninho é **"JR Reformas - Junior"** (Sabadell/Barcelona, tel
+  +34 658 187 071 — bate com o site). Essa listagem **não aparece na busca pública do Maps**
+  (busca por telefone 658187071 e por nome não retornam nada — lista nova/recém-renomeada, não
+  indexada). **O link writereview e o QR (Telegram msg 5610) estão APONTANDO PRA EMPRESA
+  ERRADA — nunca usar.** Correção pedida: Enoque/Júnior mandarem o link oficial do app Google
+  Business (Perfil → "Peça uma avaliação"); com ele, refazer QR + validar + atualizar mensagens
+  (pedido no grupo, msg `fab23b7d`; alerta no Telegram msg 5611). **Lição: nome parecido no
+  Maps ≠ perfil certo — sempre validar tel/site com o time antes de entregar material de
+  resenha. O placeid `ChIJlSZu64GjpBIRHLNDRidlrF4` é da empresa errada; o certo ainda é
+  desconhecido.**
