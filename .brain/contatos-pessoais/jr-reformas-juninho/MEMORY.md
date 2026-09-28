@@ -28,3 +28,6 @@
 - 28/09 — Juninho vai abrir **WhatsApp Empresa** (começa hoje e segunda). Quando estiver no ar:
   oferecer ajuda com perfil (descrição, catálogo, link pro site). Contexto: Google Maps do JR
   Reformas já ativo; Enoque orientando anúncios Instagram (packs + formulário pendente).
+- 28/09 (tarde) — Júnior confirmou: **app do WhatsApp Empresa JÁ INSTALADO**; vai configurar
+  hoje e segunda. Luna mandou checklist rápido (foto/logo, descrição, categoria, link do site)
+  e ofereceu ajuda na config segunda. Segunda-feira: cobrar se o perfil ficou pronto.
