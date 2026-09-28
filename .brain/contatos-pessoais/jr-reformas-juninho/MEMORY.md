@@ -90,6 +90,14 @@
   — anotado como melhoria pro Jhin. Mensagens padrão ES/PT seguem válidas; trocar o [LINK]
   pelo g.page. (msgs `bd42548a` grupo, 5613 Telegram)
 - 28/09 (noite) — **Financeiro:** falta **R$ 150 em efetivo** do Juninho. Enoque viu ele hoje e
-  disse que paga **essa semana (até 04/10)**. Anotado no Dashboard (Canvas "Nexo Digital —
-  Operações", widget Contas a receber — `canvas_1ba0e642`) + avisado no Production (msg
-  `c58e1179`). **Cobrar/atualizar o status quando o pagamento acontecer.**
+  disse que paga **essa semana (até 04/10)**. Registro OFICIAL no **Dashboard Pro da VPS**
+  (container `nexo_dashboard_backend:3500`, `POST /api/payments`): id `pay-1790627404188-7qgl`,
+  R$ 150 BRL, status PENDING. O Canvas Kimi foi extra (Abner corrigiu o alvo). Avisado no
+  Production (msgs `c58e1179`, `20d5aa6d`).
+  **API do dashboard:** auth = `Authorization: Bearer <INTERNAL_API_TOKEN>` (o
+  `DASHBOARD_API_KEY` NÃO funciona no Bearer); criar manda `{description, status}` e o valor
+  só pega via `totalAmount:{value,currency}` — campo `amount` é ignorado; PUT /api/payments/:id
+  atualiza. **Cobrar o Juninho e marcar o payment como PAID quando o pagamento acontecer.**
+  UPDATE 28/09 20:26 — Juninho confirmou: "Amanhã eu passo aí pra deixar o dinheiro". Respondido
+  no grupo dele (msg `fa2b812f`). Se ele pagar, PUT /api/payments/pay-1790627404188-7qgl →
+  status PAID (e avisar no Production).
