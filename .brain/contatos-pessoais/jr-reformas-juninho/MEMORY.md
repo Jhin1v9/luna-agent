@@ -24,3 +24,7 @@
 ## Lead 2026-09-24
 - **IA no Instagram:** no grupo do WhatsApp, Júnior perguntou se dá pra fazer "isso" (a Luna) no Instagram dele — interesse declarado em automação/IA pras redes do negócio de reformas. Lead repassado ao Abner no Production; aguardando retorno comercial.
 - **24/09 16:15 UTC:** Júnior pediu o VALOR da IA pras redes ("So pra saber valor disso, depois voces me passam porfa"). Luna nao inventou preco; respondeu que o Abner passa os valores. Aguardando retorno comercial do Abner.
+
+- 28/09 — Juninho vai abrir **WhatsApp Empresa** (começa hoje e segunda). Quando estiver no ar:
+  oferecer ajuda com perfil (descrição, catálogo, link pro site). Contexto: Google Maps do JR
+  Reformas já ativo; Enoque orientando anúncios Instagram (packs + formulário pendente).
