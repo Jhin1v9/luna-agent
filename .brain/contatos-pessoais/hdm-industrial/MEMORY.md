@@ -21,3 +21,11 @@
 ## Pedidos em andamento (24/09)
 
 Ver `.brain/luna/pedidos-clientes.md` §HDM. Resumo: 3 petições (scroll reveal ✅; carrossel — aguardando Matheus responder como quer (só hero ou mais páginas + referência); aba currículos ✅). Profissões novas (eletromecânico, mecânico industrial) ausentes no deploy — verificar.
+
+## 28/09 (noite) — Pendências pra revisão do time (aviso do Enoque no Production)
+
+- Enoque: **amanhã (29/09) o time revisa o que falta da HDM** — incl. **portal de CRM ou de RH que o
+  Matheus mencionou** fazer. Esse portal NÃO está nos registros (é demanda nova/oportunidade) — confirmar
+  escopo com o Matheus e abrir card no painel se fechar.
+- Recap enviado no Production (msg 20:48): carrossel aguardando imagens próprias do cliente;
+  profissões novas ausentes no deploy; 3 cards a mover pra revisão dele no painel.
