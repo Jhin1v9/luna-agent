@@ -50,3 +50,9 @@
   confirmar o (2), refazer link writereview + QR (`https://search.google.com/local/writereview?placeid=ChIJVxIC4aa8pBIR6HgwwAeR4N4`).
   Toda a área de atuação é Sabadell/Barcelona/Terrassa/Mataró. Pedido de confirmação enviado
   no grupo (msg `1083e945`).
+- 28/09 (noite) — **CONFIRMADO pelo Enoque** ("isso esse mesmo"): perfil = **JR REFORMAS
+  INTEGRALES** (opção 1). Material validado — link curto
+  `https://search.google.com/local/writereview?placeid=ChIJlSZu64GjpBIRHLNDRidlrF4`, QR no
+  Telegram (msg 5610), mensagens ES/PT no grupo. Recomendado: Júnior testar com a conta dele
+  (msg `aa0c648d`). Observação: o tel do site (658 187 071) NÃO bate com o do perfil Maps
+  (640 78 62 77) — se surgir divergência, investigar de novo.
