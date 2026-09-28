@@ -89,3 +89,7 @@
   Confirmado pro time: Luna não envia imagem no WhatsApp (só texto; imagens vão pelo Telegram)
   — anotado como melhoria pro Jhin. Mensagens padrão ES/PT seguem válidas; trocar o [LINK]
   pelo g.page. (msgs `bd42548a` grupo, 5613 Telegram)
+- 28/09 (noite) — **Financeiro:** falta **R$ 150 em efetivo** do Juninho. Enoque viu ele hoje e
+  disse que paga **essa semana (até 04/10)**. Anotado no Dashboard (Canvas "Nexo Digital —
+  Operações", widget Contas a receber — `canvas_1ba0e642`) + avisado no Production (msg
+  `c58e1179`). **Cobrar/atualizar o status quando o pagamento acontecer.**
