@@ -98,7 +98,8 @@
   `DASHBOARD_API_KEY` NÃO funciona no Bearer); criar manda `{description, status}` e o valor
   só pega via `totalAmount:{value,currency}` — campo `amount` é ignorado; PUT /api/payments/:id
   atualiza. **Cobrar o Juninho e marcar o payment como PAID quando o pagamento acontecer.**
-  Curiosidade do time: **04/10 é aniversário do Enoque** — o vencimento cai no dia dele 😄.
+  Curiosidade do time: **04/10 é aniversário do Enoque E do Abner** (dobradinha, info do
+  Enoque no Production 28/09) — o vencimento cai no dia dos dois 😄🎂.
   UPDATE 28/09 20:26 — Juninho confirmou: "Amanhã eu passo aí pra deixar o dinheiro". Respondido
   no grupo dele (msg `fa2b812f`). Se ele pagar, PUT /api/payments/pay-1790627404188-7qgl →
   status PAID (e avisar no Production).
