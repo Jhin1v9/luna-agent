@@ -47,3 +47,8 @@
   (infra do desktop). pm2: orchestrator/worker/whatsplay/watchdog stopped, kimiweb online.
 - Ação da sweep: NENHUMA recuperação (decisão operacional documentada). Grupo avisado de forma informativa.
 - Stack volta com `luna-stack.bat on` (ação humana ou sessão autorizada).
+
+## 27/09 21:12 → 28/09 08:17 HVR — luna-off-on ENCERRADO
+- Stack religada (luna on) às 08:17 HVR; /ready 200, fila 0 pending. Durante o off (~11h) nada chegou;
+  backfill de 2 msgs absorvido. Motivo do off confirmado: modo econômico (tokens kimi-api + Kimi Code
+  esgotados, decreto owner 28/09 08:25 — fallback kimi work permanente até nova ordem).
