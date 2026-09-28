@@ -42,6 +42,20 @@ kimiwork cobre o fast brain + composição de prompts.
 
 *2026-09-24 · autor: Luna (decreto verbal do owner Abner, ~01:52)*
 
+## Atualização 2026-09-28 — MODO ECONÔMICO / FALLBACK KIMI WORK (decreto owner 08:25)
+- Contexto: tokens da API (kimi-api) acabaram E Kimi Code junto — não há cérebro primário
+  disponível por tempo indeterminado.
+- Decreto: operar em **modo econômico** com fallback kimi work total — fast brain
+  (KIMI_ADAPTER_MODE=kimiwork) + live brain (LIVE_BRAIN_PROVIDER=kimiwork). Ambas já
+  ativas no .env desde 27/09 14:24; este decreto torna o estado PERMANENTE até nova
+  ordem (não reavaliar retorno ao primário sozinha).
+- Econômico = não gastar à toa: automações só executam agente com pendência real
+  (condition polls em Python não consomem crédito — mantidos); cron de varredura segue
+  a cadência adaptativa (.sweep_cadence.json, teto 1h); sem relatórios desnecessários.
+- Quando o owner avisar que tokens/quota voltaram: trocar pra modo primário via skill
+  `cerebro` + synapse + commit (procedimento padrão).
+*autor: Luna (decreto verbal do owner Abner, 28/09 ~08:25)*
+
 ## Atualização 2026-09-24 — caça ao BRAIN_API_TOKEN (resultado)
 - Token achado no VPS (`/home/nexo/.git-credentials`, PAT GitHub `gho_...` do sync brain-sync.js → repo Jhin1v9/principal-brain):
   **INVÁLIDO** — GitHub responde 401 Bad credentials; atlas `/brain/api/*` responde 401 "token inválido".
