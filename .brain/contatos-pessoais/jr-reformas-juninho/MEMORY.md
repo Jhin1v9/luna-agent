@@ -31,3 +31,6 @@
 - 28/09 (tarde) — Júnior confirmou: **app do WhatsApp Empresa JÁ INSTALADO**; vai configurar
   hoje e segunda. Luna mandou checklist rápido (foto/logo, descrição, categoria, link do site)
   e ofereceu ajuda na config segunda. Segunda-feira: cobrar se o perfil ficou pronto.
+- 28/09 (noite) — Time abriu novo tópico no grupo: **resenhas do Google do Juninho** (ranquear
+  no Maps). Luna ofereceu: link direto de avaliação do Google Business, mensagem padrão pro
+  cliente e QR code. Aguardando confirmação + e-mail/conta do perfil pra puxar o link certo.
