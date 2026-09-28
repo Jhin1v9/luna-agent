@@ -68,3 +68,7 @@
   Maps ≠ perfil certo — sempre validar tel/site com o time antes de entregar material de
   resenha. O placeid `ChIJlSZu64GjpBIRHLNDRidlrF4` é da empresa errada; o certo ainda é
   desconhecido.**
+- 28/09 (noite) — **Dica do Enoque registrada:** nos posts/legendas do Instagram do Juninho,
+  sempre referenciar **jr-reformas.com** (ajuda o ranqueamento local e facilita o cliente).
+  Reforços que a Luna passou: link clicável só na BIO do feed; nos stories usar o adesivo de
+  LINK (msg `4fa3138e`). Seguir cobrando isso quando o tema Instagram aparecer.
