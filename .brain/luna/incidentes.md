@@ -61,3 +61,16 @@
 - Provável causa: sessão do WhatsApp Web não carrega o chat do grupo (arquivado/fora da lista visível) ou instabilidade da sessão (whatsplay com 728 restarts).
 - Mitigação: mensagem enviada no grupo HDM pedindo ao Matheus pra repetir pedidos; fix definitivo com Jhin/Abner (fixar grupo no painel + recarregar sessão; avaliar watcher explícito por JID).
 - Bônus: msg de teste de fluxo HDM (06:54) foi parar no Production por erro de roteamento meu — fluxo de teste deve ficar interno/grupo do cliente.
+
+## 2026-09-28 (atualização) — CAUSA RAIZ do "grupo HDM sem resposta"
+
+- Não era só o watcher: o delivery outbound resolve destino pelo CONTATO DA
+  CONVERSA (contacts.address), e a Luna gravava TODAS as respostas com a
+  conversation_id do Production → mensagens pro HDM/Juninho caíam no Production.
+  Ocorreu 4x (27/09: HDM "instabilidade" + Juninho ack; 28/09: 2 respostas HDM).
+- Corrigido no procedimento: regra de ouro em grupos-clientes.md (usar sempre a
+  conversation_id do evento). Respostas reenviadas nos grupos certos e entrega
+  confirmada nos logs (target correto).
+- Print da sessão WA (prova de que Production e HDM são chats distintos) no
+  Telegram msg 5609 e em .brain/luna/analises/wa-antes.png.
+- Fix estrutural pendente (Jhin): delivery priorizar metadata.chat_id.

@@ -36,6 +36,21 @@
   quando houver jid pessoal (`NNNN@s.whatsapp.net`), registrar na ficha do
   cliente em `.brain/clients/<cliente>/MEMORY.md`.
 
+## ⚠️ REGRA DE OURO DO ENVIO (incidente 28/09 — CAUSA RAIZ encontrada)
+
+**O delivery do whatsplay resolve o destino pelo CONTATO DA CONVERSA**
+(`conversations.contact_id → contacts.address`) — `metadata.chat_id` é
+IGNORADO na entrega. Responder grupo de cliente com INSERT na
+conversation_id do PRODUCTION = mensagem entregue no PRODUCTION
+(aconteceu 4x: 2 mensagens HDM + 1 Juninho no dia 27/09, 2 HDM no dia 28/09).
+
+- **Resposta SEMPRE com `conversation_id` do PRÓPRIO evento** (vem em
+  `payload.conversation_id`): HDM = `88200635-…`, Juninho = `f1e0dc91-…`,
+  Production = `23ad6088-…`. `metadata.chat_id` continua preenchido, mas é
+  só informativo.
+- Fix estrutural proposto (Jhin): delivery priorizar `metadata.chat_id` quando
+  presente, com send-safety cruzando os dois.
+
 ## Fichas dos clientes
 
 - HDM: `.brain/clients/hdm-industrial/MEMORY.md` (+ pedidos em `.brain/luna/pedidos-clientes.md`)
