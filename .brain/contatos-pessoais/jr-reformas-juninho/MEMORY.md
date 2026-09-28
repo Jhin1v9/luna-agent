@@ -41,3 +41,12 @@
   (abre formulário de estrelas; exige login Google de quem avalia). Mensagens padrão ES/PT
   enviadas no grupo; QR code enviado no Telegram do time (msg 5610, arquivo
   `tmp/qr-resena-jr-reformas.png`, gerador em `scripts/resolve-jr-placeid.cjs`).
+- 28/09 (noite) — **⚠️ PERFÍL AINDA NÃO 100% CONFIRMADO.** Enoque informou: site do Juninho é
+  **jr-reformas.com** ("Junior Reformas — Reformas integrales en Sabadell y Barcelona", tel
+  +34 658 187 071). No Maps há DOIS candidatos: (1) JR REFORMAS INTEGRALES, Barcelona, tel
+  640 78 62 77, site reformasjr.es — domínio MORTO ("Site en construction" OVH); (2) Reformas
+  Y Servicios J Junior, Badalona, tel 931 76 33 21, sem site (placeid
+  `ChIJVxIC4aa8pBIR6HgwwAeR4N4`). O material entregue foi pro perfil (1) — se o Júnior
+  confirmar o (2), refazer link writereview + QR (`https://search.google.com/local/writereview?placeid=ChIJVxIC4aa8pBIR6HgwwAeR4N4`).
+  Toda a área de atuação é Sabadell/Barcelona/Terrassa/Mataró. Pedido de confirmação enviado
+  no grupo (msg `1083e945`).
