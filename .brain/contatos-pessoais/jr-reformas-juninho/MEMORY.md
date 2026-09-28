@@ -72,3 +72,10 @@
   sempre referenciar **jr-reformas.com** (ajuda o ranqueamento local e facilita o cliente).
   Reforços que a Luna passou: link clicável só na BIO do feed; nos stories usar o adesivo de
   LINK (msg `4fa3138e`). Seguir cobrando isso quando o tema Instagram aparecer.
+- 28/09 (noite) — **CORREÇÃO APLICADA:** Enoque reenviou o link oficial do Juninho (o mesmo
+  si= que o Júnior tinha mandado) como o link certo. **QR v2 gerado com esse link**
+  (`tmp/qr-resena-jr-reformas-v2.png`, 57 módulos, Telegram msg 5612 — substitui o 5610).
+  O si= resolve pro perfil certo no celular (token server-side do Google; não deu pra resolver
+  o placeid daqui — google.com/search bloqueia com captcha neste IP). Pedido: Enoque testar o
+  QR apontando a câmera. Upgrade opcional: link "Peça uma avaliação" do app Google Business
+  (msg `34f1a889`). **Só imprimir o QR depois do teste do Enoque confirmar.**
