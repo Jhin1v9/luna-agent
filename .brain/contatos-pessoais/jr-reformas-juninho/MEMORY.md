@@ -79,3 +79,13 @@
   o placeid daqui — google.com/search bloqueia com captcha neste IP). Pedido: Enoque testar o
   QR apontando a câmera. Upgrade opcional: link "Peça uma avaliação" do app Google Business
   (msg `34f1a889`). **Só imprimir o QR depois do teste do Enoque confirmar.**
+- 28/09 (noite) — **✅ RESOLVIDO DEFINITIVO.** Enoque mandou o link oficial do Google Business:
+  **`https://g.page/r/CRDnWdhQ6ygGEAE/review`** — validado pela Luna: nome **JR Reformas -
+  Junior**, site jr-reformas.com, tel 658 18 70 71, coords 41.4692, 2.2220 (Barcelona metro),
+  placeid real **`ChIJW45zey03CY4REOdZ2FDrKAY`**, com botão "Escribir una reseña". **QR FINAL
+  v3** (`tmp/qr-resena-jr-reformas-v3-final.png`, 29 módulos, limpo pra impressão) enviado no
+  Telegram msg 5613 — **é o definitivo, pode imprimir**. Writereview alternativo:
+  `https://search.google.com/local/writereview?placeid=ChIJW45zey03CY4REOdZ2FDrKAY`.
+  Confirmado pro time: Luna não envia imagem no WhatsApp (só texto; imagens vão pelo Telegram)
+  — anotado como melhoria pro Jhin. Mensagens padrão ES/PT seguem válidas; trocar o [LINK]
+  pelo g.page. (msgs `bd42548a` grupo, 5613 Telegram)
