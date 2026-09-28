@@ -34,3 +34,10 @@
 - 28/09 (noite) — Time abriu novo tópico no grupo: **resenhas do Google do Juninho** (ranquear
   no Maps). Luna ofereceu: link direto de avaliação do Google Business, mensagem padrão pro
   cliente e QR code. Aguardando confirmação + e-mail/conta do perfil pra puxar o link certo.
+- 28/09 (noite) — **Material entregue** (task executada, msg `908f26f0`, grupo do Juninho):
+  perfil confirmado = **JR REFORMAS INTEGRALES** (site reformasjr.es, Barcelona, coord
+  41.4112,2.1816 — placeid `ChIJlSZu64GjpBIRHLNDRidlrF4`). Link direto de avaliação:
+  `https://search.google.com/local/writereview?placeid=ChIJlSZu64GjpBIRHLNDRidlrF4`
+  (abre formulário de estrelas; exige login Google de quem avalia). Mensagens padrão ES/PT
+  enviadas no grupo; QR code enviado no Telegram do time (msg 5610, arquivo
+  `tmp/qr-resena-jr-reformas.png`, gerador em `scripts/resolve-jr-placeid.cjs`).
