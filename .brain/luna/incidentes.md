@@ -52,3 +52,12 @@
 - Stack religada (luna on) às 08:17 HVR; /ready 200, fila 0 pending. Durante o off (~11h) nada chegou;
   backfill de 2 msgs absorvido. Motivo do off confirmado: modo econômico (tokens kimi-api + Kimi Code
   esgotados, decreto owner 28/09 08:25 — fallback kimi work permanente até nova ordem).
+
+## 2026-09-28 — Inbound do grupo HDM (Matheus) não detectado pelo watcher
+
+- Reportado por Enoque (Production 07:19): "o grupo do matheus não recebeu nenhuma resposta".
+- Diagnóstico: outbound pro grupo funciona (teste 06:54 entregue), mas o watcher do whatsplay NÃO detecta mensagens novas do grupo `HDM - Industrial (SBD) - 26` — zero eventos na kimiwork_inbox; logs só mostram o Production sendo vigiado.
+- Allowlists .env OK (nome + JID `120363428577835024@g.us`). chat_registry NÃO tem entrada do grupo HDM (nem do Juninho — que chega normal, então registry não é o gate de ingest).
+- Provável causa: sessão do WhatsApp Web não carrega o chat do grupo (arquivado/fora da lista visível) ou instabilidade da sessão (whatsplay com 728 restarts).
+- Mitigação: mensagem enviada no grupo HDM pedindo ao Matheus pra repetir pedidos; fix definitivo com Jhin/Abner (fixar grupo no painel + recarregar sessão; avaliar watcher explícito por JID).
+- Bônus: msg de teste de fluxo HDM (06:54) foi parar no Production por erro de roteamento meu — fluxo de teste deve ficar interno/grupo do cliente.
