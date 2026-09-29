@@ -74,3 +74,24 @@
 - Print da sessão WA (prova de que Production e HDM são chats distintos) no
   Telegram msg 5609 e em .brain/luna/analises/wa-antes.png.
 - Fix estrutural pendente (Jhin): delivery priorizar metadata.chat_id.
+
+## 2026-09-29 — Stack fora do ar pós-sleep (boot automático falhou)
+
+- **Detecção:** sweep 29/09 ~13:43 HVR — /health e /ready sem resposta (connection refused).
+  Última sweep saudável: 00:44 HVR (29/09). Queda ocorreu entre 00:44 e 13:43 HVR —
+  provável sleep da máquina + boot automático não executou (pendência conhecida:
+  Docker auto-start + pm2-windows-startup).
+- **Diagnóstico (13:43-14:05 HVR):**
+  - pm2: luna-orchestrator / luna-whatsplay / luna-worker / luna-watchdog em crash-loop
+    ("waiting…", milhares de restarts); luna-kimiweb online (infra do Kimi Work, separada).
+  - Docker Desktop: `com.docker.backend` chegou a 11.5 GB, RAM 99.9% (32 GB total);
+    daemon inacessível (npipe dockerDesktopLinuxEngine não existe) — travou na inicialização.
+  - Memória depois estabilizou (21 GB livres), mas o daemon não subiu; `luna-stack.bat on`
+    executado 2x; na 2ª tentativa o owner interrompeu (possivelmente assumindo manualmente).
+- **Impacto:** ~13h+ sem watcher WhatsApp nem orchestrator — mensagens do período ficaram
+  sem absorção (backfill a verificar quando a stack subir); automações Geral/Voz paradas.
+- **Ação humana (urgente):** Abner — abrir o Docker Desktop manualmente (ícone na bandeja),
+  aguardar o daemon, rodar `scripts/luna-stack.bat on`; verificar backfill do whatsplay.
+  **E priorizar de vez o boot automático pós-sleep (Docker auto-start + pm2-windows-startup)
+  — é a 2ª vez que o mesmo modo de falha derruba a stack.**
+- Alerta enviado ao grupo do Telegram nesta sweep.
