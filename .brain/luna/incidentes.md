@@ -95,3 +95,28 @@
   **E priorizar de vez o boot automático pós-sleep (Docker auto-start + pm2-windows-startup)
   — é a 2ª vez que o mesmo modo de falha derruba a stack.**
 - Alerta enviado ao grupo do Telegram nesta sweep.
+
+### Resolução (29/09 ~18:15 HVR — pela Luna, a pedido do owner)
+
+- **Causa-raiz (diferente do diagnóstico inicial!):** NÃO era só o pós-sleep. O
+  `com.docker.backend` crashava em loop com `unable to get 'ProgramData'` — o
+  **Git Bash do ambiente da Luna não tem a variável de ambiente `PROGRAMDATA`**,
+  e o `cmd //c start Docker Desktop.exe` herdava esse env quebrado. Toda vez que
+  A LUNA tentou subir o Docker, o backend morria por causa disso (o backend
+  estufava RAM tentando iniciar antes de crashar — por isso parecia vazamento).
+- **Fix imediato:** matar backends/Docker Desktop, `wsl --shutdown`, e subir via
+  PowerShell com env explícito:
+  `powershell -NoProfile -Command "$env:PROGRAMDATA='C:\ProgramData'; Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'"`
+  → daemon UP em ~30s (29.8.0). Depois `pm2 resurrect` → todos os 5 processos
+  online, /health 200 e /ready 200 em ~1 min.
+- **Fila pós-recuperação:** 1 pending com 2 min (mensagem nova, normal), 5 erros
+  antigos de 24/09 (pré-existentes). Sem backfill aparente perdido no Postgres —
+  mas o whatsplay ficou ~15h sem watcher: conferir com o grupo se chegou mensagem
+  sem absorção no período (13:43→18:10 HVR de 29/09 + madrugada).
+- **Lição operacional (ADICIONAR AO RUNBOOK):** nunca subir Docker Desktop a partir
+  do shell da Luna sem `PROGRAMDATA` no env — sempre via PowerShell com
+  `$env:PROGRAMDATA='C:\ProgramData'`. Considerar fixar o env no wrapper/script
+  `luna-stack.bat`.
+- **Pendência estrutural mantida:** boot automático pós-sleep (Docker auto-start
+  + pm2-windows-startup) — sem isso, o próximo sleep repete o incidente; e o
+  `luna-stack.bat` depende de shell com PATH/env sãos.
