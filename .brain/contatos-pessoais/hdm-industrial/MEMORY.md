@@ -29,3 +29,11 @@ Ver `.brain/luna/pedidos-clientes.md` §HDM. Resumo: 3 petições (scroll reveal
   escopo com o Matheus e abrir card no painel se fechar.
 - Recap enviado no Production (msg 20:48): carrossel aguardando imagens próprias do cliente;
   profissões novas ausentes no deploy; 3 cards a mover pra revisão dele no painel.
+
+## 29/09 — Mídias do Instagram pro site
+
+- No grupo HDM (SBD-26): o time (Souza) perguntou sobre usar fotos/vídeos do Instagram do cliente no
+  site (mais autenticidade). Luna respondeu: sim, com tratamento de qualidade + preferência por
+  originais; pediu desculpas pela instabilidade que derrubou o acompanhamento do grupo (resolvida).
+- **Abner confirmou que o Matheus JÁ ENVIOU as mídias originais** e o time segue por conta própria.
+  PENDENTE: tratar (cor/nitidez) e mostrar PRÉVIA pro cliente aprovar antes de publicar no site.

@@ -100,6 +100,6 @@
   atualiza. **Cobrar o Juninho e marcar o payment como PAID quando o pagamento acontecer.**
   Aniversários do time (correção do Enoque, Production 28/09): **Abner = 04/10** (o vencimento
   cai no aniversário dele 🎂) e **Enoque = 07/08** — eu tinha registrado errado a dobradinha.
-  UPDATE 28/09 20:26 — Juninho confirmou: "Amanhã eu passo aí pra deixar o dinheiro". Respondido
-  no grupo dele (msg `fa2b812f`). Se ele pagar, PUT /api/payments/pay-1790627404188-7qgl →
-  status PAID (e avisar no Production).
+  UPDATE 29/09 16:21 — **PAGO ✅** O Abner confirmou no Production que está com os R$ 150 em
+  mãos (pagou antes do vencimento de 04/10). Payment `pay-1790627404188-7qgl` marcado **PAID**
+  no Dashboard Pro; Production avisado (msg 16:24). Caso encerrado.
