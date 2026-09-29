@@ -52,3 +52,10 @@ Ver `.brain/luna/pedidos-clientes.md` §HDM. Resumo: 3 petições (scroll reveal
 - Enoque mandou no Production: "Dossiê Técnico & Proposta Comercial — Nexo Digital" (título de
   documento). Provável material da proposta do portal (CRM/RH) pra revisão da HDM. Perguntar a ele
   se é isso e se quer ajuda pra estruturar/fechar o dossiê.
+
+## 29/09 20:11 — Preço do portal CONFIRMADO pelo Matheus
+
+- Abner (Production): "noke, nós já tínhamos falado com ele que ia fazer por **19.99 e ele já
+  confirmou". **O Matheus (Noke) confirmou o valor de 19.99** (moeda a confirmar — provável EUR/mês,
+  assinatura) pro portal (CRM ou RH). Próximo passo: fechar escopo, abrir card/projeto no painel e
+  alinhar o dossiê do Enoque com esse preço.
