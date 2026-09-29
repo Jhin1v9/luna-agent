@@ -46,3 +46,9 @@ Ver `.brain/luna/pedidos-clientes.md` §HDM. Resumo: 3 petições (scroll reveal
 - "Matheus necesitar ajuda do falar" — o Matheus pode precisar de **ajuda com idioma** (ES/PT) nas
   tratativas.
 - Financeiro interno: Enoque perguntou de caixa/transferência; Abner disse pra ele ficar com a parte dele.
+
+## 29/09 19:50 — Enoque preparando material comercial
+
+- Enoque mandou no Production: "Dossiê Técnico & Proposta Comercial — Nexo Digital" (título de
+  documento). Provável material da proposta do portal (CRM/RH) pra revisão da HDM. Perguntar a ele
+  se é isso e se quer ajuda pra estruturar/fechar o dossiê.
