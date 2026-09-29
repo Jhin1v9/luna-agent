@@ -37,3 +37,12 @@ Ver `.brain/luna/pedidos-clientes.md` §HDM. Resumo: 3 petições (scroll reveal
   originais; pediu desculpas pela instabilidade que derrubou o acompanhamento do grupo (resolvida).
 - **Abner confirmou que o Matheus JÁ ENVIOU as mídias originais** e o time segue por conta própria.
   PENDENTE: tratar (cor/nitidez) e mostrar PRÉVIA pro cliente aprovar antes de publicar no site.
+
+## 29/09 16:47 — Pistas do Enoque (Production)
+
+- Enoque disse que **encontrou erros no projeto HDM** ("os errões que encontrei foi aquele que falei
+  antes" — ainda não detalhados no canal; possivelmente relacionados à auditoria 24/09: hero escuro,
+  profissões ausentes no deploy). Vale pedir a lista dele.
+- "Matheus necesitar ajuda do falar" — o Matheus pode precisar de **ajuda com idioma** (ES/PT) nas
+  tratativas.
+- Financeiro interno: Enoque perguntou de caixa/transferência; Abner disse pra ele ficar com a parte dele.
