@@ -120,3 +120,16 @@
 - **Pendência estrutural mantida:** boot automático pós-sleep (Docker auto-start
   + pm2-windows-startup) — sem isso, o próximo sleep repete o incidente; e o
   `luna-stack.bat` depende de shell com PATH/env sãos.
+
+## 2026-09-29 (2ª queda) — Stack fora ~32 min, recuperada pela Luna em <1 min
+
+- **Detecção:** sweep 20:30 HVR — /health e /ready 000. Última sweep OK 19:58 HVR.
+  Docker Desktop fora do ar (nenhum processo com.docker), RAM normal (owner em sessão
+  de jogos — provável sleep/exit do Docker).
+- **Recuperação (Luna, 20:31-20:33 HVR):** fix PROGRAMDATA via PowerShell
+  (`$env:PROGRAMDATA='C:\ProgramData'; Start-Process 'Docker Desktop.exe'`) → daemon
+  UP em ~20s; `pm2 resurrect` → health/ready 200 em ~12s. Sem interrupção humana.
+- **Fila pós-recuperação:** 1 pending recente (2 min — normal), 372 done. Nada travado.
+- **Aviso enviado ao grupo** (queda + recuperação + cobrança do boot automático).
+- **Padrão confirmado:** sem boot automático pós-sleep, toda queda do Docker Desktop
+  exige intervenção (agora a Luna resolve em <1 min, mas o ideal é nem cair).
