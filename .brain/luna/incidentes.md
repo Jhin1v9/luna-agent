@@ -133,3 +133,14 @@
 - **Aviso enviado ao grupo** (queda + recuperação + cobrança do boot automático).
 - **Padrão confirmado:** sem boot automático pós-sleep, toda queda do Docker Desktop
   exige intervenção (agora a Luna resolve em <1 min, mas o ideal é nem cair).
+
+## 2026-09-30 (3ª queda) — Stack fora ~12h na madrugada, recuperada pela Luna
+
+- **Detecção:** sweep 30/09 13:05 HVR — /health e /ready 000. Última sweep OK 01:04 HVR.
+  Docker Desktop fora (zero processos com.docker), RAM normal.
+- **Recuperação (Luna, 13:06-13:07):** runbook PROGRAMDATA → daemon UP em 20s;
+  `pm2 resurrect` → health/ready 200 em ~12s. Autônoma, <1 min.
+- **Fila:** 5 pending frescos (nenhum >20 min), 383 done — automação Geral voltando a
+  absorver normalmente. Janela fora (~12h) foi madrugada/fora de expediente.
+- **Aviso enviado ao grupo.** 4ª queda do mesmo modo de falha — boot automático
+  pós-sleep segue pendente e é a única correção estrutural.
