@@ -64,3 +64,9 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Relatório atualizado via Tailscale: seção #revisao-3009 "SEO + GEO" no /relatorios/clientes/hdm/ (backup index.html.bak-20260930-2). Gate 303 sem cookie = intacto, comportamento normal.
 - Pendências HDM inalteradas: fotos próprias, logo final, currículos, DNS hdmindustrial.es.
 - autor: Luna
+
+### update 30/09 19:10 HVR — push GitHub + resposta ao grupo
+- Decreto owner 18:59: "VERCEL APENAS VIA GITHUB PUSH ACTIONS". Feito: main fast-forwardada (2b8a709) e push pra github.com/Jhin1v9/HDM-Industrial — Vercel Git integration CRIOU o build (dpl_ 2b8a709b797a) mas também ficou BLOCKED: bloqueio é da conta/time (plano), não do método de deploy. Site no ar segue o de 26/09.
+- Relatório HDM: div "Publicação da nova versão" atualizada com o novo fluxo (backup do dia já existe: .bak-20260930-2).
+- Grupo Nexo Digital (chat -1003915957914): respondido o /status do Enoque (msg 5629) — serviços de volta, SEO/GEO commitado, build blockado na conta, painel sem novidades.
+- Painel Nexo: 0 pedidos novos, 0 comentários pós-28/09 nos pedidos ativos (Eduardo/lead, segurança GitHub, carrossel HDM).

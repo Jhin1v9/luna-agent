@@ -184,3 +184,6 @@ autor: Luna
 - Relatório /relatorios/clientes/hdm/ atualizado (seção #revisao-3009, backup .bak-20260930-2).
 - PENDENTE: deploy travado por bloqueio Vercel (readyState=BLOCKED, plano free) — retry humano/reset via `bash scripts/publicar.sh`. Site no ar continua o de 26/09, estável.
 - autor: Luna
+
+### update 30/09 19:10 HVR — push GitHub (decreto: Vercel só via git)
+- main do HDM-Industrial em 2b8a709; build Vercel via Git integration criado mas BLOCKED (conta do time bloqueada p/ builds — ação humana: dashboard Usage/Billing). Método CLI abandonado por decreto.
