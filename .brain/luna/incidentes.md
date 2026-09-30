@@ -144,3 +144,15 @@
   absorver normalmente. Janela fora (~12h) foi madrugada/fora de expediente.
 - **Aviso enviado ao grupo.** 4ª queda do mesmo modo de falha — boot automático
   pós-sleep segue pendente e é a única correção estrutural.
+
+## 2026-09-30 (4ª queda, ~10 min após a 3ª) — Docker morreu sem shutdown registrado
+
+- **Detecção:** sweep 13:22 HVR — stack 000, só 10 min após a recuperação das 13:07.
+- **Causa suspeita:** log do backend para em 13:08 HVR sem mensagem de shutdown
+  ("stopped -> starting" e silêncio) — ou crash silencioso do Docker Desktop, ou
+  fechamento manual. Sem erro de ProgramData desta vez (env correto herdado?).
+- **Recuperação (Luna, 13:23-13:24):** runbook PROGRAMDATA → daemon 20s,
+  health/ready 200 em ~12s. Grupo avisado com pergunta: alguém fechou o Docker?
+- **Observação:** se o Docker Desktop estiver sendo fechado manualmente, as sweeps
+  vão re-subir sempre — precisa de alinhamento humano ou boot automático.
+
