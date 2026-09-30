@@ -110,3 +110,7 @@
   **Pendência:** adicionar a foto/logo dele no Google Business Profile de JR Reformas - Junior
   (placeid `ChIJW45zey03CY4REOdZ2FDrKAY`, tel 658 18 70 71). Precisa de acesso à conta Google
   dona do perfil — ação humana (Luna não tem credencial).
+
+- UPDATE 30/09 14:25 — Enoque assumiu: "simmm e mudar o de integrais! essa tarde nós deixa doneee"
+  (foto do perfil do Juninho com logo + TAMBÉM a do "integrals"/Reformas Integrales). Fica com o
+  Enoque fazer ainda hoje à tarde; Luna só confere depois.
