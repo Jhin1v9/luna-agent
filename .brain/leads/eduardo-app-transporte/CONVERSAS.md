@@ -31,3 +31,18 @@ Resposta da Luna (organização em 6 pilares — ver ENTENDIMENTOS.md) e fechame
 - Reunião 15:00 pré-marcada a pedido do Abner.
 
 data + autor: Luna · 2026-09-27
+
+## 2026-09-30 · Grupo "App de Transporte Caminhoneiros" — Luna responde no grupo (a pedido do owner)
+
+- 14:08 HVR: Luna enviou o link do relatório vivo + central de relatórios
+  (acesso do Dudu: dudu@nexo-digital.app) — já registrado pela automação Geral.
+- 14:25 HVR: **Luna respondeu no grupo** (mensagem `9ecd8153-f54e-45ad-83af-58021ade451a`,
+  sent, a pedido direto do owner às 14:12): recapitulou o que já está fechado
+  (notificação proativa push+WhatsApp, avaliação mútua, Google Maps, preço sugerido
+  por histórico) e fez 3 perguntas abertas pro Dudu destravar o MVP:
+  1) região do piloto; 2) quantos caminhoneiros/empresas já têm na mão;
+  3) data-alvo pro app rodando.
+- Envio manual pela fila outbound (messages → pg_notify luna_outbound), send-safety
+  ok (sem reply_to_event = envio manual auditado), registry: grupo allowed.
+
+data + autor: Luna · 2026-09-30
