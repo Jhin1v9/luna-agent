@@ -156,3 +156,19 @@
 - **Observação:** se o Docker Desktop estiver sendo fechado manualmente, as sweeps
   vão re-subir sempre — precisa de alinhamento humano ou boot automático.
 
+
+## 2026-09-30 (5ª queda, ~15:08-18:00) — pm2 TODOS stopped, Docker/Postgres saudáveis
+
+- **Detecção:** sweep 18:00 HVR — health/ready 000. DIFERENTE do modo de falha
+  habitual: Docker UP há 5h (luna-postgres Up 5 hours, supabase healthy), mas os
+  5 processos pm2 (orchestrator, worker, whatsplay, watchdog, **kimiweb**) estão
+  **stopped** com restart counts ~0 — parada limpa, não crash-loop. Provável ação
+  humana (pm2 stop all / delete, ou pm2 sem dump após reinício do serviço).
+- **Ação da Luna:** NÃO ressuscitou (fail-closed — parada limpa de tudo incluindo
+  kimiweb sugere intervenção intencional; ressuscitar poderia atrapalhar).
+  Grupo alertado perguntando se foi proposital.
+- **Commits novos no período** (contexto do que o time estava fazendo):
+  SEO/GEO HDM (llms.txt + 22 perfis, commit 2b8a709 no repo HDM, deploy pendente
+  por bloqueio Vercel); foto do perfil Google do Juninho (Enoque assumiu, hoje à
+  tarde).
+- **Se confirmado como não-intencional:** `pm2 resurrect` resolve em segundos.
