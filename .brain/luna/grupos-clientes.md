@@ -68,3 +68,11 @@ conversation_id do PRODUCTION = mensagem entregue no PRODUCTION
 A 1ª ingest do grupo criou client/contact/conversation PRÓPRIOS. Consolidado: conversation
 canônica `9c372fb7-…` (client Eduardo `05c1160e`, contacto do grupo `df77c38e`); client duplicado
 da ingest virou ALIAS (FK em events impede delete) e o contacto duplicado foi removido.
+
+### Grupo novo 30/09 — JR Reformas 2026
+
+- **`JR Reformas - Web (Junior) - 26`** — conversation `ac5028fa-333e-4afd-a0ff-7ed5dd0c06ad`.
+  Grupo 2026 do Juninho (padrão "- 26" como o HDM SBD-26). Participante visto: Elias (Superclim
+  Servicios) + Júnior Reformas. Distinto do DM `Reformas integrales - Projeto web(Juninho)`
+  (conv `f1e0dc91`). Ainda NÃO está na allowlist (só entrou na ingest por exceção/coincidência) —
+  **adicionar nome + JID quando confirmado com o owner**, e mapear roteamento (resposta no grupo dele).
