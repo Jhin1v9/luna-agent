@@ -187,3 +187,11 @@ autor: Luna
 
 ### update 30/09 19:10 HVR — push GitHub (decreto: Vercel só via git)
 - main do HDM-Industrial em 2b8a709; build Vercel via Git integration criado mas BLOCKED (conta do time bloqueada p/ builds — ação humana: dashboard Usage/Billing). Método CLI abandonado por decreto.
+
+## 2026-09-30 20:35 HVR — Stack local de volta (decreto owner "sobe a stack e conserta tudo")
+- pm2 local: 5/5 online (orchestrator, worker, whatsplay, kimiweb, watchdog). /health + /ready 200, db:up. Queda da tarde (15:08+) que tinha parado a automação Geral.
+- Fila kimiwork_inbox: 402 done, 0 pending (backfill automático completo ao subir). 5 errors = detector_noise de chamadas de 24/09 (já rotulados, sem ação).
+- whatsplay ingerindo em tempo real de novo; worker entregando menções ao Kimi Work.
+- Cadastro Jess/Ona no portal: já existia (409 Email ja cadastrado) — pendência de 24/09 já resolvida por terceiros.
+- Grupo Nexo Digital avisado (msg ~5631). Restam humanos: foto Google Juninho (Enoque), auditoria GitHub (Elias), DNS domínio HDM (owner/registrar).
+- autor: Luna
