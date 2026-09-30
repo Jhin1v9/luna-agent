@@ -76,3 +76,11 @@ da ingest virou ALIAS (FK em events impede delete) e o contacto duplicado foi re
   Servicios) + Júnior Reformas. Distinto do DM `Reformas integrales - Projeto web(Juninho)`
   (conv `f1e0dc91`). Ainda NÃO está na allowlist (só entrou na ingest por exceção/coincidência) —
   **adicionar nome + JID quando confirmado com o owner**, e mapear roteamento (resposta no grupo dele).
+
+## DECRETO OWNER 2026-10-01 (chat direto): "responder SEMPRE que falarem luna"
+
+O Abner cobrou a Luna silenciosa em grupos onde chamaram ela sem resposta. Regra nova, válida
+para TODOS os grupos (Production + grupos de cliente + grupo do Dudu):
+**mencionaram "luna" (em qualquer variação) → a Luna RESPONDE no grupo, sempre** — mesmo que a
+mensagem pareça só conversa; ao mínimo confirma presença e pergunta o que precisam. Silêncio só
+vale para eco puro (autor = nome do grupo) e banter sem menção. Menção = compromisso de resposta.
