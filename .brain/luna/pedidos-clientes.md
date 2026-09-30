@@ -204,3 +204,11 @@ autor: Luna
 - HDM - Industrial (SBD): última mensagem 11:09 (Enoque, mídias originais) — respondida, assunto já é pendência registrada do Matheus.
 - LIÇÃO TÉCNICA: envio manual de resposta WhatsApp = INSERT em messages (direction outbound, sender 'luna', send_state 'queued', metadata jsonb com correlation_id + reply_to_query pra citação) + SELECT pg_notify('luna_outbound', id). Espera humana ~4-6s + citação funciona. Tempo total até 'sent': ~18s.
 - autor: Luna
+
+## 2026-09-30 ~22:10 HVR — Grupo JR Reformas - Web (Junior) - 26 (decreto owner 21:34 "confere o grupo jr tambem")
+- Grupo estava FORA do escopo de ingestão do whatsplay (allowlist). Conferência exigiu inclusão: adicionado "JR Reformas - Web (Junior) - 26" em WHATSAPP_INGEST_ALLOWLIST e WHATSAPP_OUTBOUND_ALLOWLIST (.env), sweep temporário isolado p/ ler o chat, depois sweep desligado de novo e allowlists restauradas (9 originais + JR). Registrado em chat_registry (chat_key group:jr-reformas-web-junior-26, role allowed).
+- CONTEÚDO VISTO: 30/09 — time Nexo (Enoque/Abner) entregou a web do Juninho (setup básico pago, pontos: aparecer na internet, mapa etc.) e pitchou "FASE 2: GESTÃO CONTÍNUA" (ajuda constante, melhorias internas, seguimiento, informe mensal, recomendações, SEM permanência). Sinal de upsell: Jess (Ona Dance) pode querer SEO também ("Jess onadance, SEO vai querer tbm eu acho em coisa boa") — já anotado pela automação Geral na ficha Ona Dance.
+- Última mensagem (30/09 19:42 UTC): Juninho agradeceu ("Muito obrigado meus querido, Deus abençoe"), Elias respondeu "Tamo junto meu irmão". NADA ACIONÁVEL pra Luna — sem pergunta, sem menção. Item na kimiwork_inbox deixado p/ automação Geral consolidar (mesmo padrão do item 18:31, que ela resumiu sem responder no grupo).
+- LIÇÃO TÉCNICA: sweep com allowlist isolada lê últimas 3 msgs de cada chat allowlisted, mas marca is_group=false quando o chat não abre a tempo (fallback do transporte) — grupo vira "privado" e entra na fila mesmo sem menção. Dedupe fino segue valendo.
+- PENDENTE HUMANO: Fase 2 do Juninho (cliente decide); foto Google Juninho segue com Enoque.
+- autor: Luna
