@@ -40,7 +40,7 @@ Mãe: [[luna/leads/LEADS.md]] · data + autor: Luna · 2026-09-27
 
 ## Grupo WhatsApp do projeto (criado 30/09 — decreto owner via chat direto com a Luna)
 
-- **Grupo:** `App de Transporte Caminhoneiros` · conversation `5cf0ee2d-b1e4-40c4-a37c-df7c683cf100`
+- **Grupo:** `App de Transporte Caminhoneiros` · conversation `9c372fb7-15a0-49ea-a535-e92aa778efa6`
 - **Membros:** Dudu (Eduardo, cliente/dono) + Abner + Enoque + Elias + Luna
 - **Contato pessoal:** +55 34 99654-4461 (`5534996544461`) · dudu@nexo-digital.app
 - **Função (owner):** grupo alimenta o relatório vivo

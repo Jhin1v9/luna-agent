@@ -18,7 +18,7 @@
 | Eduardo (Dudu) — App de Transporte | `App de Transporte Caminhoneiros` | *(JID a capturar na 1ª ingest)* | Eduardo ("Dudu") + time (Abner, Enoque, Elias) |
 
 **Grupo do Dudu (criado 30/09 pelo Abner, pedido owner em chat direto):**
-- conversation_id `5cf0ee2d-b1e4-40c4-a37c-df7c683cf100` · client `05c1160e-…` (code `eduardo-app-transporte`) · chat_registry `group:app-transporte-caminhoneiros`
+- conversation_id `9c372fb7-15a0-49ea-a535-e92aa778efa6` · client `05c1160e-…` (code `eduardo-app-transporte`) · chat_registry `group:app-transporte-caminhoneiros`
 - Contato do GRUPO (delivery usa ele): `df77c38e-…` address = nome do grupo. Contato pessoal do Dudu: `76d61e2e-…` `5534996544461` (+55 34 99654-4461), dudu@nexo-digital.app.
 - Na allowlist (nome) desde 30/09 — **adicionar o JID `@g.us` quando a 1ª mensagem do grupo entrar na ingest** (padrão HDM/Juninho).
 - Decreto owner 30/09: o grupo alimenta o relatório vivo do projeto (slug `eduardo-transporte`); time pede "add no relatório" e a Luna registra. Um chat por assunto: grupo = projeto do app.
@@ -62,3 +62,9 @@ conversation_id do PRODUCTION = mensagem entregue no PRODUCTION
 
 - HDM: `.brain/clients/hdm-industrial/MEMORY.md` (+ pedidos em `.brain/luna/pedidos-clientes.md`)
 - Juninho: `.brain/clients/jr-reformas-juninho/MEMORY.md`
+
+### Nota 30/09 — consolidação do grupo do Dudu
+
+A 1ª ingest do grupo criou client/contact/conversation PRÓPRIOS. Consolidado: conversation
+canônica `9c372fb7-…` (client Eduardo `05c1160e`, contacto do grupo `df77c38e`); client duplicado
+da ingest virou ALIAS (FK em events impede delete) e o contacto duplicado foi removido.
