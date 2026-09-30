@@ -195,3 +195,12 @@ autor: Luna
 - Cadastro Jess/Ona no portal: já existia (409 Email ja cadastrado) — pendência de 24/09 já resolvida por terceiros.
 - Grupo Nexo Digital avisado (msg ~5631). Restam humanos: foto Google Juninho (Enoque), auditoria GitHub (Elias), DNS domínio HDM (owner/registrar).
 - autor: Luna
+
+## 2026-09-30 21:40 HVR — Revisão de TODOS os grupos (decreto owner 21:26)
+- Nexo Digital (Telegram): 0 pendentes — /status do Enoque já respondido (msg 5629).
+- 🏆Production - 2026🙏🏻 (WhatsApp): única pendência = foto de perfil Google do Juninho com logo (pedido 14:17, Enoque assumiu 14:25). Luna respondeu no grupo com CITAÇÃO (messages 45aa588f, entregue 19:31 UTC): registrado no acompanhamento, cobrança via relatório se pendurar.
+- Reformas integrales (Juninho): conversa de entrega Abner/Enoque, nada pra Luna.
+- App de Transporte Caminhoneiros: fora do escopo de ingestão do whatsplay; histórico em conversations 9c372fb7 — Luna ativa no grupo desde 11:34, última interação 12:25 documentada. Nada pendente.
+- HDM - Industrial (SBD): última mensagem 11:09 (Enoque, mídias originais) — respondida, assunto já é pendência registrada do Matheus.
+- LIÇÃO TÉCNICA: envio manual de resposta WhatsApp = INSERT em messages (direction outbound, sender 'luna', send_state 'queued', metadata jsonb com correlation_id + reply_to_query pra citação) + SELECT pg_notify('luna_outbound', id). Espera humana ~4-6s + citação funciona. Tempo total até 'sent': ~18s.
+- autor: Luna
