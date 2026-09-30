@@ -41,3 +41,17 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Acesso `hdm-industrial@nexo-digital.app` JÁ existia em `data/users.json` (slug hdm) — confirmado, não precisei criar.
 - Método: `ssh vps` (Tailscale) — skill `vps-tailscale` registrada. Fim da "ação humana" pra editar relatório.
 - autor: Luna
+
+## 2026-09-27 · LEAD Eduardo (app de transporte) — página viva criada e no ar (Luna, via Tailscale)
+- Pedido do grupo Production: documentar o brainstorm do lead Eduardo "do jeito que os grandes fazem".
+- Brain: criado `.brain/leads/` (hub LEADS.md) + `.brain/leads/eduardo-app-transporte/` com LEAD.md (ficha completa), CONVERSAS.md (transcrição fiel) e ENTENDIMENTOS.md (6 pilares + licenças Apple/Google, MVP, perguntas abertas, sentimento). Fonte da landing em `landing/index.html` na mesma pasta.
+- VPS: página em `/relatorios/clientes/eduardo-transporte/` (slug `eduardo-transporte`, SEM entrada em users.json — lead é visão interna da equipe; se virar cliente, cadastrar e-mail).
+- Dashboard: card "🟡 Lead · Eduardo — App de Transporte" adicionado no topo da Área da equipe (`/relatorios/nexo/`). Backup: `public/nexo/index.html.bak-20260927-lead`.
+- Verificado ao vivo: sem cookie = 303 pro login (gate intacto, externo via Caddy); com sessão team HMAC = 200, 14.814 bytes, conteúdo completo.
+- autor: Luna
+
+## 2026-09-30 · HDM RE-VALIDADO + relatório atualizado ao vivo (Luna, via Tailscale)
+- Pedido owner: relatório /relatorios/clientes/hdm/ estava parado em 26 Set 2026. Re-auditoria ao vivo do preview (hdm-six.vercel.app, desktop+mobile): /cookies → 200, /trabaja-con-nosotros → 200, zero HTTP ≥400 fora prefetch, carrossel 30s rodando ("01 / 04"). DIVERGÊNCIA ACHADA: relatório de 26/09 dizia "todos os itens corrigidos", mas alt vazio SEM aria-hidden persiste nos slides inativos (plant-industrial, mobilization-logistics, epi-safety) e "Montadores de estructuras" ainda quebra em 3 linhas (card 155px, 14px) — correção do site = ação do dev (re-deploy).
+- RELATÓRIO ATUALIZADO (ssh vps, bind mount): nova entrada changelog "30 Set 2026 — Re-validação ao vivo" (currículos/cookies/carrossel confirmados + 2 pendências finas + mídias próprias recebidas em tratamento) + banner de re-validação na aba #revisao. Backup index.html.bak-20260930. md5 local=VPS conferido; gate sem cookie = 303 pro login (intacto).
+- Fora do relatório (interno, 29/09): Matheus confirmou preço 19.99 do portal; Enoque preparando Dossiê Técnico & Proposta Comercial; mídias originais do Instagram recebidas — prévia pendente de tratamento.
+- autor: Luna
