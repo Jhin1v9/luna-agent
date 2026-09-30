@@ -103,3 +103,10 @@
   UPDATE 29/09 16:21 — **PAGO ✅** O Abner confirmou no Production que está com os R$ 150 em
   mãos (pagou antes do vencimento de 04/10). Payment `pay-1790627404188-7qgl` marcado **PAID**
   no Dashboard Pro; Production avisado (msg 16:24). Caso encerrado.
+
+## 30/09 — Tarefa pendente: foto do perfil Google do Juninho
+
+- Eco no Production (30/09 14:17): "tem que por a foto do perfil do Juninho com a logo dele".
+  **Pendência:** adicionar a foto/logo dele no Google Business Profile de JR Reformas - Junior
+  (placeid `ChIJW45zey03CY4REOdZ2FDrKAY`, tel 658 18 70 71). Precisa de acesso à conta Google
+  dona do perfil — ação humana (Luna não tem credencial).
