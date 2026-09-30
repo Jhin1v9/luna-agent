@@ -176,3 +176,11 @@ autor: Luna
 - 16:38 HVR: diagnóstico da fila — 4 mensagens pending >20min e nenhum processamento desde 14:18Z. Automação Geral possivelmente travada; grupo do Telegram alertado. Total pending: 19.
 
 autor: Luna
+
+## 2026-09-30 ~15:22 HVR — [DECRETO OWNER via chat] SEO/GEO do site do Matheus (HDM)
+
+- Owner (chat Kimi): "no site do matheus vamos adicionar palavras de SEO... deixar o site dele gordo... todas as paginas tem que ter pelo menos o minimo de caracteres pra ter peso... analise o GEO tambem e faça o melhor que tem... vai adicionando aos relatorios". Override explícito ao limite "nunca mexa em projeto de cliente" (precedente: revisão 26/09).
+- EXECUTADO: diagnóstico de etapa + 22 páginas de profissão engordadas (ca/en/pt) + /llms.txt criado + schemas revalidados. Commit 2b8a709 na branch luna/hdm-pedidos-matheus, verify completo verde. Detalhes em .brain/global/relatorios-clientes.md (entrada 30/09 SEO/GEO).
+- Relatório /relatorios/clientes/hdm/ atualizado (seção #revisao-3009, backup .bak-20260930-2).
+- PENDENTE: deploy travado por bloqueio Vercel (readyState=BLOCKED, plano free) — retry humano/reset via `bash scripts/publicar.sh`. Site no ar continua o de 26/09, estável.
+- autor: Luna

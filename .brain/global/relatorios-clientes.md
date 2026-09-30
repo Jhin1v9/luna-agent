@@ -55,3 +55,12 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - RELATÓRIO ATUALIZADO (ssh vps, bind mount): nova entrada changelog "30 Set 2026 — Re-validação ao vivo" (currículos/cookies/carrossel confirmados + 2 pendências finas + mídias próprias recebidas em tratamento) + banner de re-validação na aba #revisao. Backup index.html.bak-20260930. md5 local=VPS conferido; gate sem cookie = 303 pro login (intacto).
 - Fora do relatório (interno, 29/09): Matheus confirmou preço 19.99 do portal; Enoque preparando Dossiê Técnico & Proposta Comercial; mídias originais do Instagram recebidas — prévia pendente de tratamento.
 - autor: Luna
+
+## 2026-09-30 · HDM SEO/GEO — site engordado + llms.txt (Luna, decreto owner via chat 15:22)
+- Diagnóstico da etapa: SEO técnico OK (160 páginas, 1 h1/title/canonical/hreflang cada, suite check:seo verde), home gorda (~6.200 chars), MAS perfis ca/en/pt magros (~1.760–1.950 chars — só ES completo) e GEO inexistente (/llms.txt = 404).
+- APLICADO no repo hdm-industrial (branch luna/hdm-pedidos-matheus, commit 2b8a709, autor Luna): (1) rota app/llms.txt/route.ts — índice markdown gerado dos mesmos registros do sitemap (8 perfis, 5 soluções, setores, cobertura, contato), 6.016 bytes no out/; (2) 22 blocos de perfis ca/en/pt engordados com queHacen/cuando/verifica/faq traduzidos do ES — páginas de profissão passaram de ~1.800–1.950 para 2.257–3.394 chars visíveis em todos os idiomas; schemas Organization+FAQPage+hreflang já existiam e foram revalidados.
+- Verify completo passou (lint+typecheck+96 testes+placeholders+claims+build+check:seo). Scripts tmp deletados antes do commit.
+- DEPLOY BLOQUEADO: 6 tentativas de source-deploy (vercel deploy --prod --archive=tgz) entre 16:20–17:30 — upload OK, build nunca inicia, API retorna readyState=BLOCKED (token válido, projeto não pausado, fila limpa após rm dos 5 órfãos). Builds de 26/09 duravam 19–26s; últimos 4 dias sem build bem-sucedido. Causa: limite/bloqueio do plano free do time na Vercel — ação humana: dashboard Vercel (Usage/Build Settings) ou aguardar reset e rodar `bash scripts/publicar.sh`. NADA QUEBRADO no ar (produção estável no build de 26/09).
+- Relatório atualizado via Tailscale: seção #revisao-3009 "SEO + GEO" no /relatorios/clientes/hdm/ (backup index.html.bak-20260930-2). Gate 303 sem cookie = intacto, comportamento normal.
+- Pendências HDM inalteradas: fotos próprias, logo final, currículos, DNS hdmindustrial.es.
+- autor: Luna
