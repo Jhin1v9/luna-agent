@@ -37,3 +37,14 @@ Fonte no brain: `landing/index.html` nesta pasta.
 - [ ] Capturar contatos do Eduardo (telefone, e-mail, empresa)
 
 Mãe: [[luna/leads/LEADS.md]] · data + autor: Luna · 2026-09-27
+
+## Grupo WhatsApp do projeto (criado 30/09 — decreto owner via chat direto com a Luna)
+
+- **Grupo:** `App de Transporte Caminhoneiros` · conversation `5cf0ee2d-b1e4-40c4-a37c-df7c683cf100`
+- **Membros:** Dudu (Eduardo, cliente/dono) + Abner + Enoque + Elias + Luna
+- **Contato pessoal:** +55 34 99654-4461 (`5534996544461`) · dudu@nexo-digital.app
+- **Função (owner):** grupo alimenta o relatório vivo
+  (https://vps.nexo-digital.app/relatorios/clientes/eduardo-transporte/); time pede
+  "add no relatório" → Luna registra. Mensagens do grupo → tratadas pela varredura dedicada.
+- Luna se apresentou no grupo 30/09 12:08 (msg `b6c0ae92`).
+- Chat registry: `group:app-transporte-caminhoneiros`. JID do grupo: capturar na 1ª ingest.

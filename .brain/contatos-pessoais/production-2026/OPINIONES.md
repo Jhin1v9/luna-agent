@@ -990,3 +990,41 @@ Cliente explicou a tarefa do hero: substituir imagem do slider da onadance.com p
 }
 ```
 
+## 2026-09-25 — Luna
+
+Cliente esclareceu a tarefa: substituir a imagem do slider atual da onadance.com por vídeo vertical de 41s (otimizado para mobile), revisando necessidade de corte e pensando versão para PC. Tarefa já existe no Dashboard e precisa ser completada. Cliente está satisfeito e elogiou o atendimento.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site onadance.com",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Concluir a tarefa do Dashboard: trocar imagem do slider por vídeo vertical de 41s da Jess, revisando duração e adaptação para desktop.",
+  "quality_score": 4,
+  "summary": "Cliente esclareceu a tarefa: substituir a imagem do slider atual da onadance.com por vídeo vertical de 41s (otimizado para mobile), revisando necessidade de corte e pensando versão para PC. Tarefa já existe no Dashboard e precisa ser completada. Cliente está satisfeito e elogiou o atendimento.",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-09-25 — Luna
+
+Cliente confirmou a tarefa: substituir a imagem atual do slider do hero da onadance.com por vídeo vertical de 41s (otimizado para mobile). Vídeo e hero já estão no Drive. Tarefa já existe no Dashboard Pro, falta completá-la, incluindo revisar a duração do vídeo. Cliente elogiou o atendimento de forma espontânea.
+
+```json
+{
+  "outcome": "cliente_feliz",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "Slider hero do site onadance.com",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Completar tarefa no Dashboard Pro: trocar imagem do slider por vídeo vertical de 41s da Jess (pasta Drive Nexo > Cliente > Jess); revisar duração e definir se corta ou mantém; depois pensar versão para desktop",
+  "quality_score": 4,
+  "summary": "Cliente confirmou a tarefa: substituir a imagem atual do slider do hero da onadance.com por vídeo vertical de 41s (otimizado para mobile). Vídeo e hero já estão no Drive. Tarefa já existe no Dashboard Pro, falta completá-la, incluindo revisar a duração do vídeo. Cliente elogiou o atendimento de forma espontânea.",
+  "client_signal": "elogio"
+}
+```
+

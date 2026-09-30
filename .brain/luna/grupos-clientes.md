@@ -15,6 +15,13 @@
 |---|---|---|---|
 | HDM - Industrial | `HDM - Industrial (SBD) - 26` | `120363428577835024@g.us` | Matheus ("Noke") |
 | JR Reformas | `Reformas integrales - Projeto web(Juninho)` | `120363411799534605@g.us` | Juninho |
+| Eduardo (Dudu) — App de Transporte | `App de Transporte Caminhoneiros` | *(JID a capturar na 1ª ingest)* | Eduardo ("Dudu") + time (Abner, Enoque, Elias) |
+
+**Grupo do Dudu (criado 30/09 pelo Abner, pedido owner em chat direto):**
+- conversation_id `5cf0ee2d-b1e4-40c4-a37c-df7c683cf100` · client `05c1160e-…` (code `eduardo-app-transporte`) · chat_registry `group:app-transporte-caminhoneiros`
+- Contato do GRUPO (delivery usa ele): `df77c38e-…` address = nome do grupo. Contato pessoal do Dudu: `76d61e2e-…` `5534996544461` (+55 34 99654-4461), dudu@nexo-digital.app.
+- Na allowlist (nome) desde 30/09 — **adicionar o JID `@g.us` quando a 1ª mensagem do grupo entrar na ingest** (padrão HDM/Juninho).
+- Decreto owner 30/09: o grupo alimenta o relatório vivo do projeto (slug `eduardo-transporte`); time pede "add no relatório" e a Luna registra. Um chat por assunto: grupo = projeto do app.
 
 ## Grupo INTERNO do time
 

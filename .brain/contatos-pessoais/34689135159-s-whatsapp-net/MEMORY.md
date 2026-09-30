@@ -1,5 +1,7 @@
-# Memória — 34685093192@s.whatsapp.net
+# Memória — 34689135159@s.whatsapp.net
 
+> 
+> ⚠️ Correção 26/09 (decreto Abner): número certo do Nonoke é +34 689 13 51 59. A pasta estava criada como 34685093192 (número COMERCIAL da Nexo) por mistura registrada em nexo-dados.md. Conteúdo mensal preservado.
 > Resumos mensais (§11). Append-only.
 
 ## 2026-09 — Luna
