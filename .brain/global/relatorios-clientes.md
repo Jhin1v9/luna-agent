@@ -70,3 +70,9 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Relatório HDM: div "Publicação da nova versão" atualizada com o novo fluxo (backup do dia já existe: .bak-20260930-2).
 - Grupo Nexo Digital (chat -1003915957914): respondido o /status do Enoque (msg 5629) — serviços de volta, SEO/GEO commitado, build blockado na conta, painel sem novidades.
 - Painel Nexo: 0 pedidos novos, 0 comentários pós-28/09 nos pedidos ativos (Eduardo/lead, segurança GitHub, carrossel HDM).
+
+### update 30/09 20:15 HVR — DEPLOY NO AR ✅ (repo público destravou)
+- Decreto owner 20:12: "poe o repo do hdm publico". Feito via GitHub API (token do credential store, conta Jhin1v9): Jhin1v9/HDM-Industrial → public. Empty commit 89e0f3a + push → build BUILDING→READY em ~10s (o "BLOCKED" era o repo privado no plano free, NÃO limite de usage).
+- Validado ao vivo (hdm-six.vercel.app): 8 rotas críticas 200 (incl. /llms.txt 200 com conteúdo completo), conteúdo gordo confirmado no HTML de PT/EN/CA (soldadores, caldereros, mecanicos, supervisor, boilermakers).
+- Relatório HDM: div de publicação virou "✅ PUBLICADO em 30/09 às 20:15". Grupo Nexo Digital avisado (msg 5630).
+- IMPORTANTE pra sweep: repo HDM agora é PÚBLICO — código do cliente exposto no GitHub (decreto owner). Nenhum segredo no repo (env vars vêm de NEXT_PUBLIC_*/config Vercel).
