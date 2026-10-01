@@ -76,3 +76,10 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Validado ao vivo (hdm-six.vercel.app): 8 rotas críticas 200 (incl. /llms.txt 200 com conteúdo completo), conteúdo gordo confirmado no HTML de PT/EN/CA (soldadores, caldereros, mecanicos, supervisor, boilermakers).
 - Relatório HDM: div de publicação virou "✅ PUBLICADO em 30/09 às 20:15". Grupo Nexo Digital avisado (msg 5630).
 - IMPORTANTE pra sweep: repo HDM agora é PÚBLICO — código do cliente exposto no GitHub (decreto owner). Nenhum segredo no repo (env vars vêm de NEXT_PUBLIC_*/config Vercel).
+
+## 2026-10-01 · MIRANDA GESTIÓN CONTABLE — cliente NOVO (lead do Elias, Espanha)
+- Contexto: gestora da Miranda usa ContaSimple e perguntou sobre sistema próprio. Elias produziu a ESPECIFICAÇÃO FUNCIONAL v1.0 (01/10/2026) — plataforma SaaS fiscal/contábil multiempresa p/ gestoria espanhola (AEAT comum + Navarra, VERI*FACTU/SIF, Facturae/FACe, OCR, conciliação, portal do cliente, CRM, RGPD). Referência funcional: ContaSimple (sem copiar nada).
+- DOC COMPLETO salvo na VPS: /relatorios/clientes/miranda-gestoria/especificacao_sistema_gestoria_miranda.md (1.384 linhas, 40.232 bytes, verificado byte a byte com o original que o owner mandou no privado — o "cortado" era limite de mensagem do WhatsApp, não do arquivo).
+- ⚠ PENDÊNCIA (regra owner: cliente ativo = relatório obrigatório): pasta criada mas SEM index.html — Miranda ainda é lead (reunião/pauta em preparo no Production). Quando fechar, criar relatório na pasta.
+- Avisei no 🏆Production com o link (msg 22:02 HVR).
+- autor: Luna
