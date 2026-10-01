@@ -248,3 +248,23 @@ autor: Luna
 - LIÇÃO TÉCNICA: DNS local dessa máquina instável (ENOTFOUND 'vps.nexo-digital.appc' intermitente) — retry resolve; não é bug de script. Proxy /brain externo repassa p/ /api interno.
 - REGRA PRA MIM: nunca mais escrever node -e ad-hoc pra essas operações — usar o toolkit. Se faltar script pra alguma ação recorrente, generalizar em vez de one-off.
 - autor: Luna
+
+---
+
+## 2026-10-01 ~16:30 HVR — Caso grupo Juninho (renomeado, NÃO arquivado)
+
+- Sintoma: bom-dia da varredura falhou 6x ("não consegui abrir o chat").
+- Diagnóstico via `scripts/wa-peek.mjs` (olhos da Luna no WA Web via CDP :9333):
+  busca "Reformas" mostrou que **"Reformas integrales - Projeto web(Juninho)" foi RENOMEADO
+  para "JR Reformas - Web (Junior) - 26"** — não estava arquivado. A automação Geral já tinha
+  mapeado o nome novo (allowlist) e criado contact/conversation novos hoje 13:47.
+- Correção no banco (commit implícito, transação única):
+  1. conversation f1e0dc91 (97 msgs de histórico) migrada para o contact canônico f177dfd8;
+  2. contact antigo 970c050b aposentado (zz_superseded_juninho / zz-superseded:// , metadata guarda origem);
+  3. bom-dia vencido (msg 9b9677d3) marcado superseded — entregar "bom dia" 16h+ em grupo de
+     cliente seria incoerente; Luna já atuou no grupo 15:48. Próxima varredura da manhã cobre JR normalmente.
+- Lição operacional: **grupos de cliente podem ser renomeados no WhatsApp** — antes de chamar de
+  "perdido", buscar no WA (wa-peek search) e reconciliar contacts. O daemon aborta envio se não
+  acha o chat (fail-closed correto); o fix é sempre no mapeamento.
+- wa-peek: screenshot via CDP às vezes trava (compositor occluded/headful) — o script agora faz
+  dump de texto do DOM (títulos+preview) mesmo sem print, e print é best-effort com timeout 8s.
