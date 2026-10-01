@@ -220,3 +220,8 @@ autor: Luna
 - AÇÃO HUMANA: Abner — olhar o WhatsApp Web no PC: o grupo "Reformas integrales - Projeto web(Juninho)" está arquivado? O título mudou? Se estiver arquivado, desarquivar. Depois me fala que reenfileiro a mensagem (já está pronta, só pg_notify).
 - LIÇÃO: boot do whatsplay drena mensagens queued ("fila: mensagem queued encontrada no boot — drenando") — reenfileirar + notify funciona; pg_notify perdido em crash precisa de reemissão.
 - autor: Luna
+
+## 2026-10-01 10:22 HVR — lição: formato do .vps_cookie
+- O arquivo .brain/.vps_cookie foi sobrescrito em formato Netscape (curl -c, pela automação Geral) — meu leitor de 2 linhas quebrou (header inválido). Relogin manual restaurou o formato simples (2 linhas: nexo.csrf-token + nexo.session-token).
+- LIÇÃO: antes de usar o cookie, detectar formato (Netscape = comentários "#" + tabs; simples = "chave=valor" por linha) ou relogar. Ideal futuro: ambas as automações usarem o mesmo formato (Netscape é o padrão curl; aceitar os dois no leitor é o mais robusto).
+- autor: Luna
