@@ -84,3 +84,7 @@ para TODOS os grupos (Production + grupos de cliente + grupo do Dudu):
 **mencionaram "luna" (em qualquer variação) → a Luna RESPONDE no grupo, sempre** — mesmo que a
 mensagem pareça só conversa; ao mínimo confirma presença e pergunta o que precisam. Silêncio só
 vale para eco puro (autor = nome do grupo) e banter sem menção. Menção = compromisso de resposta.
+
+### update 2026-10-01 08:05 HVR — reconciliação (Luna, varredura)
+JR Reformas - Web (Junior) - 26 JÁ ESTÁ na WHATSAPP_INGEST_ALLOWLIST e WHATSAPP_OUTBOUND_ALLOWLIST do .env desde 30/09 ~22:10 HVR (decreto owner "confere o grupo jr tambem", sweep isolado executado, conteúdo conferido). Também registrado em chat_registry (group:jr-reformas-web-junior-26). Pendente só: mapear roteamento fino de resposta (padrão: responder no próprio grupo).
+- autor: Luna
