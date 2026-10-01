@@ -268,3 +268,28 @@ autor: Luna
   acha o chat (fail-closed correto); o fix é sempre no mapeamento.
 - wa-peek: screenshot via CDP às vezes trava (compositor occluded/headful) — o script agora faz
   dump de texto do DOM (títulos+preview) mesmo sem print, e print é best-effort com timeout 8s.
+
+---
+
+## 2026-10-01 ~17:15 HVR — "Jess mandando no grupo e Luna não responde" (CASCATA DE 3 FALHAS)
+
+Caso OnaDance. Não foi uma falha — foi três em cadeia:
+
+1. **Allowlist não persistida**: a Geral mapeou o grupo 11:55 UTC e ANUNCIOU "adicionado nas
+   allowlists", mas o .env do whatsplay (`WHATSAPP_OUTBOUND/INGEST_ALLOWLIST`) nunca recebeu o
+   grupo → envio abortado fail-closed ("destinatário fora da allowlist de teste") e ingest
+   do grupo parado (por isso msg da Jess 16:21 não chegou no banco).
+   **Fix Luna**: adicionou "Proyecto Nexo - OnaDance 👩🏼‍🐰‍👩🏽- 26" nas duas allowlists do .env
+   e removeu a entrada obsoleta "Reformas integrales - Projeto web(Juninho)".
+2. **pm2 restart não recarrega env**: `pm2 restart` reusa o env capturado no launch — precisa
+   `pm2 restart luna-whatsplay --update-env`. (12 restarts acumulados hoje, nenhum com env novo.)
+3. **Contact/conversation duplicados**: a Geral criou 2 contacts+conversations pro mesmo grupo
+   (11:44 e 11:48). wa-read/wa-send abortavam "ambíguo".
+   **Fix Luna**: dedupe em ambos os scripts (endereços idênticos = duplicata → usa o mais ativo;
+   endereços diferentes = ambiguidade real → aborta). Duplicata OnaDance aposentada no banco
+   (mesmo padrão do Juninho mais cedo).
+
+Mensagem à Jess (resposta ao "esta tarde lo pruebo, gracias por todo") ENVIADA ✅ 17:07 HVR.
+**Gap pra Geral**: quando mapear grupo novo, tem que (a) persistir no .env das allowlists E
+(b) dar `pm2 restart <id> --update-env` — senão o anúncio no Production é mentira.
+Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, OnaDance).

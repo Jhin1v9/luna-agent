@@ -33,17 +33,25 @@ const c = new Client({ connectionString: get('DATABASE_URL') });
 await c.connect();
 
 const r = await c.query(
-  `SELECT conv.id, ct.name FROM conversations conv
+  `SELECT conv.id, ct.name, ct.address, count(m.id) AS msgs
+   FROM conversations conv
    JOIN contacts ct ON ct.id = conv.contact_id
-   WHERE conv.channel = 'whatsapp' AND (ct.address ILIKE $1 OR ct.name ILIKE $1)`,
+   LEFT JOIN messages m ON m.conversation_id = conv.id
+   WHERE conv.channel = 'whatsapp' AND (ct.address ILIKE $1 OR ct.name ILIKE $1)
+   GROUP BY conv.id, ct.name, ct.address
+   ORDER BY msgs DESC`,
   [`%${chat}%`],
 );
 if (r.rowCount === 0) { console.error(`ERRO: nenhum chat casa com '${chat}'`); process.exit(1); }
-if (r.rowCount > 1) {
+// Duplicatas exatas de endereço (grupo remapeado 2x pela Geral): usa a conversation
+// com mais histórico. Endereços DIFERENTES continuam ambíguos — aborta.
+const distinct = [...new Set(r.rows.map((x) => x.address.toLowerCase()))];
+if (r.rowCount > 1 && distinct.length > 1) {
   console.error(`ERRO: ambíguo — ${r.rowCount} matches:`);
-  r.rows.forEach((x) => console.error(`  - ${x.name}`));
+  r.rows.forEach((x) => console.error(`  - ${x.name} (${x.msgs} msgs)`));
   process.exit(1);
 }
+if (r.rowCount > 1) console.warn(`aviso: ${r.rowCount} conversations duplicadas do mesmo chat — usando a com mais histórico (${r.rows[0].msgs} msgs)`);
 
 const msgs = await c.query(
   `SELECT direction, author_name, body, send_state, metadata, created_at

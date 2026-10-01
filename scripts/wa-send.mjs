@@ -39,9 +39,12 @@ const c = new Client({ connectionString: get('DATABASE_URL') });
 await c.connect();
 
 const r = await c.query(
-  `SELECT ct.id, ct.address, ct.name FROM conversations conv
+  `SELECT ct.id, ct.address, ct.name,
+          (SELECT count(*) FROM messages m WHERE m.conversation_id = conv.id) AS msgs
+   FROM conversations conv
    JOIN contacts ct ON ct.id = conv.contact_id
-   WHERE conv.channel = 'whatsapp' AND (ct.address ILIKE $1 OR ct.name ILIKE $1)`,
+   WHERE conv.channel = 'whatsapp' AND (ct.address ILIKE $1 OR ct.name ILIKE $1)
+   ORDER BY msgs DESC`,
   [`%${chat}%`],
 );
 
@@ -49,12 +52,16 @@ if (r.rowCount === 0) {
   console.error(`ERRO: nenhum chat WhatsApp casa com '${chat}'. Verifique o nome salvo no WhatsApp.`);
   process.exit(1);
 }
+// Endereços exatamente iguais = duplicata de mapeamento (grupo remapeado); usa o mais ativo.
+// Endereços DIFERENTES = ambiguidade real — aborta fail-closed.
+const distinctAddr = [...new Set(r.rows.map((x) => x.address.toLowerCase()))];
 const distinct = [...new Map(r.rows.map((x) => [x.id, x])).values()];
-if (distinct.length > 1) {
+if (distinctAddr.length > 1) {
   console.error(`ERRO: '${chat}' é ambíguo — ${distinct.length} matches:`);
   distinct.forEach((x) => console.error(`  - ${x.name} | ${x.address}`));
   process.exit(1);
 }
+if (distinct.length > 1) console.warn(`aviso: ${distinct.length} mapeamentos duplicados do mesmo chat — usando o mais ativo`);
 
 const target = r.rows[0];
 const metadata = { correlation_id: `corr-${crypto.randomUUID()}` };
