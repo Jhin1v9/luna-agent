@@ -212,3 +212,11 @@ autor: Luna
 - LIÇÃO TÉCNICA: sweep com allowlist isolada lê últimas 3 msgs de cada chat allowlisted, mas marca is_group=false quando o chat não abre a tempo (fallback do transporte) — grupo vira "privado" e entra na fila mesmo sem menção. Dedupe fino segue valendo.
 - PENDENTE HUMANO: Fase 2 do Juninho (cliente decide); foto Google Juninho segue com Enoque.
 - autor: Luna
+
+## 2026-10-01 08:00 HVR — Bom dia como Luna nos 3 grupos (decreto owner "liga a luna total")
+- PRODUCTION ✅ entregue 06:09 UTC (messages 1229d7a9) — bom dia + agenda do dia.
+- HDM (SBD) ✅ entregue 06:09 UTC (messages 0b9adfe0) — bom dia + site no ar c/ SEO/GEO.
+- REFORMAS INTEGRALES (JUNINHO) ❌ FALHOU 6+ tentativas (messages 9b9677d3, send_state=failed, needs_human) — o whatsplay NÃO CONSEGUE ABRIR o chat "Reformas integrales - Projeto web(Juninho)" no DOM (openChat aborta por segurança pra não mandar pro chat errado).allowlist OK (recusa das 06:17 era outra msg, "Meu Amorzinho 💖🌻", protegida corretamente). Nome no WA confere com o cadastro (watcher ainda vê o grupo na sidebar). Causa provável: grupo arquivado/renomeado no aparelho ou DOM específico desse chat; período coincidiu com crash-loop de sessão (splash noscript + restart do watchdog interno 06:09–06:44), mas persistiu DEPOIS de estável.
+- AÇÃO HUMANA: Abner — olhar o WhatsApp Web no PC: o grupo "Reformas integrales - Projeto web(Juninho)" está arquivado? O título mudou? Se estiver arquivado, desarquivar. Depois me fala que reenfileiro a mensagem (já está pronta, só pg_notify).
+- LIÇÃO: boot do whatsplay drena mensagens queued ("fila: mensagem queued encontrada no boot — drenando") — reenfileirar + notify funciona; pg_notify perdido em crash precisa de reemissão.
+- autor: Luna
