@@ -235,3 +235,16 @@ autor: Luna
   3. Mais informações de VPS/infra/segurança chegarão hoje e amanhã (diretório de pessoas, acessos).
 - EXECUTADO: sweep isolado capturou a mensagem (kimiwork_inbox pending → automação Geral responde no privado); allowlist restaurada (11 chats); sweep desligado.
 - autor: Luna
+
+## 2026-10-01 15:45 HVR — DECRETO OWNER: scripts genéricos com variável aberta
+- Owner (irritado, com razão): "NÃO é pra ser algo tipo 'rodei script pra pesquisar Nonoke mas nome é Enoke vou ter que fazer outro script NÃO'. O script tem que ter o campo aberto pra eu pôr o que quiser." Exemplo dado: script de chamada tem a variável 'vai ligar pra quem?' — muda só a variável, não o script.
+- EXECUTADO: toolkit genérico em scripts/ (todos com --chat/--to/--text/rota variáveis, fail-closed em ambiguidade):
+  - `scripts/wa-send.mjs --chat X --text Y [--quote Z]` — envia msg como Luna p/ qualquer chat (resolve contact por ILIKE, ambíguo lista e aborta).
+  - `scripts/wa-read.mjs --chat X [--limit N] [--all]` — lê últimas msgs de qualquer chat (banco local). TESTADO ✅
+  - `scripts/wa-ingest.mjs --chat X` — one-shot ao vivo: isola allowlist no alvo, sweep, captura, restaura tudo (try/finally). Generaliza o que fiz manualmente p/ JR e Enoque.
+  - `scripts/wa-call.mjs --to X [--motivo M]` — ligação p/ qualquer contato do Chat Registry (fail-closed fora do registry; --register p/ registrar). Publica voice.call.requested + notify.
+  - `scripts/painel-api.mjs <GET|POST|PUT|DELETE> <rota> [--body '{...}'] | relogin` — painel Nexo genérico, relogin automático em 401/403. TESTADO ✅
+  - `scripts/brain-api.mjs <GET|POST> <rota> [--body|—file|--type|--title]` — brain remoto Bearer, --file p/ body grande. TESTADO ✅ (Bearer aceito; GET em learning/outcomes não existe, rota é POST-only).
+- LIÇÃO TÉCNICA: DNS local dessa máquina instável (ENOTFOUND 'vps.nexo-digital.appc' intermitente) — retry resolve; não é bug de script. Proxy /brain externo repassa p/ /api interno.
+- REGRA PRA MIM: nunca mais escrever node -e ad-hoc pra essas operações — usar o toolkit. Se faltar script pra alguma ação recorrente, generalizar em vez de one-off.
+- autor: Luna
