@@ -83,3 +83,9 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - ⚠ PENDÊNCIA (regra owner: cliente ativo = relatório obrigatório): pasta criada mas SEM index.html — Miranda ainda é lead (reunião/pauta em preparo no Production). Quando fechar, criar relatório na pasta.
 - Avisei no 🏆Production com o link (msg 22:02 HVR).
 - autor: Luna
+
+## 2026-10-02 — Decreto: relatórios SEM datas (owner)
+- Owner mandou tirar as datas de todos os relatórios (fica feio quando há dias sem mudança). Removidos: "Atualizado em" de todos os footers, dateline dinâmica dos índices (index/index-public), chips de data dos changelogs (HDM 8, JR 9), selos "Revisão — dd/mm" (HDM), linha .updated do OnaDance, datas inline de narrativa (HDM/JR), data de reunião do Miranda (→ "Realizada · especificação entregue").
+- **MANTIDAS de propósito** (fatos, não freshness): data da reunião inicial e atribuição da citação no relatório do Eduardo. Se o owner quiser 100% sem datas, remover essas duas também.
+- Conteúdo atualizado junto: HDM (currículos ✅ no ar — estava "em análise" desatualizado; fotos próprias → chegaram, em tratamento, prévia p/ aprovação do Matheus), Eduardo (reunião/checklist ✅ concluídos; proposta comercial pendente).
+- Backups na VPS: `*.bak-semdata-20261002.html` ao lado de cada página. Publicação live (bind mount), verificado 200/no-gate + grep sem "Atualizado em".
