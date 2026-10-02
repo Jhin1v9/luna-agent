@@ -340,3 +340,13 @@ Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, 
 - Higiene: mescladas as duplicatas de mapeamento de Caminhoneiros (3a22f4e7 canônico) e
   HDM (e5784a7f canônico) — mesmo padrão zz_superseded dos casos anteriores.
 - autor: Luna
+
+---
+
+## 2026-10-02 11:20 HVR — Pedido NOVO no painel (interno, Abner)
+
+- **ID `cmuqpv3ij0002ofhamjemlots`** · org **Nexo Digital** (interna) · projeto "Projetos Dashboard" · criado 10:44 HVR · status **RECEIVED** · urgency HIGH · 0 comentários · fonte admin-workspace.
+- **"TESTAR LIMITES E GASTOS DA LUNA" (decreto Abner, Production 02/10):** 5 testes — (1) quota diária Kimi com N chats simultâneos (1/5/10 clientes), (2) latência API (na hora) vs Kimi Work (10–15 min), (3) recursos do PC com muitos contextos (RAM/Chrome/crons), (4) custo por tipo de tarefa, (5) comportamento 403/429 e fallback entre providers. Entregável: relatório com números em /relatorios/ + futuro medidor de tokens.
+- **Bloqueio declarado no próprio pedido:** KIMI_API_KEY ausente no .env → fast brain não pode ir pro modo kimi-api (fail-closed). Live brain já roda Kimi Work.
+- Não é pedido de cliente → não aciona regra de relatório obrigatório. Trabalho a executar em sessão dedicada (fora do escopo da varredura).
+- autor: Luna
