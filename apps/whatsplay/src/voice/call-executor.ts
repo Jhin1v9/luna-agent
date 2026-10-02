@@ -186,6 +186,54 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
         if (st.state !== 'chamada') break;
       }
       handle.stop();
+      // CALL DIGEST (decreto owner 27/09): captura a transcrição DESTA
+      // chamada (início→fim), grava em .brain/luna/calls/ e enfileira o job
+      // de classificação — ANTES de resetar a aba (reset apaga o thread).
+      try {
+        const turns = await conductor.captureTranscript(tab);
+        if (turns.length >= 2) {
+          const { mkdirSync, writeFileSync } = await import('node:fs');
+          const { dirname } = await import('node:path');
+          const { fileURLToPath } = await import('node:url');
+          const callsDir = fileURLToPath(new URL('../../../../.brain/luna/calls', import.meta.url));
+          mkdirSync(callsDir, { recursive: true });
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const file = `${callsDir}/${stamp}-${(correlationId ?? 'call').slice(0, 8)}.md`;
+          const body = [
+            `# Chamada de voz — ${new Date().toISOString()}`,
+            '',
+            `- Destinatário: ${brief.destinatario}`,
+            `- Objetivo: ${brief.objetivo}`,
+            `- correlation_id: ${correlationId ?? 'n/d'}`,
+            `- Turnos capturados: ${turns.length}`,
+            '',
+            '## Transcrição (chat do Operador, início → fim da chamada)',
+            '',
+            ...turns.map((t) => `**${t.role === 'user' ? 'Participante' : 'Operador/Luna'}:** ${t.text}`),
+            '',
+          ].join('\n');
+          writeFileSync(file, body);
+          const { enqueueJob } = await import('@luna/database');
+          await enqueueJob(pool, {
+            job_type: 'call.digest',
+            payload: {
+              transcript_path: file,
+              destinatario: brief.destinatario,
+              objetivo: brief.objetivo,
+              correlation_id: correlationId ?? null,
+              turnos: turns.length,
+            },
+            priority: 4,
+            max_attempts: 2,
+            idempotency_key: `calldigest:${correlationId ?? stamp}`,
+          });
+          log.info({ turnos: turns.length, file }, 'voice.call: transcrição capturada — call.digest enfileirado');
+        } else {
+          log.info({ turnos: turns.length }, 'voice.call: transcrição curta demais — sem call.digest');
+        }
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 200) }, 'voice.call: capture da transcrição falhou (best-effort, não derruba a chamada)');
+      }
       // Decreto owner 2026-09-26: desligou a chamada da Luna → a do Operador
       // (ChatGPT) desliga junto — fecha a aba e reabre limpa (best-effort).
       await operator.resetChatTab().catch(() => {});

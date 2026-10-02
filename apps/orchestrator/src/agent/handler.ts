@@ -288,6 +288,22 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     const runStartedAt = new Date();
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
+    // Vision (owner 27/09): mensagem com imagem → anexa base64 ao turno do
+    // FAST (adapter já suporta image_base64; o modelo vision é escolhido no
+    // adapter). Arquivo sumiu/ilegível → log e segue só com texto.
+    let imageBase64: string | undefined;
+    const imagePath = (payload as { image_path?: string | null }).image_path;
+    if (imagePath) {
+      try {
+        const { readFileSync } = await import('node:fs');
+        const buf = readFileSync(imagePath);
+        if (buf.byteLength <= 7 * 1024 * 1024) imageBase64 = buf.toString('base64');
+        else log.warn({ imagePath, bytes: buf.byteLength }, 'imagem acima de 7MB — turno segue sem visão');
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 120), imagePath }, 'imagem ilegível — turno segue sem visão');
+      }
+    }
+
     // §10: route determinística primeiro — o context pack vem DA ROUTE (§7.9):
     // só o contexto relevante, nunca "tudo".
     const route = await selectRoute({ pool: eventPool, adapter, log }, event);
@@ -315,6 +331,7 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         prompt,
         sessionKey: conversationId,
         allowLiveHandoff: route.allowLiveHandoff,
+        imageBase64,
         // Config da route (§4, routes.json) — investigation_budget /
         // investigation_timeout_ms, zero hardcode.
         investigationBudget: route.investigationBudget,

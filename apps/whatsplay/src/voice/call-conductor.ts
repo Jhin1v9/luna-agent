@@ -142,6 +142,8 @@ export class CallConductor {
   private failures = 0;
   private readonly history: string[] = [];
   private cursor = 0;
+  /** Índice do 1º elemento da transcrição DESTA chamada (snapshot no start). */
+  private startCount = 0;
   private lastRelayKey = '';
   private voiceSeen = new Set<string>();
 
@@ -162,9 +164,9 @@ export class CallConductor {
       .catch(() => {});
   }
 
-  /** Lê turnos novos do chat do ChatGPT (cursor). */
-  private async readNewTurns(tab: Page): Promise<ConductorTurn[]> {
-    const turns = (await tab
+  /** Lê TODOS os elementos da transcrição do ChatGPT (user + assistant). */
+  private async readAllTurns(tab: Page): Promise<Array<{ role: string; text: string }>> {
+    return ((await tab
       .evaluate(`(() => {
         const out = [];
         document.querySelectorAll('[data-message-author-role]').forEach((el) => {
@@ -172,7 +174,12 @@ export class CallConductor {
         });
         return out;
       })()`)
-      .catch(() => [])) as Array<{ role: string; text: string }>;
+      .catch(() => [])) as Array<{ role: string; text: string }>);
+  }
+
+  /** Lê turnos novos do chat do ChatGPT (cursor). */
+  private async readNewTurns(tab: Page): Promise<ConductorTurn[]> {
+    const turns = await this.readAllTurns(tab);
     // PROTEÇÃO DE ECO (fix arquitetura 2026-09-25): mensagens do barramento
     // interno (📟 Luna → Operador:) são relays PRÓPRIOS da conductora voltando
     // no thread — nunca contam como fala de participante.
@@ -181,6 +188,17 @@ export class CallConductor {
       .filter((t) => t.text.length > 0 && t.role === 'user' && !t.text.startsWith('📟 Luna → Operador:'));
     this.cursor = turns.length;
     return fresh.map((t) => ({ speaker: 'participante', text: t.text }));
+  }
+
+  /**
+   * Transcrição DESTA chamada, do início ao fim (decreto owner 27/09 — "não
+   * o chat todo, só desde que começou até terminar"). Chamada no encerramento,
+   * ANTES de resetar a aba do Operador. Relays internos (📟) entram como
+   * contexto do que a Luna ordenou — parte do histórico da chamada.
+   */
+  async captureTranscript(tab: Page): Promise<Array<{ role: string; text: string }>> {
+    const turns = await this.readAllTurns(tab);
+    return turns.slice(this.startCount).filter((t) => t.text.length > 0);
   }
 
   /** Lê captions novas do voice mode (dedupe por conteúdo — evoluem por
@@ -204,8 +222,18 @@ export class CallConductor {
   /** Liga o loop da conductora. Retorna handle com stop(). */
   start(tab: Page, brief: CallBriefConductor): { stop: () => void } {
     this.running = true;
+    // Marca o início da chamada: só o que vier DEPOIS deste snapshot entra
+    // na transcrição do call.digest (nunca o histórico velho do chat). O loop
+    // aguarda o snapshot antes do 1º poll — senão cursor=0 releria histórico.
+    const startReady = this.readAllTurns(tab)
+      .then((turns) => {
+        this.startCount = turns.length;
+        this.cursor = turns.length;
+      })
+      .catch(() => {});
     const pollMs = this.deps.pollMs ?? 3_000;
     const loop = async (): Promise<void> => {
+      await startReady;
       while (this.running) {
         try {
           const fresh = [...(await this.readVoiceNew(tab)), ...(await this.readNewTurns(tab))].slice(0, 6);

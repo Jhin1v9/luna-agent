@@ -54,6 +54,7 @@ async function structuredTurn(
   prompt: string,
   sessionKey: string,
   toolRounds: number,
+  imageBase64?: string,
 ): Promise<TurnTrace> {
   const toolBlock =
     toolRounds < TOOL_CALL_MAX_ITERATIONS
@@ -62,6 +63,7 @@ async function structuredTurn(
   const turn = await deps.adapter.sendTurn({
     session_key: sessionKey,
     prompt: `${STRUCTURED_INSTRUCTIONS}\n${toolBlock}\n\n---\n${prompt}`,
+    ...(imageBase64 ? { image_base64: imageBase64 } : {}),
   });
   const { output } = parseStructured(turn.reply_text);
   return { output, turn, toolRounds };
@@ -76,6 +78,8 @@ export async function runFastRoute(deps: RouterDeps, input: {
   prompt: string;
   sessionKey: string;
   allowLiveHandoff: boolean;
+  /** Vision (owner 27/09): imagem da mensagem em base64 — vai no 1º turno. */
+  imageBase64?: string;
   /** Config da route (§4, routes.json) — budget de rondas e timeout da
    *  investigação. Defaults só se a route não trouxer. */
   investigationBudget?: number;
@@ -102,7 +106,7 @@ export async function runFastRoute(deps: RouterDeps, input: {
   }
 
   const ctx: ToolContext = { conversationId: sessionKey, clientId: event.client_id };
-  let trace = await structuredTurn(deps, prompt, sessionKey, 0);
+  let trace = await structuredTurn(deps, prompt, sessionKey, 0, input.imageBase64);
 
   // §10.2/§5.1 — loop FAST↔tool, tope de 5 iterações.
   while (trace.output.type === 'TOOL_CALL' && trace.toolRounds < TOOL_CALL_MAX_ITERATIONS) {

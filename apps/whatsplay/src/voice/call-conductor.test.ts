@@ -59,7 +59,7 @@ describe('parseDecision (tolerante)', () => {
 
 describe('CallConductor loop', () => {
   it('turno do participante → Kimi decide say → texto digitado no chat do Operador + audit', async () => {
-    const tab = fakeTab([[{ role: 'user', text: 'quem é a cliente?' }]]);
+    const tab = fakeTab([[], [{ role: 'user', text: 'quem é a cliente?' }]]); // 1º evaluate = snapshot do início da chamada
     const op = fakeOperator();
     const live = fakeLive(['Fale para o Abner que é a Jess — ela quer falar contigo direto.']);
     const audits: string[] = [];
@@ -82,6 +82,7 @@ describe('CallConductor loop', () => {
 
   it('ação → executeAction com evidência + audit; Kimi caindo degrada SEM derrubar o loop', async () => {
     const tab = fakeTab([
+      [], // snapshot do início da chamada
       [{ role: 'user', text: 'manda msg pra Jess' }],
       [{ role: 'user', text: 'e aí?' }],
     ]);
@@ -115,7 +116,7 @@ describe('CallConductor loop', () => {
   });
 
   it('cursor: turnos já lidos NÃO reprocessam', async () => {
-    const tab = fakeTab([[{ role: 'user', text: 'oi' }]]);
+    const tab = fakeTab([[], [{ role: 'user', text: 'oi' }]]); // 1º evaluate = snapshot do início da chamada
     const live = fakeLive(['{"action":"hold"}']);
     const op = fakeOperator();
     const c = new CallConductor({ operator: op as never, live: live as never, log, pollMs: 60 });
@@ -152,7 +153,7 @@ describe('CallConductor loop', () => {
   it('BATCH (decreto owner 14:28 "ao vivo"): vários turnos no MESMO poll viram UM SÓ pedido à Luna', async () => {
     // Cenário real: a resposta anterior demorou e 3 falas acumularam. Antes do
     // batch eram 3 roundtrips seriais (3x a latência); agora é 1 só.
-    const tab = fakeTab([[{ role: 'user', text: 'primeira' }, { role: 'user', text: 'segunda' }, { role: 'user', text: 'terceira' }]]);
+    const tab = fakeTab([[], [{ role: 'user', text: 'primeira' }, { role: 'user', text: 'segunda' }, { role: 'user', text: 'terceira' }]]); // 1º evaluate = snapshot
     const live = fakeLive(['Resposta ao estado atual.']);
     const op = fakeOperator();
     const c = new CallConductor({ operator: op as never, live: live as never, log, pollMs: 60 });
@@ -165,6 +166,20 @@ describe('CallConductor loop', () => {
     expect(live.prompts[0]).toContain('terceira');
     expect(live.prompts[0]).toContain('novas falas na transcrição');
     expect(op.sent).toEqual(['📟 Luna → Operador: Resposta ao estado atual.']);
+  });
+
+  it('captureTranscript: SÓ o trecho desta chamada (decreto owner 27/09 — nunca o chat todo)', async () => {
+    const HIST = { role: 'user', text: 'histórico antigo do chat' };
+    const F1 = { role: 'user', text: 'fala 1 da chamada' };
+    const R1 = { role: 'assistant', text: 'resposta do operador' };
+    const final = [HIST, F1, R1];
+    const tab = fakeTab([[HIST], [HIST, F1], final, final, final]); // 1º = snapshot
+    const c = new CallConductor({ operator: fakeOperator() as never, live: fakeLive(['ok']) as never, log, pollMs: 80 });
+    const h = c.start(tab, brief);
+    await new Promise((r) => setTimeout(r, 250));
+    h.stop();
+    const seg = await c.captureTranscript(tab as never);
+    expect(seg.map((t) => t.text)).toEqual(['fala 1 da chamada', 'resposta do operador']); // HIST ficou de fora
   });
 });
 

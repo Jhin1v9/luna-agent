@@ -3,6 +3,7 @@ import { resolveIngressIdentity, insertInboundMessage, publishEvent, recordAudit
 import type { Logger } from 'pino';
 import type { UnreadMessage, WhatsAppTransport } from './transport.js';
 import { shouldRespond } from './rules.js';
+import { detectSelfEcho } from './self-echo.js';
 
 /**
  * Ingestão (§13 event-driven): mensagem nova capturada por mutação de DOM →
@@ -51,6 +52,30 @@ export function createIngest(deps: IngestDeps) {
       });
     }
 
+    // 🆕 ECO PRÓPRIO (owner 27/09): relay/citação devolve as falas da Luna
+    // como mensagem nova e ela comentava o próprio eco — skip com audit.
+    if (msg.text) {
+      const recent = await pool.query<{ body: string }>(
+        `SELECT body FROM messages
+         WHERE conversation_id = $1 AND direction = 'outbound' AND channel = 'whatsapp'
+         ORDER BY created_at DESC LIMIT 10`,
+        [identity.conversation_id],
+      );
+      const echo = detectSelfEcho(msg.text, quotedFromLuna, recent.rows.map((r) => r.body));
+      if (echo.echo) {
+        log.info({ chat: msg.chat_name, overlap: echo.overlap }, 'eco próprio detectado (relay/citação das falas da Luna) — skip sem resposta');
+        await recordAudit(pool, {
+          actor: 'whatsplay',
+          action: 'whatsapp.message.self_echo_skipped',
+          tool: 'whatsplay_ingest',
+          client_id: identity.client_id,
+          result: 'success',
+          metadata: { external_id: msg.external_id, overlap: echo.overlap, relay_signature: echo.relaySignature },
+        });
+        return 'skipped';
+      }
+    }
+
     // Foto pura (sem legenda) não menciona ninguém — no grupo segue o silêncio
     // absoluto (§5); no privado sempre responde (regra fixa).
     const effectiveText = msg.text || (msg.image_path ? '[imagem]' : '');
@@ -65,6 +90,27 @@ export function createIngest(deps: IngestDeps) {
     ) {
       log.debug({ chat: msg.chat_name }, 'grupo sem menção/reply — silêncio absoluto (§5)');
       return 'skipped';
+    }
+
+    // 📇 Diretório de pessoas (decreto owner 01/10): junto com cada mensagem a
+    // Luna recebe nome + número + papel + org do autor (ex.: "Abner 34685...
+    // CEO NEXO", "Matheus — HDM INDUSTRIAL - CLIENTE"), pra classificar quem
+    // fala o quê sem chute. Fonte: contacts.metadata (phone/role/org), seed
+    // manual; sem cadastro, os campos vêm null e nada quebra.
+    const authorName = msg.author_name ?? msg.chat_name;
+    let authorPhone: string | null = null;
+    let authorRole: string | null = null;
+    let authorOrg: string | null = null;
+    const dir = await pool.query<{ phone: string | null; role: string | null; org: string | null }>(
+      `SELECT metadata->>'phone' AS phone, metadata->>'role' AS role, metadata->>'org' AS org
+       FROM contacts WHERE name = $1 AND metadata->>'role' IS NOT NULL
+       ORDER BY updated_at DESC LIMIT 1`,
+      [authorName],
+    );
+    if (dir.rowCount) {
+      authorPhone = dir.rows[0]!.phone;
+      authorRole = dir.rows[0]!.role;
+      authorOrg = dir.rows[0]!.org;
     }
 
     const messageId = await insertInboundMessage(pool, {
@@ -127,6 +173,9 @@ export function createIngest(deps: IngestDeps) {
         quoted_text: msg.quoted_text ?? null,
         image_path: msg.image_path ?? null,
         correlation_id: event.correlation_id,
+        author_phone: authorPhone,
+        author_role: authorRole,
+        author_org: authorOrg,
       },
       idempotencyKey: `kimiwork:wa:msg:${msg.external_id}`,
     }).catch((err) => log.warn({ err: String(err).slice(0, 120) }, 'kimiwork inbox: falha ao enfileirar (não bloqueia o ingest)'));

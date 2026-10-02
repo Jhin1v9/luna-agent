@@ -108,6 +108,12 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
+    // Vision (owner 27/09 — "ela não vê imagem"): o k2 é texto puro; com
+    // imagem no turno, troca pro modelo vision (env override por modo).
+    const visionModel = process.env[`${this.mode === 'gemini' ? 'GEMINI' : 'KIMI_API'}_VISION_MODEL`];
+    const model =
+      request.image_base64 && visionModel ? visionModel : this.model;
+
     let res: Response;
     try {
       res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
@@ -117,7 +123,7 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
           authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: this.model,
+          model,
           messages: [
             {
               role: 'user',
@@ -159,7 +165,7 @@ export class OpenAiCompatAdapter implements KimiLiveAdapter {
       reply_text: content,
       session_id: `${this.provider}:${request.session_key}`,
       duration_ms: Date.now() - started,
-      model: this.model,
+      model,
       usage: data.usage
         ? {
             input_tokens: data.usage.prompt_tokens ?? 0,

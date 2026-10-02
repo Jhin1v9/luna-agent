@@ -66,6 +66,10 @@ async function main(): Promise<void> {
   runner.register('conversation.classify', createClassifyHandler({ pool, adapter: classifyAdapter, log }));
   const { createSummarizeHandler } = await import('./jobs/summarize.js');
   runner.register('memory.summarize', createSummarizeHandler({ pool, adapter: classifyAdapter, log }));
+  // Call digest (decreto owner 27/09): fim da chamada → transcrição da chamada
+  // → FAST classifica (TESTE/LEAD/ORDEM/VALIOSO) → digest no brain.
+  const { createCallDigestHandler } = await import('./jobs/call-digest.js');
+  runner.register('call.digest', createCallDigestHandler({ pool, adapter: classifyAdapter, log }));
   // P2 — HANDOFF_LIVE real (ADR-034): investigação com o Cérebro Vivo
   // (kimi CLI headless, ADR-033). Autonomia configurável (LIVE_AUTONOMY).
   // ADR-039 — live brain tem RESERVA: LIVE_BRAIN_PROVIDER=pi troca pra
@@ -109,8 +113,21 @@ async function main(): Promise<void> {
   runner.register('voice.call', createVoiceCallHandler({ pool, log }));
   const investigationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
   runner.register('investigate', createInvestigateHandler({ pool, live: liveAdapter, log, telegram: investigationTelegram }));
-  // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
   const { enqueueJob } = await import('@luna/database');
+  // Brain watch (decreto owner 27/09): varredura de diffs do brain canônico
+  // (VPS) — no boot e a cada 30 min. Cada commit novo vira sinapse local.
+  const { createBrainWatchHandler } = await import('./jobs/brain-watch.js');
+  runner.register('brain.watch', createBrainWatchHandler({ pool, log }));
+  const brainWatchTick = async (idem: string) => {
+    await enqueueJob(pool, { job_type: 'brain.watch', payload: {}, max_attempts: 2, idempotency_key: idem }).catch(() => {});
+  };
+  await brainWatchTick(`brainwatch:boot:${Date.now().toString(36)}`);
+  const brainWatchTimer = setInterval(() => {
+    const hour = new Date().toISOString().slice(0, 13);
+    brainWatchTick(`brainwatch:${hour}`).catch(() => {});
+  }, 30 * 60_000);
+  brainWatchTimer.unref();
+  // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
   const day = new Date().toISOString().slice(0, 10);
   await enqueueJob(pool, { job_type: 'memory.summarize', payload: {}, idempotency_key: 'summarize:' + day });
   const summarizeTimer = setInterval(() => {
