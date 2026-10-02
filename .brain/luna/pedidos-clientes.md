@@ -361,3 +361,53 @@ Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, 
 - **Respondido:** grupo Caminhoneiros 11:31 (escopo MVP fechado, respostas do Abner registradas) e privado 11:34 (diagnóstico completo pro owner). Decreto ler→responder gravado em `.brain/luna/toolkit.md`.
 - **Backlog priorizado:** varredura de reconciliação p/ fechar o ponto cego da ingest.
 - autor: Luna
+
+---
+
+## 2026-10-02 ~11:10 UTC — Lead novo: gestão de anúncios Sabadell (ES)
+
+- Lead espanhola (Sabadell/Barcelona) pediu gestão de Meta Ads + Google Ads; chegou até a Luna
+  (site/canal) perguntando preços e packs de anúncios — Enoque já pegou a info principal.
+- **Pagamento previsto: dia 5** — Enoque passa info do Abner pra ela.
+- Pendências: URL dos anúncios (Enoque vai mandar), sistema de recibo ou conta na billing
+  (pergunta do Enoque em aberto no Production).
+- OnaDance: Jess confirmará se podem fechar as petições atuais; fechamento será pelo dashboard Nexo.
+- autor: Luna
+
+- **UPDATE 14:57 UTC:** dados de pagamento repassados pelo Enoque: titular Abner Gabriel Ribeiro
+  Mendes, Banco BBVA, +34 685 09 31 92 — pra clienta Sabadell pagar até dia 5. Jess acompanha a
+  clienta e há chance de fechar um SEGUNDO serviço. Falta: nome da clienta, valores e mês de
+  referência → com isso a Luna monta o PDF do recibo.
+
+- **UPDATE 15:30 UTC (Abner):** billing tem função de recibo nativa. Plano: criar e-mail (humano) → conta nova no billing → Abner libera no Supabase; ou Abner convida o time direto. Recibo precisa estar pronto ate dia 4 (pagamento dia 5). Alternativa: convite direto do Abner com acesso total.
+
+---
+
+## 2026-10-02 16:15 UTC — OnaDance: Jess fechou petições antigas + 3 pedidos novos
+
+- **Fechadas (autorização explícita da Jess, "Si, podemos cerrar las peticiones"):** hero vídeo
+  (cmufc0h7v0001114r1v7ylito), Trustpilot (cmtw0230j0019ju6hc97qzbm0), "avísame cuando vuelva"
+  (cmtw01xhg000vju6hau8i8rw1), home só disponíveis (cmtw01qfb000hju6hfvx2x7t3) → COMPLETED no painel.
+- **Criadas 3 novas (projeto Ona Dance web cmshyy4os0003eix2tlfuic2o, org cmshyy4nq0001eix2h7a8ose8):**
+  orden Eternal Bloom primeiro (cmur5wyh10009ofhawevqbtd2) · sticker "agotado" + agotados no final
+  (cmur5wyl5000eofha5oxnigw3) · qualidade das imagens pixeladas (cmur5wypj000jofha6ym5e8c1).
+- **Dica operacional do painel:** update de solicitação é **PUT** (PATCH → 405). POST cria (201).
+- autor: Luna
+
+---
+
+## 2026-10-02 18:41 HVR — Ona Dance: 3 pedidos novos (Tienda) + 4 fechados
+
+**NOVOS (Jess, 18:13 HVR, status RECEIVED, projeto "Ona Dance web"):**
+1. `cmur5wyh10009ofhawevqbtd2` — Tienda: cambiar orden de productos — "Eternal Bloom" primeiro, depois os mais antigos
+2. `cmur5wyl5000eofha5oxnigw3` — Tienda: añadir sticker "agotado" nos sets + mostrar agotados no final do listado
+3. `cmur5wypj000jofha6ym5e8c1` — Tienda: revisar calidad de imágenes (se ven pixeladas)
+
+**FECHADOS (COMPLETED ~18:14 HVR):**
+- `cmufc0h7v0001114r1v7ylito` — hero vídeo vertical da Jess (41s) no slider: **APROVADO pela Jess ("aprobar", 16:05Z)** ✅
+- `cmtw0230j0019ju6hc97qzbm0` — Trustpilot aviso wp-admin (brtpmj-free) ✅
+- `cmtw01xhg000vju6hau8i8rw1` — "Avísame cuando vuelga" com captura de email ✅
+- `cmtw01qfb000hju6hfvx2x7t3` — Home: só produtos disponíveis em Relacionados/Destacados ✅
+
+Painel passou de 20 → 23 requests. Divergências: nenhuma.
+- autor: Luna
