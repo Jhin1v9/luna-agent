@@ -350,3 +350,14 @@ Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, 
 - **Bloqueio declarado no próprio pedido:** KIMI_API_KEY ausente no .env → fast brain não pode ir pro modo kimi-api (fail-closed). Live brain já roda Kimi Work.
 - Não é pedido de cliente → não aciona regra de relatório obrigatório. Trabalho a executar em sessão dedicada (fora do escopo da varredura).
 - autor: Luna
+
+---
+
+## 2026-10-02 ~11:45 HVR — Diagnóstico ingest + respostas pendentes do owner (interno)
+
+- **Reclamação owner (11:21, veio do privado):** msgs nos grupos sem resposta; msg dele pendente há horas no grupo do Eduardo; msg privada "Luna responde no grupo" (10:14) sem resposta; decreto novo: LER PRIMEIRO DEPOIS RESPONDER.
+- **Causa raiz:** ponto cego estrutural da captura (só captura chat aberto na tela). Evidência: msg Abner 7:11 no Caminhoneiros visível na tela, ausente no `kimiwork_inbox`. Detalhes: `.brain/luna/incidents/2026-10-02-ingest-ponto-cego-captura.md`.
+- **Split-brain secundário:** 5 grupos com conversations duplicadas (pipeline usava uma row, outbound gravava na outra) — merge executado com backup (`conversations_backup_20261002`). Causa da criação repetida de rows não localizada ainda — monitorar.
+- **Respondido:** grupo Caminhoneiros 11:31 (escopo MVP fechado, respostas do Abner registradas) e privado 11:34 (diagnóstico completo pro owner). Decreto ler→responder gravado em `.brain/luna/toolkit.md`.
+- **Backlog priorizado:** varredura de reconciliação p/ fechar o ponto cego da ingest.
+- autor: Luna

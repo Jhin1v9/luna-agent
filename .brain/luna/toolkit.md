@@ -1,5 +1,10 @@
 # Toolkit da Luna (scripts/ — genéricos, variável aberta, NUNCA node -e ad-hoc)
 
+## Decretos de comportamento
+
+1. **LER PRIMEIRO, DEPOIS RESPONDER** (owner, 02/10/26): antes de responder qualquer grupo, ler o relatório/histórico do cliente e o contexto recente do grupo. Nunca perguntar o que já foi respondido antes. Aplica-se a toda resposta em grupo e privado.
+2. **Ponto cego da captura** (incidente 2026-10-02-ingest-ponto-cego-captura.md): a ingest só captura o chat aberto na tela. Se o owner reclamar de msg sem resposta, verificar DIRETO na tela (wa-peek open + screen-shot) — a ausência no `kimiwork_inbox` NÃO prova que não há mensagem nova.
+
 - `wa-send.mjs --chat X --text Y [--quote Z]` — envia como Luna (resolve por ILIKE, aborta se ambíguo)
 - `wa-read.mjs --chat X [--limit N]` — lê mensagens ✅ testado
 - `wa-ingest.mjs --chat X` — sweep one-shot isolado de um chat
