@@ -5,7 +5,7 @@
 
 ## Identidade
 
-- **Cliente:** HDM - Industrial (site hdmindustrial.es, preview hdm-six.vercel.app)
+- **Cliente:** HDM - Industrial — referência canônica: preview hdm-six.vercel.app (decreto owner 02/10: domínio próprio é decisão futura dele; NÃO tratar DNS/SSL como pendência)
 - **Contato principal:** Matheus (apelido "Noke" no WhatsApp)
 - **Idioma:** PT-BR com o time; site em ES
 - **Atendimento:** painel Nexo Workspace (projeto "Main WebSite") + e-mail; WhatsApp pessoal do Matheus não estava na base até 24/09

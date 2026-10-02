@@ -38,18 +38,19 @@
   (contexto: acesso/settings). Se precisar de conteúdo de lá, pedir acesso
   (repo privado — settings/access só abre logado com a conta dele).
 
-## HDM — qual site é o de verdade (GRAVADO 2026-09-26, correção do owner)
+## HDM — referência canônica (ATUALIZADO 2026-10-02, decreto owner 02/10 00:26)
 
 - **Site REAL (novo, do Matheus): `hdm-six.vercel.app`** — Next.js, configurator de
-  perfis, 4 slides de fundo no hero, ES/CA/EN/PT. É esse que deve ser analisado/revisado.
-- `www.hdmindustrial.es` = site ANTIGO (Bootstrap, "Amplíe su equipo") — NÃO é o alvo
-  de análises do time. Analisá-lo por engano gera relatório inútil (aconteceu 26/09).
-- Apex `hdmindustrial.es` (sem www) tem SSL quebrado (ERR_SSL_PROTOCOL_ERROR).
+  perfis, 4 slides de fundo no hero, ES/CA/EN/PT. É o ÚNICO alvo de análises/revisões do time.
+- **DECRETO OWNER:** domínio próprio (`hdmindustrial.es` / `hdm-industrial.es`) é decisão FUTURA do
+  owner — NÃO listar como pendência, NÃO monitorar DNS/SSL. Time trabalha no preview até novo decreto.
+
+- `www.hdmindustrial.es` = site ANTIGO (Bootstrap, "Amplíe su equipo") — se aparecer em análise por
+  engano, descartar (aconteceu 26/09, relatório inútil). Nenhuma ação sobre ele.
 - Achados 26/09 no site real: prefetch RSC 404 em todas as rotas (redeploy Vercel),
   faixa vazia gigante no mobile mid-page, botão "SOLICITAR PERSONAL" do footer gigante
   no mobile (report do Enoque confirmado), banner de cookies por cima do footer.
   Prints: .brain/luna/analises/2026-09-26-hdm-real-preview/
-
 ## Portal de relatórios (GRAVADO 2026-09-26)
 
 - Container `nexo_relatorios` na VPS (127.0.0.1:13474), fonte em

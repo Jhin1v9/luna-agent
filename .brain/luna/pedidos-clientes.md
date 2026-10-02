@@ -151,11 +151,11 @@ slider da Jess, por mim). **Jess NÃO pediu nada novo.** Nenhum updatedAt poster
 | Seção currículos → rrhh@ (cmub9zxn, 21/09) | CLIENT_REVIEWING | ✅ **RESOLVIDO 26/09 17:50** — página de volta ao ar (commit a389b31 na branch de deploy + promote Vercel). Verificado: /trabaja-con-nosotros 200 nos 4 idiomas, home e páginas principais sem regressão, formulário → relay VPS (CORS OK). Relatório HDM atualizado ("voltou ao ar", backup .bak-20260926-3). ⏳ Pendente operacional: SMTP do relay não configurado (CV grava em disco + fallback mailto; envio automático p/ rrhh@ só após configurar SMTP_URL/Resend); relay crasha com POST malformado (fix no handler de exceção) |
 | Scroll reveal (14/09) | COMPLETED 21/09 | ✅ feito |
 
-**Produção HDM:** SSL do apex **confirmado quebrado** (https://hdmindustrial.es sem www não conecta) —
-Noke já designado; é config DNS/dominio, não código. Site antigo www.hdmindustrial.es no ar (200).
-**NOVO (26/09 14:10):** o domínio NOVO `hdm-industrial.es` (com hífen) **não existe no DNS público** —
-NXDOMAIN tanto no apex quanto no www (testado 8.8.8.8 + 1.1.1.1). Registro/configuração de DNS do
-domínio pendente no registrador (ação humana — credencial do registrar).
+**DECRETO OWNER (Abner, 02/10 00:26):** domínio próprio do HDM **REMOVIDO das pendências** — a
+referência canônica do projeto é SÓ o preview `hdm-six.vercel.app`. Mudança de host/domínio é decisão
+futura do owner: a Luna NÃO monitora, NÃO lista e NÃO cobra DNS/SSL de `hdmindustrial.es` nem
+`hdm-industrial.es`. (Histórico arquivado: apex com SSL quebrado + domínio novo sem registro DNS —
+26/09, nenhuma ação ativa.)
 
 autor: Luna
 
@@ -293,3 +293,39 @@ Mensagem à Jess (resposta ao "esta tarde lo pruebo, gracias por todo") ENVIADA 
 **Gap pra Geral**: quando mapear grupo novo, tem que (a) persistir no .env das allowlists E
 (b) dar `pm2 restart <id> --update-env` — senão o anúncio no Production é mentira.
 Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, OnaDance).
+
+## 2026-10-01 19:50 HVR — [INTERNO] Análise de concorrentes de IA (tarefa do Abner no Production)
+
+- **Pedido (Production 17:20Z):** "pegar o que essas empresas NÃO FAZEM e oferecer com a luna" + "Luna já pesquise e monte um html css tailwind e sobe no vps".
+- **EXECUTADO:** análise a fundo de Wereplai (39€/mês, script fechado, SERCASYSTEM SOLUCIONES SL), Sonora Intelligence (voz 24/7, preço oculto p/ call de vendas) e CuteOPS (software de gestão — outra categoria). Página Tailwind compilada localmente (CDN é bloqueado pelo CSP do static-htmls) com comparativo lado a lado, radar de +5 players (Ringover, CloudTalk, Bookio, Kosmo, ZeeClip, ConverFlow) e recomendações comerciais.
+- **NO AR:** https://vps.nexo-digital.app/agente-ia/analises/concorrentes/ — fonte local em `analises/ia-concorrentes/`. Publicado DENTRO de `/agente-ia/` porque o Caddy ativo (/etc/caddy/Caddyfile, root-only) só expõe handles explícitos; pasta nova em static-htmls/html/ sem handle = 403. ⚠️ Deploy futuro da landing agente-ia pode apagar a subpasta.
+- **AÇÃO HUMANA (Abner, com sudo):** criar handle limpo `/analises/*` no /etc/caddy/Caddyfile (padrão idêntico ao bloco `/agente-ia/*`, proxy 127.0.0.1:14070), `systemctl reload caddy`, e mover a pasta p/ `static-htmls/html/analises/concorrentes/`. Detalhes no toolkit.md.
+- **Ferramenta nova:** `scripts/vps-deploy-static.sh <pasta-local> <subpasta-no-html> [rota-publica]` (testado ✅).
+- autor: Luna
+
+## 2026-10-01 21:35 HVR — [LEAD] Gestora quer plataforma de facturação estilo Contasimple + radar MiWebAhora
+
+- **Lead criado no dashboard:** `lead-1790882990504-xe66` (assignedTo abner, source whatsapp-production). Gestora **Miranda** (nome veio do arquivo `especificacao_sistema_gestoria_miranda.md` circulado no Production) usa Contasimple; quer sistema onde ela é a matrix (multi-cliente) e os clientes dela usam facturação simples; vira cliente + indica. Ela e o marido querem REUNIÃO HOJE (01/10). Pauta oferecida; **conteúdo do .md não capturável pelo ingest (documento não é baixado — só texto/imagem)** — pedido no grupo pra colarem o conteúdo.
+- **Contasimple (referência):** Cegid; grátis / 10,95€ / 15,95€ + IVA; Verifactu; autónomos/pymes.
+- **UPDATE 22:05 HVR:** Abner colou a especificação no grupo — veio CORTADA (só cabeçalho + Visão do Produto, parou em "telas ou e…"; restante pedido). Trecho salvo em `analises/miranda-gestoria/especificacao_sistema_gestoria_miranda.md`. **Pauta da reunião completa** em `analises/miranda-gestoria/pauta-reuniao-2026-10-01.md` (escopo MVP multi-tenant, preço 990-1.900 setup + 189 base + 5-9€/cliente ativo, protótipo 1 sem + MVP 4-6 sem, parceria de indicação) — enviada no Production (messages b7cca8fe, entregue 20:00Z).
+- **UPDATE 22:15 HVR — quadrado no portal ✅:** pedido do Abner (msg 20:04Z) executado no portal /relatorios: (1) `data/users.json` ganhou `miranda@nexo-digital.app` → slug `miranda-gestoria` (bak `users.json.bak-luna-20261001`); (2) card **LEAD · Novo** na listagem pública (padrão do Eduardo; bak `index.html.bak-luna-20261001`); (3) página de relatório `public/clientes/miranda-gestoria/index.html` (sumário, módulos, pilares técnicos, roadmap 4 fases, checklist da reunião, link p/ spec v1.0 completa — cópia local atualizada em `analises/miranda-gestoria/especificacao_sistema_gestoria_miranda.md`). Login testado ponta a ponta (POST /relatorios/entrar → 303 p/ página dela). Confirmado no Production (msg b9e687af, sent 20:12Z). Spec COMPLETA (40 KB, 50 seções — AEAT/Navarra, VERI*FACTU, SaaS multi-gestoría) já estava no portal, salva por sessão paralela às 22:02Z; trecho cortado local ficou obsoleto.
+- **UPDATE 22:35 HVR — cards atrás do portão + user Luna + access log ✅ (decreto Abner, msg 20:21Z):** home pública do /relatorios virou SÓ login (`public/index-public.html`, zero cards/nomes); cliente logado cai DIRETO na própria página (`redirect /clientes/<slug>/`); listagem com cards só para sessão team (`index.html` original). `luna@nexo-digital.app` adicionada a `RELATORIOS_TEAM_EMAILS` (VPS .env; boot log: "equipe: 5 e-mails"). **Access log** novo: `data/logs/access.log` (JSON lines: ts, ev=login|login_fail|view|home, email, role, slug, path, ip, ua) + endpoint equipe `GET /relatorios/nexo/api/acessos?limit=N`. ⚠️ **APRENDIZADO OPERACIONAL:** server.js é BAKED na imagem (só public/ e data/ são mounts) — mudança nele exige `docker compose build relatorios && up -d`. E o `cap_drop: ALL` do compose zera CAP_DAC_OVERRIDE: root do container NÃO escreve em dir de outro dono → data/logs ficou `chmod 777` (sem sudo p/ chown); **o MESMO problema provavelmente quebra a escrita do puesto de mando em `data/cambios`** — não corrigido (fora do escopo do pedido), sinalizado ao Abner. Backups: `server.js.bak-luna-20261001`, `index.html.bak-gate-20261001`, `docker-compose.yml.bak-luna-20261001`, `.env.bak-luna-20261001`. Confirmado no Production (msg 5cc4bff1, sent 20:28Z).
+- **UPDATE 22:50 HVR — botão "Voltar" ✅:** pedido duplicado do Abner (msg 20:43Z) com acréscimo: botão fixo `← Voltar` em todas as páginas de relatório do portal (`jr-reformas`, `hdm`, `onadance`, `eduardo-transporte`, `miranda-gestoria` + `_em-breve.html`; baks `*.bak-voltar20261001`). Volta pra `/relatorios/` — equipe cai na listagem de cards, cliente cai na própria página. Confirmado no Production (msg 91dd43bf, sent).
+- **UPDATE 22:58 HVR — bug do Voltar ("só dá F5") corrigido ✅:** como CLIENTE, `/relatorios/` redireciona ao próprio relatório (portão) → botão parecia reload. Fix: rota **`/relatorios/voltar`** — cliente → `/sair` (encerra sessão, cai no campo de login, como o Abner pediu); equipe/anon → `/` (listagem/log-in). Botões dos 6 arquivos repontados. ⚠️ bug inicial: TDZ (`session` const declarada depois no server.js) crashava a rota — fix com `readSession(req)` local; rebuild da imagem. Testado e2e. Bak `server.js.bak-voltar20261001`. Confirmado (msg 5c7aa8ae, sent).
+- **Radar atualizado:** MiWebAhora (miwebahora.es — Freename AG Suíça; builder de sites com IA, assistente "Lina", grátis+9€/mês, GEO Google+ChatGPT) adicionado à página de concorrentes. Concorrente do low-end Nexo.
+- autor: Luna
+
+---
+
+## 2026-10-02 06:41 HVR — INCIDENTE: queda noturna da stack (máquina reiniciou)
+
+- 01:14 → 06:41 sem varreduras: a máquina reiniciou/hibernou durante a noite. Docker Desktop
+  NÃO subiu sozinho → daemon docker fora → luna-postgres fora → orchestrator/worker/whatsplay
+  em crash-loop (pm2 daemon inteiro tinha morrido; ~35 restarts acumuladas cada).
+- Recuperação (06:43–06:46): `pm2 resurrect` (5 processos), subi Docker Desktop manual,
+  luna-postgres subiu sozinho (restart policy), whatsplay com `--update-env` (garantir allowlists
+  atuais com OnaDance). /health 200, /ready db up. Grupo Telegram alertado ✅.
+- ⚠ CAUSA RAIZ NÃO RESOLVIDA: Docker Desktop sem auto-start no boot. AÇÃO HUMANA: ligar
+  "Start Docker Desktop when you sign in" nas Settings do Docker, ou criar tarefa agendada.
+  Enquanto isso não for feito, TODO restart da máquina derruba a stack até alguém subir o Docker.
+- autor: Luna

@@ -172,3 +172,9 @@
   por bloqueio Vercel); foto do perfil Google do Juninho (Enoque assumiu, hoje à
   tarde).
 - **Se confirmado como não-intencional:** `pm2 resurrect` resolve em segundos.
+
+## 2026-10-01 21:25 HVR — eco de outbound com autor ERRADO (novo sintoma do watcher)
+
+- Mesmo padrão do outcome "watcher-reingere-outbound-e-duplicatas" (3 eventos de eco hoje), mas com agravante: o re-ingest atribuiu o eco a **"Elias Superclim Servicios"** (contact de cliente) em vez do grupo Production/luna — author_phone null, message_id novo, texto = cauda exata da resposta da Luna (messages 5e5cb1aa).
+- Risco: evento fantasma parecendo vir de cliente → processamento errado se a validação de eco depender só de autor/chat. Mitigação aplicada: validação de eco por CONTEÚDO (match com tail do último outbound), não por autor.
+- Fix estrutural segue o mesmo pedido: whatsplay ignorar own-echo (sender luna no painel) + dedupe por (conversation, texto, 10min).

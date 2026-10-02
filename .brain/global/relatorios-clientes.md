@@ -62,7 +62,7 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - Verify completo passou (lint+typecheck+96 testes+placeholders+claims+build+check:seo). Scripts tmp deletados antes do commit.
 - DEPLOY BLOQUEADO: 6 tentativas de source-deploy (vercel deploy --prod --archive=tgz) entre 16:20–17:30 — upload OK, build nunca inicia, API retorna readyState=BLOCKED (token válido, projeto não pausado, fila limpa após rm dos 5 órfãos). Builds de 26/09 duravam 19–26s; últimos 4 dias sem build bem-sucedido. Causa: limite/bloqueio do plano free do time na Vercel — ação humana: dashboard Vercel (Usage/Build Settings) ou aguardar reset e rodar `bash scripts/publicar.sh`. NADA QUEBRADO no ar (produção estável no build de 26/09).
 - Relatório atualizado via Tailscale: seção #revisao-3009 "SEO + GEO" no /relatorios/clientes/hdm/ (backup index.html.bak-20260930-2). Gate 303 sem cookie = intacto, comportamento normal.
-- Pendências HDM inalteradas: fotos próprias, logo final, currículos, DNS hdmindustrial.es.
+- Pendências HDM (02/10: DNS/domínio REMOVIDO por decreto owner — ver nexo-dados.md): fotos próprias, logo final, currículos.
 - autor: Luna
 
 ### update 30/09 19:10 HVR — push GitHub + resposta ao grupo
