@@ -1,7 +1,15 @@
 # PLANOS — consolidado (Kimi Code × Kimi Work × decretos do Abner)
 
-> Última atualização: 2026-09-24 por Luna. Este arquivo é a fila única de
+> Última atualização: 2026-09-27 por Luna. Este arquivo é a fila única de
 > verdade — sessões novas LEIAM aqui antes de propor trabalho.
+
+## 📐 Plano pronto pra execução (decreto owner 27/09)
+- **Modo Edição (mini-CMS) do site HDM + fotos reais do Matheus** — análise total feita
+  (fotos IMG_0078–0084 inventariadas, site mapeado: ~1.900–2.000 textos ×4 idiomas, 12 imgs,
+  ~25 tokens de tema). Arquitetura reusável `@nexo/site-cms` (content skin em runtime sobre o
+  estático, /edit com senha, docker+Postgres na VPS, guardrails de claims no publish).
+  **Plano completo: `docs/PLANO-MODO-EDICAO-HDM.md`** — 6–8 dias de dev, fases 0–4.
+  Execução: time (Jhin/Enoque/Elias). Decisões pendentes do owner listadas na §5 do plano.
 
 ## ✅ Entregue (2026-09-23/24)
 - Chat Registry (migração 012): identidade por número/jid, deny-first, blocklist (namorada BLOCKED com nota do incidente), enforce em voice.call (tool FAST + executor). voice.call trancado atrás de VOICE_CALL_ENABLED (OFF até decidirmos religar).
