@@ -329,3 +329,14 @@ Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, 
   "Start Docker Desktop when you sign in" nas Settings do Docker, ou criar tarefa agendada.
   Enquanto isso não for feito, TODO restart da máquina derruba a stack até alguém subir o Docker.
 - autor: Luna
+
+---
+
+## 2026-10-02 07:10 HVR — Bom dia nos grupos de cliente (decreto owner 07:06)
+
+- 5 mensagens ENVIADAS e confirmadas (send_state=sent): Caminhoneiros (resposta ao Dudu sobre
+  a pergunta do ~jozee — perguntei se é ele, pra registro; escopo já está fechado e prévia em
+  preparo), JR Reformas, HDM, OnaDance (espanhol, pra Jess) e Production (resumo do funil).
+- Higiene: mescladas as duplicatas de mapeamento de Caminhoneiros (3a22f4e7 canônico) e
+  HDM (e5784a7f canônico) — mesmo padrão zz_superseded dos casos anteriores.
+- autor: Luna

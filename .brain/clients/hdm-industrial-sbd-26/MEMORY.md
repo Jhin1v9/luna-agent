@@ -9,3 +9,11 @@ Setembro/2026 com o grupo HDM: o time (Souza) perguntou se podiam usar fotos e v
 Pendências: - Tratar as mídias recebidas (cor/nitidez) e apresentar prévia pro cliente aprovar antes de publicar no site
 - Confirmar recebimento/organização dos arquivos originais que o Matheus mandou
 
+## 2026-10 — Luna
+
+Outubro no grupo HDM começou com a Luna reforçando presença: saudação de bom dia com a confirmação de que o site segue no ar com o SEO/GEO aplicado (llms.txt + perfis engordados, commit 2b8a709). Sem pedidos novos, reclamações ou decisões do cliente no período — o grupo está em acompanhamento contínuo. As pendências conhecidas do projeto permanecem fora desta conversa: fotos próprias da equipe, logo final e revisão da aba de currículos.
+
+Pendências: - Fotos próprias da equipe HDM — aguardando envio do cliente
+- Logo final — PDF pendente de reenvio pelo Matheus
+- Aba de currículos (CLIENT_REVIEWING) — aguardando revisão do cliente no painel
+
