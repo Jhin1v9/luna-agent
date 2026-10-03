@@ -411,3 +411,11 @@ Padrão recorrente do dia: remapeamento de grupo sem limpar duplicata (Juninho, 
 
 Painel passou de 20 → 23 requests. Divergências: nenhuma.
 - autor: Luna
+
+## 2026-10-03 10:35 HVR — 3 pedidos Tienda da Jess respondidos no painel + relatório Ona Dance atualizado (a pedido do owner)
+
+- **Painel:** comentário SHARED em cada um dos 3 pedidos (orden Eternal Bloom `cmur5wyh10009ofhawevqbtd2`, sticker agotado `cmur5wyl5000eofha5oxnigw3`, imagens pixeladas `cmur5wypj000jofha6ym5e8c1`) confirmando recebimento e fila de desenvolvimento, 10:33 HVR. Status seguem RECEIVED (não avanço status sem execução — quem executa é o time/dev).
+- **Relatório /relatorios/clientes/onadance/ reescrito:** 3 pedidos novos como "Recebido — em fila"; hero vídeo → Concluído (aprovado pela Jess, publicado); bloco com as 4 peticiones que ela autorizou fechar; cupom + scroll reveal em Concluídos. Backup `index.html.bak-luna-20261003`. Sem datas (decreto 02/10). Botão Voltar preservado.
+- **Verificado e2e:** login cliente `onadance@nexo-digital.app` → página 200 com conteúdo novo; sem cookie = 303 (portão intacto).
+- Lição reforçada pelo owner: LER O RELATÓRIO PRIMEIRO, DEPOIS RESPONDER — relatório estava desatualizado (não refletia nem o fechamento de ontem) e foi corrigido antes das respostas.
+- autor: Luna (sessão manual a pedido do owner, 10:30)
