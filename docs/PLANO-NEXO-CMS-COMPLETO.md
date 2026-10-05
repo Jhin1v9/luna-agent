@@ -134,3 +134,61 @@
 3. Limite do editor: confirmar que "adicionar seção nova" fica na Fase C (rebuild)?
 4. Idiomas da UI do editor: PT + ES pra começar?
 5. Quem usa primeiro em produção: HDM (Matheus) ou só time Nexo no início?
+
+---
+
+## 12. Chat de IA no editor (com cobrança de créditos do workspace) — pedido owner 27/09
+
+### 12.1 Como funciona (fluxo)
+1. Editor logado abre o **chat lateral** e escreve o que quer ("deixa o hero mais direto",
+   "cria FAQ sobre dietas", "@hero encurta o título").
+2. Referências exatas: digita `@` → autocomplete das chaves `data-cms` do site (ex.: `@hero`,
+   `@faq.1`); ou **arrasta o elemento da página para dentro do chat** → vira token `[el:es:home.heroTitle]`
+   (vários elementos podem ser arrastados numa mensagem só).
+3. A mensagem vai pra API do nexo-cms → **checa saldo de créditos do cliente** (workspace) →
+   chama a IA (**Kimi ou DeepSeek**, chave em env, trocável) com system prompt contendo:
+   snapshot do conteúdo do site + schema data-cms + **regras de cobrança** + guardrails de claims.
+4. A IA responde com **ações estruturadas** (lista de edits: key → novo valor) + **custo calculado
+   por ela mesma** (classificação no system prompt). A API valida o custo nos limites e aplica
+   tudo em **DRAFT/PREVIEW** — o site na tela atualiza ao vivo, mas nada está publicado.
+5. O usuário vê o diff e decide: **"Salvar e publicar"** (fluxo draft→publish já existente) ou descarta.
+6. **Cobrança**: o custo é debitado no ato da execução — **salvou ou não, o crédito foi gasto**
+   (regra do owner). Só pergunta/resposta simples (sem mudança) cobra o mínimo.
+
+### 12.2 Tabela de custos (âncora: 1h de uso intenso ≈ 100 créditos)
+| Tipo | Quando | Custo |
+|---|---|---|
+| `PERGUNTA` | dúvida/orientação, zero mudança no site | **1** |
+| `EDICAO_SIMPLES` | 1–3 campos de texto curtos | **3** |
+| `EDICAO_MEDIA` | seção inteira, galeria, troca de imagem, textos longos | **8** |
+| `ESTRUTURA` | nova seção do catálogo, rearranjo, conteúdo rico/SEO novo | **20** |
+
+A IA classifica cada resposta numa dessas classes (instrução no system prompt) e justifica
+("2 textos curtos + troca de 1 imagem = EDICAO_MEDIA"). A API valida: classe fora da tabela
+ou custo inconsistente com o nº de ações → recalcula pela tabela. Teto por sessão (ex.: 100)
+com confirmação explícita do usuário pra estourar.
+
+### 12.3 Integração de créditos (já existe no workspace)
+- Saldo/tarifas: API de créditos do dashboard Nexo (`/api/credits/*`, auth — org por cliente,
+  ex.: HDM = org `cmtldsn65...`; planos com creditsPerMonth já existem).
+- **Débito**: chamada autenticada server-side (nexo-cms → dashboard backend) debitando o custo
+  da org do cliente. Admin (Abner) repõe/ajusta créditos pelo painel workspace existente
+  (endpoint admin de adjust). Sem saldo → o chat avisa e bloqueia execuções (perguntas continuam? NÃO — bloqueio total até recarga; configurável).
+- **Ledger próprio** (tabela `ai_usage`): id, site_id, org_id, ts, classe, custo, modelo,
+  nº de ações, resumo, publicado(bool). Base do relatório mensal por cliente + conferência.
+
+### 12.4 Segurança e limites
+- A IA só enxerga/mexe no **schema data-cms** (conteúdo) — nunca código, nunca infra.
+- Mudanças sempre em draft; guardrails de claims rodam **antes do preview** também.
+- Máx. de ações por mensagem (ex.: 30), timeout, retry com idempotency key (não cobra 2x).
+- Chaves Kimi/DeepSeek em env da VPS (nunca no client). Custo real de API monitorado
+  (se o custo real estourar X× o cobrado, alerta pro admin ajustar a tabela).
+
+### 12.5 Entregas
+| # | Item | Fase |
+|---|---|---|
+| 12.1 | Chat UI lateral (histórico, streaming, referências @ e drag-into-chat) | B |
+| 12.2 | Provider Kimi/DeepSeek + system prompt (schema + billing + guardrails) | B |
+| 12.3 | Aplicação em draft/preview com diff + Salvar/Publicar | B |
+| 12.4 | Ledger ai_usage + débito no workspace + tela de uso pro admin | B/C |
+| 12.5 | Ajuste fino da tabela de custos com dados reais | C |
