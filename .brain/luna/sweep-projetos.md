@@ -38,3 +38,6 @@ quota 403 do Kimi Code. Próximo passo ao retomar: ProfilesPages + MiscPages + r
 - Veredito: backend v0 sólido (7,5/10 — bcrypt, sessão HMAC, brute-guard, audit, draft/publish); editor é protótipo (nota geral 5,2/10).
 - Bugs críticos: (C1) tag <script src> não fechada mata Preview + seletor de idioma; (C2) Moveable não persiste layout — só texto salva; (C3) CMS_SITE fixo "demo" — multi-tenancy não ligado; (C4) popup posicionado com coordenadas do iframe sem offset.
 - Documento completo (achados C1–C4, P0/P1/P2, benchmark, notas por dimensão) gravado em /home/nexo/nexo-cms/docs/AVALIACAO-EDITOR.md na VPS.
+
+## 2026-10-05 — FIX: falso positivo recorrente do gatilho por evento
+Sintoma: 4 disparos seguidos da varredura com painel 100% inalterado. Causa raiz no predicado `conditions/sweep_trigger.py` (asset da automação 27b0babd): a API do painel envolve os requests em `{"data": [...]}`, mas o código lia `data.get("requests", [])` → lista vazia → signature `[]` SEMPRE diferente do snapshot (24 itens) → dispara a cada poll (limitado só pelo tempo de execução da rodada anterior). Fix: `data.get("data") or data.get("requests") or []`. Verificado ao vivo: panel_ok=True, 24 itens, signature casa com o snapshot → deve ficar quieto até houver mudança real.
