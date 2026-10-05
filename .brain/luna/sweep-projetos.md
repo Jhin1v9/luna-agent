@@ -22,3 +22,6 @@ Owner decretou senha única compartilhada entre CMS e dashboard para compartilha
 - Dashboard interno (nexo_dashboard_backend, PG): hash do usuario `abner` resetado para 7741 via ds.saveUser (bcrypt $2b$10$). Login API confirmado: POST /dashboard/api/auth/login → 200, role Admin.
 - nexo-cms (/home/nexo/nexo-cms/.env): CMS_ADMIN_PASSWORD já era 7741 (decisão 27/09) — conferido, idêntico.
 - AUTORIZAÇÃO: owner explicito ("pode usar a msm senha... assim podem compartilhar as env .7741@"). Ressalva da decisão 27/09 mantida: trocar antes de expor a público.
+
+## 2026-10-05 varredura (pós 16:34Z)
++2 commits: segurança — senha do dashboard unificada com CMS (7741, decreto owner); synapses — passos 0+2 do nexo-cms (editor quadriculado + guias, codemod em andamento). Painel sem novidade. Fila 0 pending (Geral estável após o episódio do dispatch). Stack 5/5.
