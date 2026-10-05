@@ -16,3 +16,9 @@ EPISÓDIO FILA: 5 msgs do Eduardo (~15:58Z, incl. resposta aos nomes de branding
 - Stack pm2 CAIU entre as rodadas (daemon morto, 0 processos) — recuperada com pm2 resurrect; 5/5 online, health 200. Docker/Postgres seguiam de pé.
 - Gasto Kimi Code R$36,18 lançado no dashboard interno (vps.nexo-digital.app/dashboard): id exp_muvi2q3xzynbop, categoria Software, moeda BRL, caixa deduzido (estava 0 → -36,18).
 - ⚠ SENHA DIVERGENTE: owner informou "abner / 7741" mas o hash do usuario abner no datastore-pg do dashboard NÃO bate com 7741 (nem 7741@). A 7741 é a senha do NEXO-CMS (decisão 09-27), não do dashboard. Lançamento feito gravando direto no datastore replicando o handler POST /api/expenses. PENDENTE: owner confirmar senha real do dashboard ou pedir reset para 7741.
+
+## 2026-10-05 senha unificada (decreto owner 19:08 HVR)
+Owner decretou senha única compartilhada entre CMS e dashboard para compartilhar as envs.
+- Dashboard interno (nexo_dashboard_backend, PG): hash do usuario `abner` resetado para 7741 via ds.saveUser (bcrypt $2b$10$). Login API confirmado: POST /dashboard/api/auth/login → 200, role Admin.
+- nexo-cms (/home/nexo/nexo-cms/.env): CMS_ADMIN_PASSWORD já era 7741 (decisão 27/09) — conferido, idêntico.
+- AUTORIZAÇÃO: owner explicito ("pode usar a msm senha... assim podem compartilhar as env .7741@"). Ressalva da decisão 27/09 mantida: trocar antes de expor a público.
