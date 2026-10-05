@@ -32,3 +32,9 @@ Sessão da Luna Live Brain construindo o nexo-cms. Documentação operacional gr
 Andamento: editor /previas/hdm-matheus/edit no ar com quadriculado + guias Canva (commit 7646914);
 codemod data-cms HDM na branch feat/cms-editmode (8 arquivos); sessão PARADA 18:49 HVR por
 quota 403 do Kimi Code. Próximo passo ao retomar: ProfilesPages + MiscPages + runtime + verify.
+
+## 2026-10-05 — Avaliação completa do nexo-cms (comando direto do owner)
+- Auditoria total do editor do CMS (editor.html 187 linhas, server.js 169, schema.sql, cms-runtime.js) + teste ao vivo.
+- Veredito: backend v0 sólido (7,5/10 — bcrypt, sessão HMAC, brute-guard, audit, draft/publish); editor é protótipo (nota geral 5,2/10).
+- Bugs críticos: (C1) tag <script src> não fechada mata Preview + seletor de idioma; (C2) Moveable não persiste layout — só texto salva; (C3) CMS_SITE fixo "demo" — multi-tenancy não ligado; (C4) popup posicionado com coordenadas do iframe sem offset.
+- Documento completo (achados C1–C4, P0/P1/P2, benchmark, notas por dimensão) gravado em /home/nexo/nexo-cms/docs/AVALIACAO-EDITOR.md na VPS.
