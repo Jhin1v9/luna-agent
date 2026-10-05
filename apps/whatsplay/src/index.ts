@@ -155,12 +155,16 @@ async function main(): Promise<void> {
       // Decreto owner 2026-09-24: agente não age sozinho em loop — sweep
       // periódico (abre chats allowlisted a cada ~12s) só sob demanda.
       sweepEnabled: config.WHATSAPP_SWEEP_ENABLED === 'true',
+      // Decreto owner 03/10/2026: a cada ciclo, não-lidas allowlisted viram
+      // ingest (e a Geral dispara em ≤1min) — resposta garantida por badge,
+      // não só por diff de preview.
+      reconcileMs: config.WHATSAPP_RECONCILE_MS,
     },
   );
   await transport.ensureMainChatList();
   await watcher.tick(); // arma o baseline
   watcher.start();
-  log.info('ingest watcher ativo (baseline armado, zero polling de conversas)');
+  log.info('ingest watcher ativo (baseline + reconcile de não-lidas a cada ' + Math.round(config.WHATSAPP_RECONCILE_MS / 1000) + 's)');
 
   // Health loop da página (diagnóstico ao vivo 2026-09-22): a sessão caía
   // pro fallback noscript/splash intermitentemente e a automação ficava cega

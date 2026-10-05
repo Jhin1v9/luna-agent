@@ -45,6 +45,17 @@ export interface WatcherOptions {
    * WHATSAPP_SWEEP_ENABLED=true.
    */
   sweepEnabled?: boolean;
+  /**
+   * Reconciler de não-lidas (decreto owner 03/10/2026 "a cada not, responde
+   * SEMPRE"): a cada reconcileMs, relê a LISTA de chats (só leitura de nós —
+   * zero abertura) e ingere TODA conversa allowlisted com badge de não-lida,
+   * inclusive as que o tick por diff de preview perdeu (badge visível no DOM
+   * mas não detectado — incidente 03/10: msgs do Enoque 15:49 e do Eduardo
+   * 16:17 ficaram 20–50 min sem resposta). Abrir o chat marca como lida — é o
+   * comportamento desejado (a Luna lê e responde). Duplicatas caem na
+   * idempotency de messages (§7.6). Default: 60s. 0 = desligado.
+   */
+  reconcileMs?: number;
 }
 
 /** Diff puro: quais chats têm mensagem nova desde o snapshot anterior.
@@ -125,6 +136,15 @@ export class IngestWatcher {
   /** Roda o sweep a cada N ticks (4s × 3 = 12s — decreto owner: latência). */
   private readonly sweepEvery = 3;
   private readonly sweepEnabled: boolean;
+  private readonly reconcileMs: number;
+  private reconcileTimer: NodeJS.Timeout | null = null;
+  private reconciling = false;
+  /** Último preview reconciliado por chat (chave barata: evita reabrir chat
+   *  sem novidade a cada ciclo). */
+  private lastReconciled = new Map<string, string>();
+  /** Saúde do loop de ticks: watchdog avisa se parar (evaluate travado). */
+  private lastTickDoneAt = Date.now();
+  private watchdogTimer: NodeJS.Timeout | null = null;
   private lastSeenMsg = new Map<string, string>();
 
   constructor(
@@ -133,6 +153,7 @@ export class IngestWatcher {
   ) {
     this.intervalMs = opts.intervalMs ?? 4_000;
     this.sweepEnabled = opts.sweepEnabled ?? false;
+    this.reconcileMs = opts.reconcileMs ?? 60_000;
     this.debouncer = new Debouncer({ flushMs: deps.debounceMs });
     this.ingest = deps.ingestFn ?? createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log }).ingestOne;
     this.ingestAllowlist = parseAllowlist(deps.ingestAllowlist?.join(','));
@@ -161,6 +182,7 @@ export class IngestWatcher {
       return await this.tickInner();
     } finally {
       this.ticking = false;
+      this.lastTickDoneAt = Date.now();
     }
   }
 
@@ -172,6 +194,15 @@ export class IngestWatcher {
       for (const b of badges) this.baseline.set(b.chat_id, b.preview);
       this.seeded = true;
       this.deps.log.info({ chats: badges.length, withUnread: badges.filter((b) => b.unread > 0).length }, 'watcher: baseline armado (nada antigo dispara)');
+      // FIX 1 (decreto owner 03/10 "responde sempre"): não-lidas PRE-EXISTENTES
+      // em chats da allowlist NÃO ficam para trás — a Jess 09:03 HVR caiu nesse
+      // buraco (máquina off de noite + baseline ignorando). Agora o boot já
+      // reconcilia: cada badge allowlisted vira ingest e a Geral responde.
+      if (this.reconcileMs > 0) {
+        void this.reconcileUnread('boot').catch((err) =>
+          this.deps.log.error({ err }, 'watcher: reconcile do boot falhou'),
+        );
+      }
       return { seeded: true, fresh: 0 };
     }
     this.sweepCount++;
@@ -270,13 +301,59 @@ export class IngestWatcher {
     }
   }
 
-  /** Abre só o chat novidade, extrai mensagens inbound recentes, ingere. */
-  private async extractAndIngest(badge: ChatBadge): Promise<void> {
+  /**
+   * Reconciler de não-lidas (decreto owner 03/10): relê a lista (sem abrir
+   * nada) e ingere cada chat allowlisted com badge. Rede de segurança do
+   * caminho por diff de preview — quando o DOM/sessão falha em propagar a
+   * mudança de preview, o badge continua visível e é pego aqui.
+   * Chave barata = preview do badge: mudou (ou nunca reconciliado) → abre,
+   * extrai e ingere. Idempotency de messages (§7.6) cobre a corrida com o
+   * caminho do tick.
+   */
+  async reconcileUnread(origem: 'timer' | 'boot' = 'timer'): Promise<void> {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      const badges = await this.collect();
+      for (const b of badges) {
+        try {
+          if (b.unread <= 0) continue;
+          if (
+            this.enforceIngest &&
+            !matchesAllowlist(this.ingestAllowlist, b.chat_name) &&
+            !matchesAllowlist(this.ingestAllowlist, b.chat_id)
+          ) {
+            continue; // fora da allowlist: não abre, não marca lida (§5)
+          }
+          if (this.enforceIngest && this.sweepEnabled) {
+            // Com sweep ligado, allowlisted é responsabilidade dele — o mesmo
+            // "sem corrida" do badge-path (dupla resposta no chat). Sweep abre
+            // o chat periodicamente e zera o badge, então o reconcile tem
+            // pouco a cobrir aqui de qualquer forma.
+            continue;
+          }
+          if (this.lastReconciled.get(b.chat_id) === b.preview) continue; // sem novidade
+          const outcome = await this.extractAndIngest(b);
+          if (outcome === 'ingested') this.lastReconciled.set(b.chat_id, b.preview);
+          // 'empty' (só mídia/sem texto) NÃO marca: tenta de novo no próximo
+          // ciclo — barulho de log aceito, engolir mensagem não é.
+        } catch {
+          // falhou antes de ingerir: não marca — tenta no próximo ciclo
+        }
+      }
+    } finally {
+      this.reconciling = false;
+    }
+  }
+
+  /** Abre só o chat novidade, extrai mensagens inbound recentes, ingere.
+   *  Retorna 'ingested' (achou texto) ou 'empty' (só mídia/sem texto). */
+  private async extractAndIngest(badge: ChatBadge): Promise<'ingested' | 'empty'> {
     const messages = await this.deps.transport.readConversation(badge.chat_id, 10);
     const inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
     if (inbound.length === 0) {
       this.deps.log.info({ chat: badge.chat_name }, 'watcher: sem texto inbound (mídia?) — ignorado');
-      return;
+      return 'empty';
     }
     const last = inbound[inbound.length - 1]!;
     const msg: UnreadMessage = {
@@ -298,6 +375,7 @@ export class IngestWatcher {
         this.deps.log.error({ err }, 'watcher: ingest falhou'),
       );
     });
+    return 'ingested';
   }
 
   start(): void {
@@ -306,12 +384,42 @@ export class IngestWatcher {
       this.tick().catch((err) => this.deps.log.error({ err }, 'watcher: tick falhou'));
     }, this.intervalMs);
     this.timer.unref();
+    if (this.reconcileMs > 0) {
+      this.reconcileTimer = setInterval(() => {
+        this.reconcileUnread('timer').catch((err) => this.deps.log.error({ err }, 'watcher: reconcile falhou'));
+      }, this.reconcileMs);
+      this.reconcileTimer.unref();
+    }
+    // Watchdog do loop de ticks: se nenhum tick completa há 5 min, o evaluate
+    // da página provavelmente travou (incidente 03/10: ~2h40 cego). Loga em
+    // ERROR (visível no sweep) e destrava a trava de reentrância — o próximo
+    // tick tenta de novo; o reconcile segue em timer independente.
+    this.watchdogTimer = setInterval(() => {
+      const staleMs = Date.now() - this.lastTickDoneAt;
+      if (staleMs > 5 * 60_000) {
+        this.deps.log.error({ stale_min: Math.round(staleMs / 60_000) }, 'watcher: ticks parados há minutos — evaluate da página possivelmente travado');
+        if (this.ticking) {
+          this.deps.log.error({}, 'watcher: destravando flag de tick (tick anterior possivelmente pendurado)');
+          this.ticking = false;
+        }
+        this.lastTickDoneAt = Date.now();
+      }
+    }, 60_000);
+    this.watchdogTimer.unref();
   }
 
   stop(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.reconcileTimer) {
+      clearInterval(this.reconcileTimer);
+      this.reconcileTimer = null;
+    }
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
     this.debouncer.clear();
   }

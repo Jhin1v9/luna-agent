@@ -123,6 +123,11 @@ const envSchema = z.object({
   // valor (default) mantém desligado. O ingest normal (badge/DOM-mutação)
   // não depende dele.
   WHATSAPP_SWEEP_ENABLED: z.string().default('false'),
+  // Reconciler de não-lidas (decreto owner 03/10/2026 "a cada not, responde
+  // SEMPRE"): de quanto em quanto tempo o watcher relê a lista e ingere
+  // chats allowlisted com badge de não-lida — rede de segurança do caminho
+  // por diff de preview. 0 desliga. Default 60s.
+  WHATSAPP_RECONCILE_MS: z.coerce.number().int().min(0).default(60_000),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
