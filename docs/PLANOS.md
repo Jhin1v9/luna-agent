@@ -11,7 +11,9 @@
   **Plano completo: `docs/PLANO-MODO-EDICAO-HDM.md`** — 6–8 dias de dev, fases 0–4.
   Execução: time (Jhin/Enoque/Elias). Decisões pendentes do owner listadas na §5 do plano.
 
-- **nexo-cms — plano COMPLETO por área** (editor visual, conteúdo, mídia, tema, backend, estrutura, segurança, integração, infra, UX, qualidade + roadmap A/B/C): 
+- **nexo-cms — plano COMPLETO por área** (editor visual, conteúdo, mídia, tema, backend,
+  estrutura, segurança, integração, infra, UX, qualidade + roadmap A/B/C):
+  `docs/PLANO-NEXO-CMS-COMPLETO.md`
 
 ## ✅ Entregue (2026-09-23/24)
 - Chat Registry (migração 012): identidade por número/jid, deny-first, blocklist (namorada BLOCKED com nota do incidente), enforce em voice.call (tool FAST + executor). voice.call trancado atrás de VOICE_CALL_ENABLED (OFF até decidirmos religar).
