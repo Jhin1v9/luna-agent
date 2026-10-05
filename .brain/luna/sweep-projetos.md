@@ -7,3 +7,7 @@ Atividade de outra sessão no repo (4 commits): plano completo nexo-cms (11 áre
 
 ## 2026-10-05 varredura (pós 15:45Z)
 +1 commit: chaves de IA do CMS provisionadas na VPS (kimi primário + gemini reserva). Painel sem novidade. Fila 0 pending. Stack 5/5.
+
+## 2026-10-05 varredura (pós 15:50Z)
++2 commits: decisões owner registradas (senha 7741, estreia só time, /edit por prévia — Fase A desbloqueada) + fix da URL do editor na lista de decisões.
+EPISÓDIO FILA: 5 msgs do Eduardo (~15:58Z, incl. resposta aos nomes de branding no Caminhoneiros) ficaram ~30 min pending — Geral com runs failed/cancelled (agent_dispatch_failed) entre 16:22–16:26, recuperou sozinha no run das 16:26 (drenou tudo). Sem alerta necessário (fila zerou antes da ação). Causa raiz do dispatch failed não identificada no wire — monitorar.
