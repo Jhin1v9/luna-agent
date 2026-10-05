@@ -178,3 +178,20 @@ continua exigindo rebuild via `publicar.sh` — textos/imagens/tema/cores/radios
 - Visual editing Next.js (padrão Sanity): https://www.sanity.io/docs/visual-editing/visual-editing-with-next-js-app-router
 - CMS self-hosted c/ builder visual: https://www.reddit.com/r/nextjs/comments/1my4jec/self_hosted_cms_with_visual_builder/
 - Mapa do site + inventário de mídia: ver `.brain/luna/analises/` (análises 26/09) e este documento §1.
+
+---
+
+## 7. Status da execução (27/09)
+
+- [x] **Site no VPS**: branch `main` (com fotos reais do Matheus + logo oficial integradas pelo
+      time) em Docker (node20→nginx) em `https://vps.nexo-digital.app/previas/hdm-matheus`
+      (Caddy via API admin, strip prefix; basePath via env + patch de deploy de refs `/images/`
+      SOMENTE no diretório de deploy — repo do cliente intacto). Botão "Ver prévia" no relatório.
+- [x] **Decisão de pesquisa (EN/ES/PT/ZH/RU)**: núcleo do editor = **Moveable** (MIT) sobre o DOM
+      existente + contenteditable + API própria. GrapesJS/Puck/Craft descartados (document model
+      próprio / React-only / sem UI).
+- [x] **nexo-cms v0 no VPS** (`/home/nexo/nexo-cms`): API auth (bcrypt+HMAC+rate-limit), content
+      draft/publish, theme, audit; runtime 3KB; editor overlay demo. Ciclo completo validado.
+      Portas 127.0.0.1:13720/13721 (não públicas ainda).
+- [ ] Codemod `data-cms` no site HDM · media library · tema visual · guardrails de claims ·
+      rota pública do `/edit` · migração de layout entre containers (fase avançada).
