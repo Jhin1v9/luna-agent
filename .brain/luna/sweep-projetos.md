@@ -25,3 +25,10 @@ Owner decretou senha única compartilhada entre CMS e dashboard para compartilha
 
 ## 2026-10-05 varredura (pós 16:34Z)
 +2 commits: segurança — senha do dashboard unificada com CMS (7741, decreto owner); synapses — passos 0+2 do nexo-cms (editor quadriculado + guias, codemod em andamento). Painel sem novidade. Fila 0 pending (Geral estável após o episódio do dispatch). Stack 5/5.
+
+## 2026-10-05 análise sessão Kimi Code 9de66a55 (comando owner 19:38)
+Sessão da Luna Live Brain construindo o nexo-cms. Documentação operacional gravada na VPS:
+/home/nexo/nexo-cms/docs/OPERACOES.md (stack, acessos, commits, roadmap, incidentes).
+Andamento: editor /previas/hdm-matheus/edit no ar com quadriculado + guias Canva (commit 7646914);
+codemod data-cms HDM na branch feat/cms-editmode (8 arquivos); sessão PARADA 18:49 HVR por
+quota 403 do Kimi Code. Próximo passo ao retomar: ProfilesPages + MiscPages + runtime + verify.
