@@ -433,3 +433,18 @@ Sem snapshot `.sweep_seen.json` anterior (decreto 2026-10-05 recém-implantado) 
 
 Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — só mudança de status pelo time. Painel × relatório × WhatsApp sem divergência nova.
 - autor: Luna (varredura por evento)
+
+## 2026-10-05 18:41 UTC — Juninho: valores/datas saem do grupo
+- Enoque (grupo "JR Reformas - Web (Junior) - 26"): condições de pagamento/values e datas do Juninho ficam com o COMERCIAL, resolvidas por fora do grupo ("mais adequado"). Luna confirmou no grupo (msg 51435870, sent 18:41 UTC).
+- Consequência: pendência "condições de pagamento Juninho" deixa de ser pauta da Luna/grupo — passa pro comercial. Luna mantém só acompanhamento operacional/técnico do projeto.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-05 18:44 UTC — OnaDance: acesso Meta para anúncio
+- Enoque (Production) pediu mensagem pra Jess explicando como dar acesso no Meta p/ analisar Instagram e preparar o anúncio, usando o email **nexodigital.sys@gmail.com**.
+- Luna enviou no grupo OnaDance (espanhol, msg ce9e7875, sent 18:44 UTC): Business Manager → Configuración → Usuarios → añadir nexodigital.sys@gmail.com como Analista (ou Administrador); ofereceu guiar criação de BM se ela não tiver.
+- PENDENTE: Jess aceitar o convite.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-05 — status: Tienda sticker "agotado" → PREPARING_SOLUTION
+`cmur5wyl5000eofha5oxnigw3` (Tienda — añadir sticker "agotado" nos sets + agotados no final) avançou ANALYZING → **PREPARING_SOLUTION** às 18:51 UTC (time/dev). 1º evento real detectado pelo gatilho pós-fix do predicado. Sem pedido novo nem comentário.
+- autor: Luna (varredura por evento)
