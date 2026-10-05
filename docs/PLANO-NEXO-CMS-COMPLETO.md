@@ -130,7 +130,7 @@
 
 ## Decisões do owner (fechadas 27/09)
 1. ~~Senha admin~~ → **7741** (provisória; rate-limit ativo; trocar antes de expor público).
-2. URL do editor →  (mesmo domínio).
+2. URL do editor → `/previas/<site>/edit` (mesmo domínio).
 3. Limite estrutura → seção nova = Fase C (catálogo + rebuild assistido).
 4. UI do editor → PT primeiro, ES depois.
 5. Estreia → **só o time Nexo**; cliente entra quando o owner avisar (estado pronto).
