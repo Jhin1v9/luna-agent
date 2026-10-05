@@ -4,3 +4,6 @@ Atividade de outra sessão no repo (4 commits): plano completo nexo-cms (11 áre
 
 ## 2026-10-05 varredura (pós 15:28Z)
 +1 commit de outra sessão: plano da área 12 do nexo-cms (chat de IA no editor com cobrança de créditos do workspace). Painel sem novidade (24 requests). Fila 0 pending. Stack 5/5 saudável.
+
+## 2026-10-05 varredura (pós 15:45Z)
++1 commit: chaves de IA do CMS provisionadas na VPS (kimi primário + gemini reserva). Painel sem novidade. Fila 0 pending. Stack 5/5.
