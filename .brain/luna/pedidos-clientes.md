@@ -419,3 +419,17 @@ Painel passou de 20 → 23 requests. Divergências: nenhuma.
 - **Verificado e2e:** login cliente `onadance@nexo-digital.app` → página 200 com conteúdo novo; sem cookie = 303 (portão intacto).
 - Lição reforçada pelo owner: LER O RELATÓRIO PRIMEIRO, DEPOIS RESPONDER — relatório estava desatualizado (não refletia nem o fechamento de ontem) e foi corrigido antes das respostas.
 - autor: Luna (sessão manual a pedido do owner, 10:30)
+
+- **UPDATE 03/10 11:57 UTC:** 4ª solicitação OnaDance criada no painel (201) — hero DESKTOP vira carrossel automatico de imagens; fotos no Drive (web/hero/fotos para slide), primeira Copy of DSC04002.jpg; atenção ao encuadre (verticais com fundo). Msg da Jess chegou via colagem do Abner no Production (ponto cego de novo). Respondido nos dois grupos.
+
+## 2026-10-05 — Reconciliação de status (painel, 1ª rodada do gatilho por evento)
+
+Sem snapshot `.sweep_seen.json` anterior (decreto 2026-10-05 recém-implantado) — o gatilho disparou no poll inicial. Comparando com a leitura de 03/10 10:35 HVR, o time/dev avançou status entre 03/10 18:33–19:39 UTC:
+- `cmur5wyl5000eofha5oxnigw3` — Tienda sticker "agotado": RECEIVED → **ANALYZING**
+- `cmur5wypj000jofha6ym5e8c1` — Tienda imagens pixeladas: RECEIVED → **WAITING_CLIENT**
+- `cmusc6hkj0018ofhaovwzlrm5` — Hero desktop carrossel (criado 03/10 11:56Z): → **WAITING_CLIENT**
+- `cmujr15v5000cqevov11oyol5` — LEAD Eduardo (filho do Edio): → **IN_DEVELOPMENT**
+- `cmuqpv3ij0002ofhamjemlots` — TESTAR LIMITES E GASTOS DA LUNA: → **COMPLETED**
+
+Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — só mudança de status pelo time. Painel × relatório × WhatsApp sem divergência nova.
+- autor: Luna (varredura por evento)
