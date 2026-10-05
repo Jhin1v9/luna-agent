@@ -165,8 +165,7 @@
 
 A IA classifica cada resposta numa dessas classes (instrução no system prompt) e justifica
 ("2 textos curtos + troca de 1 imagem = EDICAO_MEDIA"). A API valida: classe fora da tabela
-ou custo inconsistente com o nº de ações → recalcula pela tabela. Teto por sessão (ex.: 100)
-com confirmação explícita do usuário pra estourar.
+ou custo inconsistente com o nº de ações → recalcula pela tabela. TETO POR SESSÃO configurável (padrão 100) — ajustável pelo admin do CMS por site/cliente; ao estourar, pede confirmação explícita do usuário pra continuar.
 
 ### 12.3 Integração de créditos (já existe no workspace)
 - Saldo/tarifas: API de créditos do dashboard Nexo (`/api/credits/*`, auth — org por cliente,
@@ -191,4 +190,5 @@ com confirmação explícita do usuário pra estourar.
 | 12.2 | Provider Kimi/DeepSeek + system prompt (schema + billing + guardrails) | B |
 | 12.3 | Aplicação em draft/preview com diff + Salvar/Publicar | B |
 | 12.4 | Ledger ai_usage + débito no workspace + tela de uso pro admin | B/C |
-| 12.5 | Ajuste fino da tabela de custos com dados reais | C |
+| 12.5 | Teto de sessão + tabela de custos editáveis pelo admin (UI de configuração) | C |
+| 12.6 | Ajuste fino da tabela de custos com dados reais | C |
