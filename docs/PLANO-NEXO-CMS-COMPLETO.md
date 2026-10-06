@@ -135,3 +135,28 @@
 4. UI do editor → PT primeiro, ES depois.
 5. Estreia → **só o time Nexo**; cliente entra quando o owner avisar (estado pronto).
 6. Teto de sessão e tabela de custos → configuráveis pelo admin (padrão 100).
+
+---
+
+## 8. Atualização 06/10 — editor v3 + relatório vivo
+
+Pesquisa de excelência (Webflow/Framer/Canva/Figma + fóruns ES/PT/ZH/RU — 2 de 3 digests):
+padrões roubados = toolbar contextual flutuante sobre a seleção, painel de propriedades que
+muda conforme o elemento, estado "pegado" (lift shadow) no drag, edição inline dblclick,
+guias com badges de espaçamento, onboarding por empty states.
+
+- [x] **Painel de formatação completo** (decreto owner): tipo de elemento (h1–h6/p/span/a/
+      button/li/blockquote/small/strong), fonte (9 famílias + campo personalizado), tamanho
+      **PX ou REM** (toggle), B/I/U/caixa alta, alinhamento (4), cor do texto, entrelinha,
+      espaçamento de letras, limpar formatação. Salvo como `_style.<key>` (JSON) → runtime v2
+      aplica + troca a tag. End-to-end testado (publicou e resetou).
+- [x] **Toolbar flutuante contextual** (estilo Canva) sobre o elemento: B/I/U, alinhamento,
+      editar texto, abrir formatação — com estados atuais marcados.
+- [x] Micro-animação: elemento levanta (sombra animada) ao ser arrastado.
+- [x] **RELATÓRIO VIVO**: `/previas/hdm-matheus/edit/relatorio.html` — o que o editor faz,
+      o que vem por aí e registro de mudanças (atualizar a cada leva).
+- [x] Bug crítico corrigido: chave de layout (era `_layout.es:...`, runtime não aplicava) →
+      agora `es:_layout.home...` padronizado; layout de fato aplica pro visitante.
+- [x] Texto proibido que estava no ar (heroLead, publicado pré-guardrails) removido.
+- [ ] Próximos: media library, richtext inline, reordenar seções (drag entre containers),
+      chat IA com créditos (Fase B), tema visual.
