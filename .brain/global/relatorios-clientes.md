@@ -89,3 +89,7 @@ Regras operacionais, procedimentos e decisões. Append-only, assinado `data + au
 - **MANTIDAS de propósito** (fatos, não freshness): data da reunião inicial e atribuição da citação no relatório do Eduardo. Se o owner quiser 100% sem datas, remover essas duas também.
 - Conteúdo atualizado junto: HDM (currículos ✅ no ar — estava "em análise" desatualizado; fotos próprias → chegaram, em tratamento, prévia p/ aprovação do Matheus), Eduardo (reunião/checklist ✅ concluídos; proposta comercial pendente).
 - Backups na VPS: `*.bak-semdata-20261002.html` ao lado de cada página. Publicação live (bind mount), verificado 200/no-gate + grep sem "Atualizado em".
+
+## 2026-10-06 · REGRA PERMANENTE (decreto owner) — relatório único do HDM
+- A página do relatório do cliente HDM é **SEMPRE** `vps.nexo-digital.app/relatorios/clientes/hdm/` — NUNCA criar/duplicar outra página de relatório pra ele. Toda novidade é ADICIONADA nessa (changelog/nav/seções).
+- autor: Luna (registrando decreto do owner)
