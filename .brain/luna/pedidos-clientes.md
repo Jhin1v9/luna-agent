@@ -478,3 +478,7 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 - **Por que o gatilho não disparou (diagnóstico):** o predicado `sweep_trigger.py` diffa só `/api/admin/requests` (lista). Client actions e needs não mudam id/status/updatedAt dos requests nem aparecem na lista (`_count` só traz comments/needs; clientActions só no detalhe `/requests/<id>`). Gatilho é cego a esse tipo de att. Pendência de engenharia registrada em sweep-projetos.md (precisa de endpoint de listagem de client actions no painel ou predicado via detalhe).
 - **Notificação enviada** ao grupo WhatsApp "Proyecto Nexo - OnaDance" (conversation `28ac5041-5233-4c80-991c-76e96a9c1e24`): mensagem `7da896f3` em espanhol pedindo fotos horizontais (por aqui ou Drive web/hero/fotos para slide), **send_state=sent 11:48Z**. Enviada manualmente por comando direto do owner (esta automação não envia WhatsApp por decreto 24/09 — fluxo automático ficou como pendência).
 - autor: Luna (sessão manual a pedido do owner)
+
+## 2026-10-07 12:42 UTC — status: Tienda orden Eternal Bloom → PREPARING_SOLUTION
+`cmur5wyh10009ofhawevqbtd2` (Tienda — cambiar orden de productos: "Eternal Bloom" primero) avançou RECEIVED → **PREPARING_SOLUTION** às 12:42 UTC. **Os 3 pedidos da Tienda agora estão em PREPARING_SOLUTION** (orden + sticker agotado + imagens) — time/dev trabalhando na loja da Jess em lote.
+- autor: Luna (varredura por evento, durante deploy do endpoint all=1)
