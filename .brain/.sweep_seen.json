@@ -1,5 +1,5 @@
 {
- "seenAt": "2026-10-07T13:02:03.594Z",
+ "seenAt": "2026-10-07T20:08:58.524Z",
  "signature": [
   [
    "c6kjmmkugoa1h4gnviecd06lh",
@@ -120,6 +120,18 @@
    "cmusc6hkj0018ofhaovwzlrm5",
    "WAITING_CLIENT",
    "2026-10-03T19:39:25.916Z"
+  ]
+ ],
+ "pendingActions": [
+  [
+   "cmubj6thh0011uibjsy7u8ujj",
+   "PENDING",
+   "2026-09-21T17:40:38.981Z"
+  ],
+  [
+   "cmuxzq8mo000esq0n1gr2iuio",
+   "PENDING",
+   "2026-10-07T10:54:34.801Z"
   ]
  ]
 }
