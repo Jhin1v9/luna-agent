@@ -160,3 +160,24 @@ guias com badges de espaçamento, onboarding por empty states.
 - [x] Texto proibido que estava no ar (heroLead, publicado pré-guardrails) removido.
 - [ ] Próximos: media library, richtext inline, reordenar seções (drag entre containers),
       chat IA com créditos (Fase B), tema visual.
+
+---
+
+## 9. Atualização 07/10 — estabilização + especificação do CHAT (decreto owner)
+
+Estabilização: Moveable/Lucide **vendored local** (CDN 403 era ponto único de falha — derrubava
+seleção/hover/drag); seleção por delegação + fallback sem Moveable; hover Canva; toggle
+Preview/Editar revalidado por teste automatizado (Playwright real no fluxo do owner).
+
+### Especificação do chat (decreto owner 07/10)
+- Personagem: **Luna** — se identifica como Luna; **foto de perfil redonda da Luna** (nada de
+  ícone de estrela genérico); styling extraordinário/tecnológico.
+- **Envio de fotos no chat** (o usuário manda imagem pra contextualizar pedidos).
+- **Sessão persistente** (histórico sobrevive reload).
+- **Acesso ao brain**: a Luna do chat tem acesso ao brain da operação (contexto dos clientes) e
+  toda mudança feita via chat/CRM grava no brain **do cliente específico** e no **relatório
+  daquele cliente específico** (regra: relatório HDM = sempre /relatorios/clientes/hdm/, nunca
+  duplicar — "mudanças feitas via CRM" registradas na timeline do cliente).
+- Arquitetura (pesquisa 07/10): API de conteúdo semântica é a superfície primária (>95% acerto
+  vs 58% coordenadas); tool de snapshot DOM (elemento+bbox+estilo) só pra grounding; código
+  read-only opcional; draft+aprovação humana; cobrança de créditos por execução (Área 12).
