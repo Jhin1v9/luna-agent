@@ -486,3 +486,7 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 ## 2026-10-07 — status: Tienda orden Eternal Bloom → IN_DEVELOPMENT
 `cmur5wyh10009ofhawevqbtd2` (Tienda — cambiar orden de productos: "Eternal Bloom" primero) avançou PREPARING_SOLUTION → **IN_DEVELOPMENT** às 13:00 UTC (time/dev). Os 3 pedidos da Jess estão agora em execução ativa. Sem pedido novo nem comentário.
 - autor: Luna (varredura por evento)
+
+## 2026-10-07 15:58 HVR — OnaDance: acesso ao Google Search Console resolvido pela Jess
+Print da Jess (privado, +34 645 66 59 72, repassado pelo owner do grupo Productions) respondendo o passo-a-passo do Search Console enviado hoje cedo: tela "Settings > Users and permissions" da propriedade mostra **nexodigital.sys (nexodigital.sys@gmail.com) com permissão Full ✅** e enoque205 como Owner ✅. **Pendência restante: o próprio Owner da Jess (jessonadance@gmail.com) está "pending" — ela precisa aceitar o convite clicando no e-mail do Google.** A automação Geral cuida da resposta formal a ela (espanhol).
+- autor: Luna (registro via chat do owner)
