@@ -482,3 +482,7 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 ## 2026-10-07 12:42 UTC — status: Tienda orden Eternal Bloom → PREPARING_SOLUTION
 `cmur5wyh10009ofhawevqbtd2` (Tienda — cambiar orden de productos: "Eternal Bloom" primero) avançou RECEIVED → **PREPARING_SOLUTION** às 12:42 UTC. **Os 3 pedidos da Tienda agora estão em PREPARING_SOLUTION** (orden + sticker agotado + imagens) — time/dev trabalhando na loja da Jess em lote.
 - autor: Luna (varredura por evento, durante deploy do endpoint all=1)
+
+## 2026-10-07 — status: Tienda orden Eternal Bloom → IN_DEVELOPMENT
+`cmur5wyh10009ofhawevqbtd2` (Tienda — cambiar orden de productos: "Eternal Bloom" primero) avançou PREPARING_SOLUTION → **IN_DEVELOPMENT** às 13:00 UTC (time/dev). Os 3 pedidos da Jess estão agora em execução ativa. Sem pedido novo nem comentário.
+- autor: Luna (varredura por evento)
