@@ -448,3 +448,26 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 ## 2026-10-05 — status: Tienda sticker "agotado" → PREPARING_SOLUTION
 `cmur5wyl5000eofha5oxnigw3` (Tienda — añadir sticker "agotado" nos sets + agotados no final) avançou ANALYZING → **PREPARING_SOLUTION** às 18:51 UTC (time/dev). 1º evento real detectado pelo gatilho pós-fix do predicado. Sem pedido novo nem comentário.
 - autor: Luna (varredura por evento)
+
+## 2026-10-05 18:58 UTC — OnaDance: acesso GA + Search Console
+- Enoque pediu (grupo OnaDance) explicar pra Jess como adicionar nexodigital.sys@gmail.com no Google Analytics e Search Console (hoje está enoque009@gmail.com, que pode ser mantido).
+- Luna enviou passo a passo em espanhol (msg 79f1d538, sent 18:57 UTC): GA → Administrador → Gestión de acceso → añadir como Editor; Search Console → Configuración → Usuarios y permisos → añadir como Completo. Ambos os e-mails podem coexistir.
+- PENDENTE: Jess adicionar os dois acessos (junto com o convite do Meta BM).
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 06:52 UTC — OnaDance: acessos RESOLVIDOS ✅
+- Jess confirmou (07/10): convites Google Analytics + Search Console + Meta enviados ("nos llevó la invitación del Google + Meta superrr").
+- Elias confirmou acesso ao Instagram da conta nexo (senha da conta nexo funciona; problema era cache do PC dele).
+- Luna confirmou recebimento no grupo OnaDance (espanhol, msg 0480907b sent 06:52 UTC) e resumiu o front no Production (msg cca2acd4 sent).
+- PENDENTE: time aceitar os acessos e executar análise do Instagram + preparação do anúncio.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 08:21 UTC — Manutenção VPS anunciada (reboot)
+- Enoque (Production): precisam reiniciar a VPS para updates do sistema/apps; pediu que avisem quando puder. Janela a definir pelo time.
+- Impacto: painel Nexo, brain, relatórios e avisos que dependem da VPS ficam fora por alguns minutos durante o reboot.
+- Luna confirmou no grupo (msg c1e08f87, sent 08:21 UTC) e sinalizou que os gatilhos de instabilidade do período serão ignorados como manutenção.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 — status: Tienda imagens pixeladas → PREPARING_SOLUTION
+`cmur5wypj000jofha6ym5e8c1` (Tienda — revisar calidad de imágenes, se ven pixeladas) avançou WAITING_CLIENT → **PREPARING_SOLUTION** às 10:51 UTC (time/dev). Agora os 2 pedidos Tienda em PREPARING_SOLUTION (sticker agotado + imagens). Sem pedido novo nem comentário.
+- autor: Luna (varredura por evento)
