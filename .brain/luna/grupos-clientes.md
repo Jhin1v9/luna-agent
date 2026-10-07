@@ -125,3 +125,5 @@ JR Reformas - Web (Junior) - 26 JÁ ESTÁ na WHATSAPP_INGEST_ALLOWLIST e WHATSAP
 
 ## REGRA 2026-10-01 (pos-cobranca do Abner)
 - ANTES de fazer qualquer pergunta a cliente, consultar brain local + outcomes VPS + painel. NUNCA perguntar ao cliente o que ja esta documentado (vacilo cometido no grupo do Dudu: perguntei o coracao do MVP quando a reuniao de 27/09 ja tinha definido: alma do app = matching automatico caminhoneiro certo/carga certa/valor justo + 6 pilares).
+
+- **UPDATE 07/10:** conversation do grupo "Proyecto Nexo - OnaDance" RECRIADA pelo whatsplay — id atual `28ac5041-5233-4c80-991c-76e96a9c1e24` (a antiga d2594357-3e30-4508-9a39-39f71e92fe03 de 01/10 não existe mais no banco). Nome/address inalterados.

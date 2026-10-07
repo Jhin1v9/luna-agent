@@ -471,3 +471,10 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 ## 2026-10-07 — status: Tienda imagens pixeladas → PREPARING_SOLUTION
 `cmur5wypj000jofha6ym5e8c1` (Tienda — revisar calidad de imágenes, se ven pixeladas) avançou WAITING_CLIENT → **PREPARING_SOLUTION** às 10:51 UTC (time/dev). Agora os 2 pedidos Tienda em PREPARING_SOLUTION (sticker agotado + imagens). Sem pedido novo nem comentário.
 - autor: Luna (varredura por evento)
+
+## 2026-10-07 08:50 HVR — Client Action nova no painel (Hero desktop) + notificação enviada ao grupo da Jess (a pedido do owner)
+
+- **Att do owner no painel:** Client Action `cmuxzq8mo000esq0n1gr2iuio` no request Hero desktop (`cmusc6hkj0018ofhaovwzlrm5`, Ona Dance) — tipo "Enviar fotos horizontal": las fotos son todas verticales y en el carrusel no completan la pantalla. Status PENDING, criada 07:54 HVR. **Não é um request** — é uma ação do cliente anexada ao request; por isso não altera a signature dos requests (id/status/updatedAt).
+- **Por que o gatilho não disparou (diagnóstico):** o predicado `sweep_trigger.py` diffa só `/api/admin/requests` (lista). Client actions e needs não mudam id/status/updatedAt dos requests nem aparecem na lista (`_count` só traz comments/needs; clientActions só no detalhe `/requests/<id>`). Gatilho é cego a esse tipo de att. Pendência de engenharia registrada em sweep-projetos.md (precisa de endpoint de listagem de client actions no painel ou predicado via detalhe).
+- **Notificação enviada** ao grupo WhatsApp "Proyecto Nexo - OnaDance" (conversation `28ac5041-5233-4c80-991c-76e96a9c1e24`): mensagem `7da896f3` em espanhol pedindo fotos horizontais (por aqui ou Drive web/hero/fotos para slide), **send_state=sent 11:48Z**. Enviada manualmente por comando direto do owner (esta automação não envia WhatsApp por decreto 24/09 — fluxo automático ficou como pendência).
+- autor: Luna (sessão manual a pedido do owner)
