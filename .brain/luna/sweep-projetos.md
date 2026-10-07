@@ -54,3 +54,6 @@ Att do owner (client action "Enviar fotos horizontal" no request Hero desktop) n
 3. **Testes:** positivo (action nova → dispara com client_actions) ✅; estabilidade com baseline → False ✅; endpoint legado sem all=1 → vazio ✅; painel 200 externo pós-deploy ✅.
 4. **Achado no meio do deploy:** 3º pedido Tienda (orden Eternal Bloom) → PREPARING_SOLUTION 12:42Z — os 3 pedidos da loja da Jess agora em PREPARING_SOLUTION.
 Próxima client action criada no painel dispara o gatilho em até 1 min.
+
+## 2026-10-07 — Lição (feedback do owner): Luna misturou threads no grupo da Jess
+Jess respondeu o passo-a-passo do Search Console com print ("está con full", 15:58) e a resposta da Luna (16:02) agradeceu mas já pivotou pro carrossel (client action de fotos horizontais) — sem confirmar o acesso nem lembrar do Owner pending. Regra registrada no brain remoto (outcome negative): **fechar o loop do assunto da mensagem atual ANTES de pivotar pro backlog, com transição explícita**. Correção pontual (mensagem confirmando Search Console + convite pending) fica com a automação Geral.
