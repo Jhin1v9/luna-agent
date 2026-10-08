@@ -529,6 +529,15 @@ export default function Painel() {
                         {o.result && (
                           <div className={`mt-2 rounded-lg border p-2 text-[12px] ${o.status === 'error' ? 'border-fail/30 bg-fail/5 text-fail' : 'border-ok/30 bg-ok/5 text-ok'}`}>{o.result}</div>
                         )}
+                        {(o.status === 'done' || o.status === 'error' || o.status === 'ignored') && (
+                          <button className="btn btn-sm mt-2" onClick={async () => {
+                            try {
+                              await postJSON(`/api/comando/${o.id}/reprocessar`, {});
+                              toast.success(`ordem ${o.id.slice(0, 8)} voltou para pending`);
+                              loadAuto();
+                            } catch (e: any) { toast.error(e.message); }
+                          }}><RotateCcw size={11} />Reprocessar</button>
+                        )}
                       </li>
                     ))}
                   </ul>

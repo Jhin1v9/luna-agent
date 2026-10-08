@@ -29,5 +29,16 @@ module.exports = {
     app('luna-whatsplay', `${root}/apps/whatsplay`),
     app('luna-worker', `${root}/apps/worker`),
     app('luna-watchdog', `${root}/apps/watchdog`),
+    {
+      name: 'venus-watchdog',
+      script: `${root}/scripts/venus/watchdog.mjs`,
+      cwd: root,
+      interpreter: 'node',
+      windowsHide: true,
+      restart_delay: 4000,
+      max_restarts: 10,
+      out_file: `${root}/logs-venus-watchdog.out.log`,
+      error_file: `${root}/logs-venus-watchdog.err.log`,
+    },
   ],
 };

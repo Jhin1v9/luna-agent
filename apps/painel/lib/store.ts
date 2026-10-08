@@ -338,6 +338,18 @@ export async function criarOrdem(ordem: string, contexto?: string): Promise<{ ok
   return { ok: true, id: rows[0].id };
 }
 
+export async function reprocessarOrdem(id: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const rows = await db<{ id: string }>(
+    `UPDATE luna_ordens SET status='pending', result=NULL, executed_at=NULL
+     WHERE id=$1 AND status IN ('done','error','ignored') RETURNING id`,
+    [id],
+  );
+  if (rows[0]) return { ok: true, id };
+  const cur = await db<{ status: string }>(`SELECT status FROM luna_ordens WHERE id=$1`, [id]);
+  if (!cur[0]) return { ok: false, error: 'ordem nao encontrada' };
+  return { ok: false, error: `so e permitido reprocessar done/error/ignored (atual: ${cur[0].status})` };
+}
+
 // ---------------------------------------------------------------------------
 // VÊNUS — status via heartbeat 'venus-varredura', log via tail do pm2,
 // invocar tarefa = spawn real do venus.mjs (process.execPath = node.exe real)
