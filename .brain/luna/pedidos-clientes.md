@@ -490,3 +490,54 @@ Total segue 24 requests. Nenhum pedido novo de cliente nem comentário novo — 
 ## 2026-10-07 15:58 HVR — OnaDance: acesso ao Google Search Console resolvido pela Jess
 Print da Jess (privado, +34 645 66 59 72, repassado pelo owner do grupo Productions) respondendo o passo-a-passo do Search Console enviado hoje cedo: tela "Settings > Users and permissions" da propriedade mostra **nexodigital.sys (nexodigital.sys@gmail.com) com permissão Full ✅** e enoque205 como Owner ✅. **Pendência restante: o próprio Owner da Jess (jessonadance@gmail.com) está "pending" — ela precisa aceitar o convite clicando no e-mail do Google.** A automação Geral cuida da resposta formal a ela (espanhol).
 - autor: Luna (registro via chat do owner)
+
+## 2026-10-07 14:02 UTC — OnaDance: Jess respondeu hero carrossel (fotos verticais)
+- Jess (grupo OnaDance, espanhol): fotos do Drive são TODAS verticais e no carrossel desktop não completam a tela. Pediu fotos horizontais (por aqui ou Drive web/hero/fotos para slide).
+- Luna respondeu (espanhol, msg 1725c249, sent 14:02 UTC): duas opções — Jess envia horizontais, ou o time trata as verticais (recorte/fundo adaptado).
+- PENDENTE: decisão da Jess OU time executar tratamento das verticais (solicitação cmur5wyh10009ofhawevqbtd2 no painel).
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 20:19 UTC — App de transporte: ROTTU fechado ✅ (falta ok Eduardo + checagem)
+- Elias propôs ROTTU, Enoque topou e pediu slogan. Consenso do time: ROTTU é o nome.
+- Luna enviou 4 sugestões de slogan no grupo (msg 12372bff, sent 20:19 UTC).
+- PENDENTE: ok final do Eduardo (cliente) + checagem domínio .com.br/INPI/@redes (Luna roda quando autorizarem) + registro do nome.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 20:2x UTC — Manutenção VPS: janela MARCADA (22:30)
+- Enoque (Production): restart da VPS confirmado para 22:30 (downtime 1-5 min, updates do sistema).
+- Luna confirmou no grupo (msg 0ab2c0ad) e vai checar painel/brain/relatórios quando a VPS voltar.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-07 20:36 UTC — Manutenção VPS: reboot CONCLUÍDO ✅
+- Enoque confirmou reinício bem-sucedido (revisando updates, sem conflitos esperados).
+- Checagem pós-reboot da Luna: relatórios 200, anúncios 200, painel + brain vivos (401/403 sem auth = normal). Confirmado no Production (msg 9c716372, sent 20:36 UTC).
+- PENDENTE: nenhum da manutenção.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-08 06:3x UTC — App de transporte: checagem final de domínios/marcas RODADA
+- Abner (CEO) aprovou ROTTU no grupo ("achei top, so bora"). Luna rodou a checagem final (RDAP Registro.br/Verisign + busca de marcas):
+- ROTTU: rottu.com.br TOMADO (mai/2026, terceiro, ativo até 2028), rottu.com TOMADO, conflito real no segmento (empresa tech Rottu ativa, Rottu Systems, #rottu com 12K reels). LIVRES: rottucargas.com.br, rottuapp.com.br.
+- FRETTI: fretti.com.br TOMADO (ago/2026), fretti.com TOMADO.
+- FRETOO: fretoo.com.br DISPONÍVEL; fretoo.com em redemption; som próximo de "Fretou Brasil" (fretes ativa).
+- Mapa enviado no grupo (msg e1fe9782). Caminhos dados: ROTTU+complemento ou FRETOO com domínio livre. Registro do domínio precisa CPF/CNPJ (humano).
+- PENDENTE: decisão final time/cliente + registro do domínio.
+- autor: Luna (loop menções e tarefas gerais)
+
+## 2026-10-08 07:0x UTC — App de transporte: Enoque pende para ROTTU + complemento
+- Enoque no grupo: endossou ROTTU+complemento e pediu nome COMPOSTO ("tem que ter um nome composto"). Abner elogiou o mapa.
+- Luna re-rodou RDAP: rottucargas.com.br, rottufretes.com.br, rottutransportes.com.br, rottulog.com.br TODOS LIVRES (404 registro.br); rottu.app TAMBÉM LIVRE (404 via rdap.org).
+- Recomendação enviada no grupo (msg 8d71272b, sent confirmado): **Rottu Cargas → rottucargas.com.br** (composto direto pro segmento; blindagem futura com rottu.app). Ofereci preparar identidade (slogan, descrição de loja, onboarding) já em cima desse nome.
+- Registro continua dependendo de CPF/CNPJ (humano) — Luna guia o passo a passo quando alguém for registrar no registro.br.
+- PENDENTE: confirmação final do nome composto (Rottu Cargas vs outra variação) + registro.
+- autor: Luna (loop menções e tarefas gerais)
+
+### 2026-10-08 07:1x UTC — URLs verificadas: FRETTI tem concorrente ATIVO no segmento
+- Enoque pediu URLs de Fretti/Fretoo pra votação do time. Verificado com curl: fretti.com.br NO AR = "Fretti: seu frete. Rápido e fácil." — empresa de frete ATIVA no Brasil, MESMA proposta do app → FRETTI fora da votação (conflito direto, não só domínio tomado). rottu.com.br = "Validação de Rótulos de Alimentos" (segmento diferente, conflito baixo). fretoubrasil.com.br NO AR = "Fretou Brasil – Transporte de Cargas" (empresa ativa — som próximo de FRETOO, risco de confusão). fretoo.com.br não resolve (livre, consistente com RDAP).
+- Resposta com o mapa completo enviada (msg 24cbfce6, sent 07:10 UTC). Posição: voto = Rottu Cargas, decisão por votação do time.
+- PENDENTE: votação do time no grupo App de Transporte.
+
+## 2026-10-08 — 2 entregas da Tienda aguardando revisão da Jess (CLIENT_REVIEWING)
+- `cmur5wyh10009ofhawevqbtd2` — orden Eternal Bloom primeiro: IN_DEVELOPMENT → **CLIENT_REVIEWING** às 10:43 UTC
+- `cmur5wypj000jofha6ym5e8c1` — imagens pixeladas: PREPARING_SOLUTION → **CLIENT_REVIEWING** às 10:44 UTC
+Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrumentação lastFire do predicado funcionou (diff exato capturado no disparo). Sem pedido novo nem comentário.
+- autor: Luna (varredura por evento)
