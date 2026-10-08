@@ -127,7 +127,7 @@ export class IngestWatcher {
   private baseline = new Map<string, string>();
   private seeded = false;
   private timer: NodeJS.Timeout | null = null;
-  private readonly debouncer: Debouncer;
+  private readonly debouncer: Debouncer<UnreadMessage>;
   private readonly ingest: (msg: UnreadMessage) => Promise<'published' | 'skipped'>;
   private readonly intervalMs: number;
   private readonly ingestAllowlist: string[];
@@ -290,11 +290,15 @@ export class IngestWatcher {
           received_at: new Date().toISOString(),
         };
         this.deps.log.info({ chat: entry, self_test: isSelfTest }, 'watcher(sweep): mensagem nova');
-        this.debouncer.push(`sweep:${entry}`, msg.text, (combined) => {
-          void this.ingest({ ...msg, text: combined }).catch((err) =>
-            this.deps.log.error({ err }, 'watcher: ingest falhou'),
-          );
-        });
+        this.debouncer.push(
+          `sweep:${entry}`,
+          { text: msg.text, ctx: msg },
+          (combined, m) => {
+            void this.ingest({ ...m, text: combined }).catch((err) =>
+              this.deps.log.error({ err }, 'watcher: ingest falhou'),
+            );
+          },
+        );
       } catch {
         // chat não abriu agora (virtualizado?), tenta no próximo ciclo
       }
@@ -370,11 +374,15 @@ export class IngestWatcher {
       author_name: (last as { author?: string | null }).author ?? badge.chat_name,
       received_at: new Date().toISOString(),
     };
-    this.debouncer.push(badge.chat_id, msg.text, (combined) => {
-      void this.ingest({ ...msg, text: combined }).catch((err) =>
-        this.deps.log.error({ err }, 'watcher: ingest falhou'),
-      );
-    });
+    this.debouncer.push(
+      badge.chat_id,
+      { text: msg.text, ctx: msg },
+      (combined, m) => {
+        void this.ingest({ ...m, text: combined }).catch((err) =>
+          this.deps.log.error({ err }, 'watcher: ingest falhou'),
+        );
+      },
+    );
     return 'ingested';
   }
 

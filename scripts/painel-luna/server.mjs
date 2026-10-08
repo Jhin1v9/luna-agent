@@ -130,7 +130,12 @@ const server = http.createServer(async (req, res) => {
       res.end(HTML);
     } else if (url.pathname === '/api/status' && req.method === 'GET') {
       const e = env();
-      send({ modo: { KIMI_ADAPTER_MODE: e.KIMI_ADAPTER_MODE ?? 'mock', LIVE_BRAIN_PROVIDER: e.LIVE_BRAIN_PROVIDER ?? 'kimi', VENUS_AUTONOMO: e.VENUS_AUTONOMO ?? 'false' }, modos: MODES, editaveis: ENV_EDITABLE, checks: await checks(), servicos: await servicos() });
+      const chats = await db(
+        `SELECT metadata->>'chat_id' AS chat_id, COUNT(*)::int AS n, MAX(created_at) AS last_at
+         FROM messages WHERE direction='outbound' AND metadata->>'chat_id' IS NOT NULL
+         GROUP BY 1 ORDER BY last_at DESC LIMIT 20`,
+      );
+      send({ modo: { KIMI_ADAPTER_MODE: e.KIMI_ADAPTER_MODE ?? 'mock', LIVE_BRAIN_PROVIDER: e.LIVE_BRAIN_PROVIDER ?? 'kimi', VENUS_AUTONOMO: e.VENUS_AUTONOMO ?? 'false' }, modos: MODES, editaveis: ENV_EDITABLE, checks: await checks(), servicos: await servicos(), chats: chats.rows });
     } else if (url.pathname === '/api/modo' && req.method === 'POST') {
       const b = await readBody(req);
       envSet(b.key, String(b.value));
@@ -219,7 +224,7 @@ const HTML = `<!doctype html>
   <div class="card" style="grid-column:1/-1">
     <h2>📨 Enviar mensagem (pipeline oficial — messages + luna_outbound)</h2>
     <div class="linha">
-      <input id="chat" placeholder="chat_id (ex.: 🏆Production - 2026🙏🏻)" value="🏆Production - 2026🙏🏻">
+      <select id="chat"></select>
     </div>
     <textarea id="texto" rows="4" placeholder="Mensagem… (guard-rail ativo: sem promessa de prazo)"></textarea>
     <div class="linha" style="margin-top:8px">
@@ -253,6 +258,11 @@ async function refresh() {
   const fb = document.getElementById('fb');
   if (!fb.options.length) s.modos.forEach(m => fb.add(new Option(m, m)));
   fb.value = s.modo.KIMI_ADAPTER_MODE; document.getElementById('lb').value = s.modo.LIVE_BRAIN_PROVIDER; document.getElementById('va').value = s.modo.VENUS_AUTONOMO;
+  // dropdown de chats conhecidos (saídas reais recentes) — texto aberto virou select
+  const sel = document.getElementById('chat');
+  const atual = sel.value;
+  sel.innerHTML = s.chats.map(c => new Option(c.chat_id + '  (' + c.n + ' msgs)', c.chat_id)).map(o => o.outerHTML).join('');
+  if ([...sel.options].some(o => o.value === atual)) sel.value = atual;
   document.getElementById('checks').innerHTML = Object.entries(s.checks).map(([k, v]) =>
     '<div class="check"><span><span class="dot" style="background:' + (v.ok ? 'var(--ok)' : 'var(--erro)') + '"></span>' + esc(k) + '</span><span class="dim">' + esc(v.detalhe) + '</span></div>').join('');
   document.getElementById('servicos').innerHTML = s.servicos.map(v => {
