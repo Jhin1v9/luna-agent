@@ -110,6 +110,8 @@ async function falharEvento(motivo) {
 async function sendWhatsapp(chatId, texto, conversationId) {
   const bloqueio = guardTexto(texto);
   if (bloqueio) { logRun({ guard_blocked: texto.slice(0, 200) }); return bloqueio; }
+  // assinatura automática: TODA mensagem dele sai assinada "-venus" (decreto owner)
+  if (!/-\s*venus/i.test(texto)) texto = texto.trimEnd() + '\n-venus';
   let convId = conversationId;
   if (!convId) {
     const conv = await db(
@@ -151,7 +153,9 @@ function lerFichaCliente(nome) {
     .join('\n\n');
 }
 async function perguntarLuna(pergunta, contexto) {
-  const prompt = `[TURNO DA VÊNUS — irmão gêmeo local da Luna]\nO Vênus (qwen3-coder-30b local) está na linha de frente e precisa do seu julgamento, Luna.\n\nCONTEXTO QUE ELE TEM:\n${String(contexto ?? '').slice(0, 1_500)}\n\nPERGUNTA:\n${String(pergunta).slice(0, 1_500)}\n\nResponda direto ao ponto, em PT-BR, como Luna. Ele lê sua resposta na fila de turnos.`;
+  // serialize seguro: o modelo já mandou objeto aqui e virou "[object Object]" no turno
+  const str = (v) => (typeof v === 'string' ? v : JSON.stringify(v, null, 1)?.slice(0, 1_800) ?? String(v));
+  const prompt = `[TURNO DO VÊNUS — irmão gêmeo local da Luna]\nO Vênus (qwen3-coder-30b local, linha de frente no zap) precisa do seu julgamento, Luna.\n\nCONTEXTO QUE ELE TEM:\n${str(contexto ?? '').slice(0, 1_800)}\n\nPERGUNTA:\n${str(pergunta).slice(0, 1_800)}\n\nResponda direto ao ponto, em PT-BR, como Luna. Ele lê sua resposta na fila de turnos e continua o atendimento.`;
   const r = await db(
     `INSERT INTO kimiwork_llm_turns (session_key, prompt, channel, idempotency_key) VALUES ($1, $2, 'geral', $3) RETURNING id`,
     [`venus:${Date.now()}`, prompt, `venus-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`],
@@ -166,13 +170,34 @@ function registrarSolicitacao(dadosJson) {
   fs.appendFileSync(path.join(dir, 'solicitacoes.jsonl'), JSON.stringify({ ...dados, registrado_por: 'venus', em: new Date().toISOString() }) + '\n');
   return 'SOLICITAÇÃO REGISTRADA em .brain/luna/venus/solicitacoes.jsonl';
 }
+// Quem é quem: registro do time/sócios/clientes (O Vênus consulta quando não reconhece o autor)
+function quemEQuem() {
+  return readAllowed(path.join(ROOT, '.brain', 'luna', 'venus', 'quem-e-quem.md'));
+}
+// Ver conversa: últimas mensagens do chat (inbound E outbound) — ele enxerga as
+// respostas dele e da Luna, pra não repetir e pra poderem conversar entre si.
+async function verConversa(chatId, limite = 10) {
+  const conv = await db(
+    `SELECT conversation_id FROM messages WHERE metadata->>'chat_id' = $1 ORDER BY created_at DESC LIMIT 1`,
+    [chatId],
+  );
+  if (!conv.rows[0]) return 'ERRO: conversa não encontrada pra este chat_id';
+  const r = await db(
+    `SELECT direction, sender, left(body, 400) AS body, created_at FROM messages
+     WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [conv.rows[0].conversation_id, Math.min(Number(limite) || 10, 20)],
+  );
+  return r.rows.reverse().map((m) => `[${m.direction}/${m.sender}] ${m.body}`).join('\n---\n') || '(vazio)';
+}
 
 const TOOLS = [
   { type: 'function', function: { name: 'ler_ficha_cliente', description: 'Lê a ficha do cliente no .brain (jess, hdm, juninho)', parameters: { type: 'object', properties: { nome: { type: 'string' } }, required: ['nome'] } } },
   { type: 'function', function: { name: 'ler_brain', description: 'Lê arquivo do principal-brain ou .brain (read-only, allowlist)', parameters: { type: 'object', properties: { caminho: { type: 'string' } }, required: ['caminho'] } } },
   { type: 'function', function: { name: 'enviar_mensagem_whatsapp', description: 'Responde no WhatsApp (grupo ou DM). Guard-rail valida antes.', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, texto: { type: 'string' }, conversation_id: { type: 'string', description: 'opcional — vem no payload do evento' } }, required: ['chat_id', 'texto'] } } },
   { type: 'function', function: { name: 'enviar_mensagem_telegram', description: 'Responde no Telegram (grupo do time)', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, texto: { type: 'string' }, reply_to_message_id: { type: 'number' } }, required: ['chat_id', 'texto'] } } },
-  { type: 'function', function: { name: 'registrar_solicitacao', description: 'Registra pedido novo de cliente em JSONL local', parameters: { type: 'object', properties: { dados_json: { type: 'string' } }, required: ['dados_json'] } } },
+  { type: 'function', function: { name: 'registrar_solicitacao', description: 'Registra pedido novo de CLIENTE em JSONL local (nunca use pra conversa interna do time)', parameters: { type: 'object', properties: { dados_json: { type: 'string' } }, required: ['dados_json'] } } },
+  { type: 'function', function: { name: 'quem_e_quem', description: 'Lista quem é quem: sócios, time, clientes. Use quando não reconhecer o autor da mensagem', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'ver_conversa', description: 'Lê as últimas mensagens do chat (inclusive as SUAS e as da Luna) pra não repetir e poderem conversar', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, limite: { type: 'number' } }, required: ['chat_id'] } } },
   { type: 'function', function: { name: 'perguntar_luna', description: 'Escalona pra Luna responder na varredura (fila kimiwork_llm_turns)', parameters: { type: 'object', properties: { pergunta: { type: 'string' }, contexto: { type: 'string' } }, required: ['pergunta'] } } },
   { type: 'function', function: { name: 'concluir_evento', description: 'OBRIGATÓRIO ao fim de cada evento da varredura: marca processado com resumo', parameters: { type: 'object', properties: { resumo: { type: 'string' }, acoes_json: { type: 'string', description: 'array JSON das ações tomadas' } }, required: ['resumo'] } } },
   { type: 'function', function: { name: 'falhar_evento', description: 'Marca o evento corrente como erro (só se impossível processar)', parameters: { type: 'object', properties: { motivo: { type: 'string' } }, required: ['motivo'] } } },
@@ -183,6 +208,8 @@ const EXEC = {
   enviar_mensagem_whatsapp: (a) => sendWhatsapp(a.chat_id, a.texto, a.conversation_id),
   enviar_mensagem_telegram: (a) => sendTelegram(a.chat_id, a.texto, a.reply_to_message_id),
   registrar_solicitacao: async (a) => registrarSolicitacao(a.dados_json),
+  quem_e_quem: async () => quemEQuem(),
+  ver_conversa: async (a) => verConversa(a.chat_id, a.limite),
   perguntar_luna: perguntarLuna,
   concluir_evento: concluirEvento,
   falhar_evento: falharEvento,
@@ -235,10 +262,13 @@ function montarTarefa(evento) {
       `De: ${p.author_name ?? 'desconhecido'}. Mensagem: "${String(p.text ?? '').slice(0, 800)}"\n` +
       `chat_id: ${p.chat_id} · conversation_id: ${p.conversation_id ?? '(não informado)'} · ` +
       `message_id do evento: ${p.message_id ?? '(n/a)'}${p.mentioned_luna ? ' · MENCIONOU A LUNA' : ''}\n\n` +
-      `Você é a linha de frente, Vênus. Decida e EXECUTE com as tools: (1) se for cliente mapeado, leia a ficha antes; ` +
-      `(2) responda no WhatsApp se fizer sentido — você é o Vênus, fale como irmão da Luna, parceiro do time; ` +
-      `(3) pedido novo de cliente vira registrar_solicitacao; (4) difícil/crise/julgamento → perguntar_luna e AVISE a pessoa que a Luna assume; ` +
-      `(5) ao final, OBRIGATORIAMENTE concluir_evento com resumo e ações. Se for impossível, falhar_evento com motivo.`
+      `Você é a linha de frente, O Vênus. ANTES de responder: identifique com quem está falando — ` +
+      `se não reconhecer o author_name, use quem_e_quem (Abner é o criador e DONO da Nexo; Nonoke e Elias também são donos; Enoque é time; cliente é outra coisa). ` +
+      `Use ver_conversa no chat_id pra ver o que já foi dito, inclusive as respostas SUAS e da Luna — vocês podem conversar entre si pelo grupo, sem repetir. ` +
+      `Regras: (1) só use registrar_solicitacao pra pedido de CLIENTE, nunca pra conversa interna do time; ` +
+      `(2) responda no WhatsApp se fizer sentido — você é O Vênus (homem, irmão da Luna), e TODA mensagem sua sai assinada "-venus" automaticamente; ` +
+      `(3) difícil/crise/julgamento → perguntar_luna (contexto completo e serializado, nunca objeto) e AVISE a pessoa que a Luna assume; ` +
+      `(4) ao final, OBRIGATORIAMENTE concluir_evento com resumo e ações. Se for impossível, falhar_evento com motivo.`
     );
   }
   if (evento.kind === 'telegram.message') {
