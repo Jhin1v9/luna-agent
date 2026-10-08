@@ -140,6 +140,7 @@ async function heartbeatVenus() {
 
 // ── evento corrente da varredura (concluir/falhar só vale pra ele) ──
 let currentEvent = null;
+let enviosNoEvento = 0; // fail-safe: se o turno terminar sem NENHUM envio, o resgate manda a resposta final
 async function concluirEvento(resumo, acoesJson) {
   if (!currentEvent) return 'ERRO: nenhum evento da varredura em processamento';
   let acoes = [];
@@ -180,6 +181,7 @@ async function sendWhatsapp(chatId, texto, conversationId) {
     [convId, texto, JSON.stringify({ source: 'venus', chat_id: chatId })],
   );
   await db(`SELECT pg_notify('luna_outbound', $1)`, [ins.rows[0].id]);
+  enviosNoEvento++;
   // supervisão da irmã maior: crítico por regras em toda mensagem dele
   try { await supervisionar(ins.rows[0].id, chatId, texto); } catch (e) { console.error('  supervisor:', e.message.slice(0, 120)); }
   return `MENSAGEM WHATSAPP ENFILEIRADA (id ${ins.rows[0].id}). Guard-rail ok.`;
@@ -195,6 +197,7 @@ async function sendTelegram(chatId, texto, replyTo) {
   });
   const data = await res.json();
   if (!data.ok) return `ERRO telegram: ${JSON.stringify(data).slice(0, 200)}`;
+  enviosNoEvento++;
   return `MENSAGEM TELEGRAM ENVIADA (message_id ${data.result?.message_id}). Guard-rail ok.`;
 }
 
@@ -321,7 +324,8 @@ function montarTarefa(evento) {
       `se não reconhecer o author_name, use quem_e_quem (Abner é o criador e DONO da Nexo; Nonoke e Elias também são donos; Enoque é time; cliente é outra coisa). ` +
       `Use ver_conversa no chat_id pra ver o que já foi dito, inclusive as respostas SUAS e da Luna — vocês podem conversar entre si pelo grupo, sem repetir. ` +
       `Regras: (1) só use registrar_solicitacao pra pedido de CLIENTE, nunca pra conversa interna do time; ` +
-      `(2) responda no WhatsApp se fizer sentido — você é O Vênus (homem, irmão da Luna), e TODA mensagem sua sai assinada "-venus" automaticamente; ` +
+      `(2) responda no WhatsApp se fizer sentido — você é O Vênus (homem, irmão da Luna), e TODA mensagem sua sai assinada "-venus" automaticamente. ` +
+      `ATENÇÃO: sua resposta final em texto NÃO é enviada sozinha — você PRECISA chamar enviar_mensagem_whatsapp com o texto, senão a pessoa nunca recebe; ` +
       `(3) difícil/crise/julgamento → perguntar_luna (contexto completo e serializado, nunca objeto) e AVISE a pessoa que a Luna assume; ` +
       `(4) ao final, OBRIGATORIAMENTE concluir_evento com resumo e ações. Se for impossível, falhar_evento com motivo.`
     );
@@ -340,8 +344,26 @@ function montarTarefa(evento) {
 
 async function processarEvento(evento) {
   currentEvent = evento;
+  enviosNoEvento = 0;
   try {
-    await run(montarTarefa(evento), { comTools: true });
+    const resposta = await run(montarTarefa(evento), { comTools: true });
+    // FAIL-SAFE (bug raiz-quadrada 2026-10-09): texto final NÃO chega ao
+    // WhatsApp/Telegram sozinho — só chega se a tool de envio for chamada.
+    // Se o turno terminou sem nenhum envio mas gerou resposta, enviamos nós.
+    if (enviosNoEvento === 0 && resposta && resposta.trim().length >= 2) {
+      const p = evento.payload ?? {};
+      try {
+        if (evento.kind === 'whatsapp.message' && p.chat_id) {
+          console.log('[vênus] resgate: turno terminou sem chamar envio — mandando a resposta final pelo pipeline');
+          await sendWhatsapp(String(p.chat_id), resposta.trim());
+        } else if (evento.kind === 'telegram.message' && p.chat_id) {
+          console.log('[vênus] resgate: turno terminou sem chamar envio — mandando a resposta final pelo telegram');
+          await sendTelegram(String(p.chat_id), resposta.trim(), p.message_id ? Number(p.message_id) : undefined);
+        }
+      } catch (e) {
+        console.error(`  ✗ resgate falhou: ${e.message}`);
+      }
+    }
     // se ele esqueceu de concluir, fecha com erro honesto
     const check = await db(`SELECT status FROM kimiwork_inbox WHERE id=$1`, [evento.id]);
     if (check.rows[0]?.status === 'processing') {
