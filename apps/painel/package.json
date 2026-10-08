@@ -1,0 +1,28 @@
+{
+  "name": "painel-luna",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel de controle da Luna (Next.js + Tailwind, mock pronto para plugar no stack real)",
+  "scripts": {
+    "dev": "next dev -p 3101",
+    "build": "next build",
+    "start": "next start -p 3101 -H 127.0.0.1"
+  },
+  "dependencies": {
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "framer-motion": "^12.0.0",
+    "lucide-react": "^0.469.0",
+    "sonner": "^1.7.2",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0"
+  }
+}

@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-line: #30363d;
+  --color-fg: #e6edf3;
+  --color-dim: #8b949e;
+  --color-ok: #3fb950;
+  --color-fail: #f85149;
+  --color-info: #58a6ff;
+  --color-luna: #bc8cff;
+  --color-warn: #d29922;
+  --font-sans: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+@layer base {
+  html { color-scheme: dark; }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 15% -5%, rgba(188, 140, 255, 0.07), transparent),
+      radial-gradient(ellipse 50% 35% at 90% 0%, rgba(88, 166, 255, 0.06), transparent);
+    background-attachment: fixed;
+  }
+  ::selection { background: rgba(188, 140, 255, 0.35); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 8px; border: 2px solid #0d1117; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  .card {
+    @apply relative rounded-2xl border border-line/80 bg-surface/70 p-5 backdrop-blur-sm overflow-hidden;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 10px 34px rgba(0,0,0,0.35);
+  }
+  .card-hover { @apply transition-colors duration-200 hover:border-luna/30; }
+  .card-title {
+    @apply mb-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-dim;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-bg/70 px-3.5 py-2
+      text-[13px] font-medium text-fg transition-all duration-150
+      hover:border-dim/60 hover:bg-surface active:scale-[0.97]
+      disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-transparent font-semibold text-bg;
+    background-image: linear-gradient(120deg, #bc8cff, #58a6ff);
+    box-shadow: 0 0 22px rgba(188, 140, 255, 0.28);
+  }
+  .btn-primary:hover { opacity: 0.92; }
+  .btn-danger { @apply border-fail/50 text-fail hover:bg-fail/10; }
+  .input {
+    @apply w-full rounded-lg border border-line bg-bg/80 px-3 py-2 text-[13px] text-fg
+      placeholder:text-dim/50 outline-none transition-colors focus:border-info/60;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium;
+  }
+  .badge-luna { @apply border-luna/40 text-luna; }
+  .badge-info { @apply border-info/40 text-info; }
+  .badge-ok { @apply border-ok/40 text-ok; }
+  .badge-fail { @apply border-fail/40 text-fail; }
+  .badge-warn { @apply border-warn/40 text-warn; }
+  .mono { @apply font-mono text-[12px]; }
+  .dot-pulse { position: relative; }
+  .dot-pulse::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 999px;
+    border: 1px solid currentColor; opacity: 0.5;
+    animation: ping-soft 1.8s cubic-bezier(0,0,0.2,1) infinite;
+  }
+}
+
+@keyframes ping-soft {
+  0% { transform: scale(0.6); opacity: 0.6; }
+  80%, 100% { transform: scale(1.6); opacity: 0; }
+}

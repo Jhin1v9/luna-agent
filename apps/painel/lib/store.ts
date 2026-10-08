@@ -1,0 +1,362 @@
+// ============================================================================
+// STORE REAL — painel da Luna plugado no stack (Postgres / .env / colibri / venus)
+// Contratos de retorno idênticos ao mock (são o contrato da API e do frontend).
+// ============================================================================
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
+import pg from 'pg';
+
+export interface Modo { KIMI_ADAPTER_MODE: string; LIVE_BRAIN_PROVIDER: string; VENUS_AUTONOMO: string }
+export interface Check { id: string; label: string; ok: boolean; detail: string }
+export interface Chat { chat_id: string; label: string; count: number; last_used: string }
+export interface Msg {
+  id: string; conversation_id: string; chat_id: string; direction: 'inbound' | 'outbound';
+  sender: string; body: string; send_state: 'queued' | 'sent' | 'failed'; created_at: string;
+}
+export interface CtxLine { sender: string; direction: string; body: string; created_at: string }
+export interface Servico {
+  service: string; pid: number; state: string; seconds_since: number; alive: boolean;
+  status: 'vivo' | 'parado'; next_beat_in_s: number; progress: number; interval_s: number;
+}
+export interface InboxEvent {
+  id: string; kind: string; payload: Record<string, unknown>;
+  status: 'pending' | 'processing' | 'done' | 'error';
+  received_at: string; processed_at: string | null; processing_by: string | null;
+  result: Record<string, unknown> | null;
+}
+export interface Turno {
+  id: string; session_key: string; prompt: string; channel: 'geral';
+  status: 'pending' | 'answered' | 'failed'; response: string | null;
+  answered_at: string | null; created_at: string;
+}
+export interface VenusInfo { status: string; running: boolean; processed_by_venus: number; log: string[] }
+
+// ---------------------------------------------------------------------------
+// Caminhos e .env (raiz do repo = dois níveis acima de apps/painel)
+// ---------------------------------------------------------------------------
+export const REPO_ROOT = path.resolve(process.cwd(), '..', '..');
+const REPO_ENV = path.join(REPO_ROOT, '.env');
+const COLIBRI = (process.env.VENUS_BASE_URL ?? 'http://127.0.0.1:8000/v1').replace(/\/$/, '');
+const BRAIN_REMOTE = 'https://vps.nexo-digital.app/brain/';
+const VENUS_LOG = path.join(os.homedir(), '.pm2', 'logs', 'venus-varredura-out.log');
+
+export const ENV_ALLOWLIST: Record<string, string[]> = {
+  KIMI_ADAPTER_MODE: ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'],
+  LIVE_BRAIN_PROVIDER: ['kimi', 'kimiwork'],
+  VENUS_AUTONOMO: ['true', 'false'],
+};
+
+const BEAT_INTERVAL_S: Record<string, number> = {
+  orchestrator: 30, worker: 30, watchdog: 30, whatsplay: 15, 'venus-varredura': 30,
+};
+const STALE_S = 90;
+
+function envAll(): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!fs.existsSync(REPO_ENV)) return out;
+  for (const line of fs.readFileSync(REPO_ENV, 'utf8').split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith('#') || !t.includes('=')) continue;
+    const i = t.indexOf('=');
+    out[t.slice(0, i)] = t.slice(i + 1).trim().replace(/^["']|["']$/g, '');
+  }
+  return out;
+}
+
+async function db<T>(query: string, params: unknown[] = []): Promise<T[]> {
+  const env = envAll();
+  if (!env.DATABASE_URL) throw new Error('DATABASE_URL ausente no .env');
+  const c = new pg.Client({ connectionString: env.DATABASE_URL });
+  await c.connect();
+  try { return (await c.query(query, params as never[])).rows as T[]; }
+  finally { await c.end(); }
+}
+
+// ---------------------------------------------------------------------------
+// MODO / .env — allowlist fail-closed, gravação atômica (tmp + rename)
+// ---------------------------------------------------------------------------
+export function getModo(): Modo {
+  const e = envAll();
+  return {
+    KIMI_ADAPTER_MODE: e.KIMI_ADAPTER_MODE ?? 'mock',
+    LIVE_BRAIN_PROVIDER: e.LIVE_BRAIN_PROVIDER ?? 'kimi',
+    VENUS_AUTONOMO: e.VENUS_AUTONOMO ?? 'false',
+  };
+}
+
+export function setEnvKey(key: string, value: string): { ok: boolean; error?: string; gravado?: Record<string, string> } {
+  if (!Object.prototype.hasOwnProperty.call(ENV_ALLOWLIST, key)) {
+    return { ok: false, error: `chave fora da allowlist: ${key}` };
+  }
+  if (!ENV_ALLOWLIST[key].includes(String(value))) {
+    return { ok: false, error: `valor nao permitido para ${key}: ${value}` };
+  }
+  const lines = fs.readFileSync(REPO_ENV, 'utf8').split(/\r?\n/);
+  const idx = lines.findIndex((l) => l.trim().startsWith(`${key}=`));
+  if (idx >= 0) lines[idx] = `${key}=${value}`;
+  else lines.push(`${key}=${value}`);
+  const tmp = REPO_ENV + '.tmp';
+  fs.writeFileSync(tmp, lines.join('\n'));
+  fs.renameSync(tmp, REPO_ENV); // atômico
+  return { ok: true, gravado: { [key]: String(value) } };
+}
+
+// ---------------------------------------------------------------------------
+// VALIDAÇÃO AO VIVO — colibri / postgres / telegram / brain + presença de keys
+// ---------------------------------------------------------------------------
+export async function getValidacao(): Promise<Check[]> {
+  const e = envAll();
+  const checks: Check[] = [];
+  try {
+    const r = await fetch(`${COLIBRI}/models`, { signal: AbortSignal.timeout(3_000) });
+    const d = await r.json().catch(() => ({}));
+    checks.push({ id: 'colibri', label: 'Colibri (modelo da Venus)', ok: r.ok, detail: d.data?.[0]?.id ?? `HTTP ${r.status}` });
+  } catch {
+    checks.push({ id: 'colibri', label: 'Colibri (modelo da Venus)', ok: false, detail: 'colibri fora do ar (127.0.0.1:8000)' });
+  }
+  try {
+    await db('SELECT 1');
+    checks.push({ id: 'postgres', label: 'PostgreSQL', ok: true, detail: `SELECT 1 ok — ${e.DATABASE_URL?.split('@')[1]?.split('/')[0] ?? 'ok'}` });
+  } catch (err) {
+    checks.push({ id: 'postgres', label: 'PostgreSQL', ok: false, detail: (err as Error).message.slice(0, 80) });
+  }
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${e.TELEGRAM_BOT_TOKEN}/getMe`, { signal: AbortSignal.timeout(5_000) });
+    const d = await r.json();
+    checks.push({ id: 'telegram', label: 'Telegram', ok: !!d.ok, detail: d.ok ? `@${d.result.username}` : 'token invalido' });
+  } catch {
+    checks.push({ id: 'telegram', label: 'Telegram', ok: false, detail: 'rede/timeout' });
+  }
+  try {
+    const r = await fetch(BRAIN_REMOTE, { signal: AbortSignal.timeout(5_000) });
+    checks.push({ id: 'brain', label: 'Brain remoto', ok: r.ok || r.status < 500, detail: `HTTP ${r.status} — vps.nexo-digital.app/brain/` });
+  } catch {
+    checks.push({ id: 'brain', label: 'Brain remoto', ok: false, detail: 'inacessivel' });
+  }
+  for (const k of ['DATABASE_URL', 'TELEGRAM_BOT_TOKEN', 'BRAIN_API_TOKEN', 'KIMI_API_KEY_2', 'LLM_API_KEY', 'GEMINI_API_KEY']) {
+    checks.push({ id: `key:${k}`, label: `Key ${k}`, ok: Boolean(e[k]), detail: e[k] ? 'presente (valor oculto)' : 'AUSENTE no .env' });
+  }
+  return checks;
+}
+
+// ---------------------------------------------------------------------------
+// MENSAGENS / CHATS — tabela `messages`; envio = INSERT queued + pg_notify
+// ---------------------------------------------------------------------------
+const CHAT_LABELS: Record<string, string> = { productions: 'Nexo Productions (grupo)' };
+
+export async function getChats(): Promise<Chat[]> {
+  const rows = await db<{ chat_id: string; count: number; last_used: string }>(
+    `SELECT metadata->>'chat_id' AS chat_id, COUNT(*)::int AS count, MAX(created_at) AS last_used
+     FROM messages WHERE direction='outbound' AND metadata->>'chat_id' IS NOT NULL
+     GROUP BY 1 ORDER BY last_used DESC LIMIT 20`,
+  );
+  const chats = rows.map((r) => ({ ...r, label: CHAT_LABELS[r.chat_id] ?? r.chat_id }));
+  return chats.sort((a, b) => (a.chat_id === 'productions' ? -1 : b.chat_id === 'productions' ? 1 : 0));
+}
+
+interface MsgRow {
+  id: string; conversation_id: string; chat_id: string; direction: 'inbound' | 'outbound';
+  sender: string; body: string; send_state: 'queued' | 'sent' | 'failed'; created_at: string;
+}
+
+export async function getAtividade(limit = 20): Promise<Omit<Msg, 'direction'>[]> {
+  const rows = await db<MsgRow>(
+    `SELECT id, conversation_id, metadata->>'chat_id' AS chat_id, direction, sender,
+            left(body, 500) AS body, send_state, created_at
+     FROM messages WHERE direction='outbound' AND sender IN ('luna','agent:venus')
+     ORDER BY created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return rows.map(({ id, conversation_id, chat_id, sender, body, send_state, created_at }) =>
+    ({ id, conversation_id, chat_id, sender, body, send_state, created_at }));
+}
+
+export async function getContexto(conversation_id: string): Promise<CtxLine[]> {
+  const rows = await db<CtxLine>(
+    `SELECT sender, direction, left(body, 500) AS body, created_at FROM messages
+     WHERE conversation_id=$1 ORDER BY created_at DESC LIMIT 8`,
+    [conversation_id],
+  );
+  return rows.reverse();
+}
+
+// guard-rail de saída (ativado em QUALQUER envio)
+const DEADLINE_RE = /\b(essa semana|este fim de semana|nesta semana|amanh[aã]|hoje ainda|te entrego|te mando|fica pronto|agendamos|at[eé] (hoje|amanh[aã]|sexta|segunda|ter[cç]a|quarta|quinta|domingo)|pra (hoje|amanh[aã])|prazo de \d|em \d+ dias)\b/i;
+
+export async function sendMessage(input: { chat_id: string; body: string; sender: string }):
+  Promise<{ ok: boolean; blocked?: boolean; error?: string; id?: string; send_state?: string }> {
+  const { chat_id, body, sender } = input;
+  if (!chat_id || !body || !['luna', 'agent:venus'].includes(sender)) {
+    return { ok: false, error: 'payload invalido' };
+  }
+  if (body.length > 900) return { ok: false, error: 'texto acima de 900 chars' };
+  if (DEADLINE_RE.test(body)) {
+    return { ok: false, blocked: true, error: 'guard-rail de prazo: mensagem promete prazo/deadline. Reformule sem prometer data.' };
+  }
+  const conv = await db<{ conversation_id: string }>(
+    `SELECT conversation_id FROM messages WHERE metadata->>'chat_id' = $1 ORDER BY created_at DESC LIMIT 1`,
+    [chat_id],
+  );
+  if (!conv[0]) return { ok: false, error: 'conversation_id nao encontrada pra este chat_id' };
+  const ins = await db<{ id: string }>(
+    `INSERT INTO messages (conversation_id, direction, channel, sender, body, send_state, metadata)
+     VALUES ($1, 'outbound', 'whatsapp', $2, $3, 'queued', $4) RETURNING id`,
+    [conv[0].conversation_id, sender, body, JSON.stringify({ source: 'painel', chat_id })],
+  );
+  await db(`SELECT pg_notify('luna_outbound', $1)`, [ins[0].id]);
+  return { ok: true, id: ins[0].id, send_state: 'queued' };
+}
+
+// ---------------------------------------------------------------------------
+// SERVIÇOS — service_heartbeats
+// ---------------------------------------------------------------------------
+interface BeatRow { service: string; pid: number; meta: { state?: string; overall?: string; ready?: boolean } | null; seen_at: string }
+
+export async function getServicos(): Promise<Servico[]> {
+  const rows = await db<BeatRow>('SELECT service, pid, meta, seen_at FROM service_heartbeats ORDER BY service');
+  const now = Date.now();
+  return rows.map((s) => {
+    const seconds_since = Math.max(0, Math.floor((now - new Date(s.seen_at).getTime()) / 1000));
+    const interval_s = BEAT_INTERVAL_S[s.service] ?? 30;
+    const alive = seconds_since <= STALE_S;
+    return {
+      service: s.service, pid: s.pid ?? 0,
+      state: s.meta?.state ?? s.meta?.overall ?? (s.meta?.ready ? 'READY' : '—'),
+      seconds_since, alive, status: alive ? 'vivo' as const : 'parado' as const,
+      next_beat_in_s: Math.max(0, interval_s - seconds_since),
+      progress: Math.min(1, seconds_since / interval_s),
+      interval_s,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// INBOX (kimiwork_inbox) — processamento real do Vênus marca result.processed_by
+// ---------------------------------------------------------------------------
+interface InboxRow {
+  id: string; kind: string; payload: Record<string, unknown>; status: InboxEvent['status'];
+  received_at: string; processed_at: string | null; result: Record<string, unknown> | null;
+}
+
+export async function getInbox(): Promise<InboxEvent[]> {
+  const rows = await db<InboxRow>(
+    `SELECT id, kind, payload, status, received_at, processed_at, result
+     FROM kimiwork_inbox ORDER BY received_at DESC LIMIT 50`,
+  );
+  return rows.map((r) => ({
+    ...r,
+    processing_by: (r.result?.processed_by as string) ?? (r.payload?.processing_by as string) ?? null,
+  }));
+}
+
+export async function reprocessarInbox(id: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const rows = await db<{ id: string }>(
+    `UPDATE kimiwork_inbox SET status='pending', processed_at=NULL, result=NULL
+     WHERE id=$1 AND status IN ('done','error') RETURNING id`,
+    [id],
+  );
+  if (rows[0]) return { ok: true, id };
+  const exists = await db<{ status: string }>(`SELECT status FROM kimiwork_inbox WHERE id=$1`, [id]);
+  if (!exists[0]) return { ok: false, error: 'evento nao encontrado' };
+  return { ok: false, error: `so e permitido reprocessar done/error (atual: ${exists[0].status})` };
+}
+
+// ---------------------------------------------------------------------------
+// TURNOS (kimiwork_llm_turns) — UPDATE atômico evita corrida
+// ---------------------------------------------------------------------------
+interface TurnoRow {
+  id: string; session_key: string; prompt: string; status: Turno['status'];
+  response: string | null; created_at: string; answered_at: string | null;
+}
+
+export async function getTurnos(): Promise<Turno[]> {
+  const rows = await db<TurnoRow>(
+    `SELECT id, session_key, prompt, status, response, created_at, answered_at
+     FROM kimiwork_llm_turns ORDER BY created_at DESC LIMIT 50`,
+  );
+  return rows.map((r) => ({ ...r, channel: 'geral' as const }));
+}
+
+export async function responderTurno(id: string, response: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+  if (!response || !String(response).trim()) return { ok: false, error: 'resposta vazia' };
+  const rows = await db<{ id: string }>(
+    `UPDATE kimiwork_llm_turns SET status='answered', response=$2, answered_at=now()
+     WHERE id=$1 AND status='pending' RETURNING id`,
+    [id, String(response).trim()],
+  );
+  if (rows[0]) return { ok: true, id };
+  return { ok: false, error: 'turno ja respondido/falhou ou nao existe (claim perdido)' };
+}
+
+export async function escalarInbox(id: string): Promise<{ ok: boolean; error?: string; turno_id?: string }> {
+  const ev = await db<InboxRow>(`SELECT * FROM kimiwork_inbox WHERE id=$1`, [id]);
+  if (!ev[0]) return { ok: false, error: 'evento nao encontrado' };
+  const texto = (ev[0].payload as { from?: string; text?: string }).text ?? JSON.stringify(ev[0].payload);
+  const de = (ev[0].payload as { from?: string }).from ?? '?';
+  const rows = await db<{ id: string }>(
+    `INSERT INTO kimiwork_llm_turns (session_key, prompt, idempotency_key)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`,
+    [`inbox:${id}`, `[escalado da inbox ${id} | ${ev[0].kind}] ${de}: ${texto}`, `escalate-${id}`],
+  );
+  if (rows[0]) return { ok: true, turno_id: rows[0].id };
+  return { ok: false, error: 'este evento ja foi escalado' };
+}
+
+// ---------------------------------------------------------------------------
+// VÊNUS — status via heartbeat 'venus-varredura', log via tail do pm2,
+// invocar tarefa = spawn real do venus.mjs (process.execPath = node.exe real)
+// ---------------------------------------------------------------------------
+let tarefaRunning = false;
+const tarefaLog: string[] = [];
+const ts = () => new Date().toLocaleTimeString('pt-BR', { hour12: false });
+
+function tailVenusLog(): string[] {
+  try {
+    const lines = fs.readFileSync(VENUS_LOG, 'utf8').trim().split(/\r?\n/);
+    return lines.slice(-30);
+  } catch {
+    return tarefaLog.length ? tarefaLog.slice(-30) : ['(log do pm2 nao encontrado — venus-varredura rodou desde o ultimo restart?)'];
+  }
+}
+
+export async function getVenus(): Promise<VenusInfo> {
+  const beats = await db<{ seen_at: string; meta: { state?: string } | null }>(
+    `SELECT seen_at, meta FROM service_heartbeats WHERE service='venus-varredura'`,
+  );
+  const age = beats[0] ? Math.floor((Date.now() - new Date(beats[0].seen_at).getTime()) / 1000) : null;
+  const online = age !== null && age <= STALE_S;
+  const processed = await db<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM kimiwork_inbox WHERE result->>'processed_by' = 'venus'`,
+  );
+  return {
+    status: online ? 'online' : 'parado',
+    running: tarefaRunning,
+    processed_by_venus: processed[0]?.n ?? 0,
+    log: tailVenusLog(),
+  };
+}
+
+export function invocarTarefa(texto: string): { ok: boolean; error?: string } {
+  if (!texto || !String(texto).trim()) return { ok: false, error: 'tarefa vazia' };
+  if (tarefaRunning) return { ok: false, error: 'ja existe uma tarefa em execucao' };
+  tarefaRunning = true;
+  tarefaLog.push(`[${ts()}] [tarefa] invocada: ${texto}`);
+  const child = spawn(process.execPath, [path.join(REPO_ROOT, 'scripts', 'venus', 'venus.mjs'), '--tarefa', String(texto).trim()], {
+    cwd: REPO_ROOT,
+    env: { ...process.env },
+  });
+  child.stdout.on('data', (d) => tarefaLog.push(`[${ts()}] ${String(d).trim()}`));
+  child.stderr.on('data', (d) => tarefaLog.push(`[${ts()}] ! ${String(d).trim()}`));
+  child.on('close', (code) => {
+    tarefaRunning = false;
+    tarefaLog.push(`[${ts()}] [tarefa] concluida (exit ${code})`);
+  });
+  child.on('error', (err) => {
+    tarefaRunning = false;
+    tarefaLog.push(`[${ts()}] [tarefa] ERRO: ${err.message}`);
+  });
+  return { ok: true };
+}
