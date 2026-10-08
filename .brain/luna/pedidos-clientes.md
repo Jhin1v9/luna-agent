@@ -546,3 +546,9 @@ Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrument
 - `cmur5wyl5000eofha5oxnigw3` — sticker "agotado": PREPARING_SOLUTION → **IN_DEVELOPMENT** às 10:44 UTC (time/dev pegou pra desenvolver — último dos 3 da Tienda a entrar em dev)
 - `cmusc6hkj0018ofhaovwzlrm5` — hero desktop carrossel: WAITING_CLIENT → **CLIENT_REVIEWING** às 10:44 UTC. Nota: havia client action pendente "Enviar fotos horizontal" (criada 07/10 10:54Z, `cmuxzq8mo000esq0n1gr2iuio`) — o avanço de status sugere que a Jess respondeu ou o dev entregou com as verticais; verificar se a action foi resolvida na próxima varredura de actions.
 - autor: Luna (varredura por evento)
+
+## 2026-10-08 (3º evento do dia) — sticker agotado entregue: ONADANCE TODA EM REVISÃO
+- `cmur5wyl5000eofha5oxnigw3` — sticker "agotado": IN_DEVELOPMENT → **CLIENT_REVIEWING** às 10:50 UTC (dev durou ~6 min — provável ajuste de config/catálogo, não código pesado)
+- **Placar OnaDance:** os 4 pedidos abertos (orden, imagens pixeladas, hero carrossel, sticker agotado) estão AGORA TODOS em CLIENT_REVIEWING — a bola está 100% com a Jess.
+- Client actions: sem mudança (2 pendentes, incl. "Enviar fotos horizontal" criada 07/10 — continua PENDING mesmo com o hero em revisão; a Jess ainda não enviou as fotos horizontais).
+- autor: Luna (varredura por evento)
