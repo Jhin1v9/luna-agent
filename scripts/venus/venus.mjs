@@ -53,11 +53,25 @@ const READ_ALLOWED = [
   path.resolve(ROOT, '.brain'),
   path.resolve(ROOT, 'scripts', 'venus'),
 ];
+// Clientes conhecidos: pessoa ↔ empresa ↔ pasta no .brain ↔ aliases aceitos.
+// "onadance" é a EMPRESA da Jess (mesma ficha). Alias "jesús" removido — não
+// existe cliente com esse nome (correção owner 2026-10-09).
 const CLIENTES = {
-  jess: 'jess-onadance', onadance: 'jess-onadance', 'jesús': 'jess-onadance',
-  hdm: 'hdm-industrial', matheus: 'hdm-industrial',
-  juninho: 'jr-reformas-juninho', jr: 'jr-reformas-juninho',
+  'jess-onadance': { nome: 'Jess Nuñez', empresa: 'Ona Dance', pasta: 'jess-onadance', aka: ['jess', 'onadance', 'ona dance', 'jess nuñez', 'jess nunez'] },
+  'hdm-industrial': { nome: 'Matheus', empresa: 'HDM Industrial', pasta: 'hdm-industrial', aka: ['hdm', 'matheus'] },
+  'jr-reformas-juninho': { nome: 'Juninho', empresa: 'JR Reformas', pasta: 'jr-reformas-juninho', aka: ['juninho', 'jr', 'jr reformas'] },
 };
+// índice alias → ficha (montado uma vez)
+const CLIENTE_POR_ALIAS = {};
+for (const [id, c] of Object.entries(CLIENTES)) {
+  CLIENTE_POR_ALIAS[id] = c.pasta;
+  for (const a of c.aka) CLIENTE_POR_ALIAS[a.toLowerCase()] = c.pasta;
+}
+const CLIENTES_RESUMO = Object.values(CLIENTES)
+  .map((c) => `${c.nome} (${c.empresa}) — usar: ${c.aka.join(', ')}`).join(' | ');
+function pastaCliente(nome) {
+  return CLIENTE_POR_ALIAS[String(nome).toLowerCase().trim()];
+}
 function readAllowed(caminho) {
   const abs = path.resolve(caminho);
   if (!READ_ALLOWED.some((p) => abs.startsWith(p + path.sep))) return 'ERRO: fora da allowlist de leitura (bloqueado)';
@@ -83,6 +97,45 @@ async function chat(messages, tools) {
   });
   if (!res.ok) throw new Error(`colibri HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
+}
+
+// ── supervisão (irmã maior): crítico por regras, ZERO tokens ──
+// Toda mensagem outbound dele passa aqui; flag dispara turno pra Luna julgar.
+const CRITIC_RULES = [
+  { re: /(esta semana|essa semana|nesta semana|te entrego|fica pronto|agendamos|pra (hoje|amanhã)|até (hoje|amanhã|sexta))/i, reason: 'promessa de prazo' },
+  { re: /\ba\s+[Vv]ênus/, reason: 'artigo feminino (é O Vênus)' },
+  { re: /irmã da Luna/i, reason: 'gênero errado (irmÃO da Luna)' },
+  { re: /(sou a (ia|inteligência) da nexo)/i, reason: 'apresentação genérica/errada' },
+];
+function critic(texto) {
+  const reasons = CRITIC_RULES.filter((r) => r.re.test(texto)).map((r) => r.reason);
+  if (texto.trim().length < 25) reasons.push('resposta muito curta/genérica');
+  return { pass: reasons.length === 0, reasons };
+}
+async function supervisionar(messageId, chatId, texto) {
+  const c = critic(texto);
+  const ins = await db(
+    `INSERT INTO venus_supervision (message_id, chat_id, body, critic, flagged) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    [messageId, chatId, texto.slice(0, 500), JSON.stringify(c), !c.pass],
+  );
+  if (!c.pass) {
+    await db(
+      `INSERT INTO kimiwork_llm_turns (session_key, prompt, channel, idempotency_key) VALUES ($1,$2,'geral',$3)`,
+      [
+        `venus-supervisor:${ins.rows[0].id}`,
+        `[SUPERVISÃO DO VÊNUS — irmã maior]\nO Vênus enviou a mensagem abaixo no chat "${chatId}" e o crítico por regras apontou: ${c.reasons.join('; ')}.\n\nMENSAGEM DELE:\n"${texto.slice(0, 900)}"\n\nComo irmã maior, decida:\n(a) falso positivo / tá ok → UPDATE venus_supervision SET luna_verdict='falso_positivo', reviewed_at=now() WHERE id='${ins.rows[0].id}';\n(b) precisa correção → envie a correção no MESMO chat pelo pipeline oficial (INSERT messages send_state='queued' sender='luna' + pg_notify luna_outbound); em grupo de CLIENTE, se ele fez bobina, peça desculpa em nome da Nexo com leveza e naturalidade; no productions pode ser com humor de irmã mais velha;\n(c) depois registre: UPDATE venus_supervision SET luna_verdict=<ok|corrigido|pedi_desculpas|falso_positivo>, luna_action=<resumo>, reviewed_at=now() WHERE id='${ins.rows[0].id}'.\n\nSe o padrão se repetir, considere anotar a regra em .brain/luna/venus/ pra reforço da persona dele.`,
+        `sup-${ins.rows[0].id}`,
+      ],
+    );
+  }
+  return ins.rows[0].id;
+}
+async function heartbeatVenus() {
+  await db(
+    `INSERT INTO service_heartbeats (service, pid, meta, seen_at) VALUES ('venus-varredura',$1,'{"state":"VIGIANDO"}'::jsonb,now())
+     ON CONFLICT (service) DO UPDATE SET pid=$1, seen_at=now(), meta='{"state":"VIGIANDO"}'::jsonb`,
+    [process.pid],
+  );
 }
 
 // ── evento corrente da varredura (concluir/falhar só vale pra ele) ──
@@ -127,6 +180,8 @@ async function sendWhatsapp(chatId, texto, conversationId) {
     [convId, texto, JSON.stringify({ source: 'venus', chat_id: chatId })],
   );
   await db(`SELECT pg_notify('luna_outbound', $1)`, [ins.rows[0].id]);
+  // supervisão da irmã maior: crítico por regras em toda mensagem dele
+  try { await supervisionar(ins.rows[0].id, chatId, texto); } catch (e) { console.error('  supervisor:', e.message.slice(0, 120)); }
   return `MENSAGEM WHATSAPP ENFILEIRADA (id ${ins.rows[0].id}). Guard-rail ok.`;
 }
 async function sendTelegram(chatId, texto, replyTo) {
@@ -145,8 +200,8 @@ async function sendTelegram(chatId, texto, replyTo) {
 
 // ── tools ──
 function lerFichaCliente(nome) {
-  const pasta = CLIENTES[String(nome).toLowerCase()];
-  if (!pasta) return `ERRO: cliente desconhecido. Use um de: ${Object.keys(CLIENTES).join(', ')}`;
+  const pasta = pastaCliente(nome);
+  if (!pasta) return `ERRO: cliente desconhecido "${String(nome).slice(0, 40)}". Clientes cadastrados: ${CLIENTES_RESUMO}`;
   const base = path.join(ROOT, '.brain', 'clientes', pasta);
   return ['CLIENTE.md', 'PEDIDOS.md', 'PROJETOS.md']
     .map((f) => { const c = readAllowed(path.join(base, f)); return `### ${f}\n${typeof c === 'string' && c.startsWith('ERRO:') ? '(ausente)' : c}`.slice(0, 6_500); })
@@ -309,6 +364,7 @@ async function varredura() {
   for (;;) {
     ciclos++;
     try {
+      await heartbeatVenus(); // irmã maior enxerga se ele travar/morrer
       if (!venusAutonomo()) {
         if (ciclos % 10 === 1) console.log(`[vênus] modo desligado (VENUS_AUTONOMO!=true) — aguardando`);
       } else {
