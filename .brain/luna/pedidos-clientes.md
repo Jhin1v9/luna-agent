@@ -541,3 +541,8 @@ Print da Jess (privado, +34 645 66 59 72, repassado pelo owner do grupo Producti
 - `cmur5wypj000jofha6ym5e8c1` — imagens pixeladas: PREPARING_SOLUTION → **CLIENT_REVIEWING** às 10:44 UTC
 Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrumentação lastFire do predicado funcionou (diff exato capturado no disparo). Sem pedido novo nem comentário.
 - autor: Luna (varredura por evento)
+
+## 2026-10-08 (2º evento do dia) — sticker agotado em desenvolvimento; hero carrossel em revisão
+- `cmur5wyl5000eofha5oxnigw3` — sticker "agotado": PREPARING_SOLUTION → **IN_DEVELOPMENT** às 10:44 UTC (time/dev pegou pra desenvolver — último dos 3 da Tienda a entrar em dev)
+- `cmusc6hkj0018ofhaovwzlrm5` — hero desktop carrossel: WAITING_CLIENT → **CLIENT_REVIEWING** às 10:44 UTC. Nota: havia client action pendente "Enviar fotos horizontal" (criada 07/10 10:54Z, `cmuxzq8mo000esq0n1gr2iuio`) — o avanço de status sugere que a Jess respondeu ou o dev entregou com as verticais; verificar se a action foi resolvida na próxima varredura de actions.
+- autor: Luna (varredura por evento)
