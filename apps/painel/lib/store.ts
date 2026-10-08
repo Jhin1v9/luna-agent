@@ -32,6 +32,12 @@ export interface Turno {
   answered_at: string | null; created_at: string;
 }
 export interface VenusInfo { status: string; running: boolean; processed_by_venus: number; log: string[] }
+export interface Ordem {
+  id: string; ordem: string; contexto: string | null;
+  status: 'pending' | 'processing' | 'done' | 'error' | 'ignored';
+  result: string | null; created_at: string; executed_at: string | null;
+}
+export interface Comando { perguntas: Turno[]; ordens: Ordem[] }
 
 // ---------------------------------------------------------------------------
 // Caminhos e .env (raiz do repo = dois níveis acima de apps/painel)
@@ -303,6 +309,33 @@ export async function escalarInbox(id: string): Promise<{ ok: boolean; error?: s
   );
   if (rows[0]) return { ok: true, turno_id: rows[0].id };
   return { ok: false, error: 'este evento ja foi escalado' };
+}
+
+// ---------------------------------------------------------------------------
+// CADEIA DE COMANDO LUNA > VÊNUS (decreto owner 2026-10-09):
+//   perguntas = turnos venus:* (ele pergunta → a Luna responde, UPDATE atômico)
+//   ordens    = luna_ordens (a Luna ordena → ele executa na varredura, prioridade máxima)
+// ---------------------------------------------------------------------------
+export async function getComando(): Promise<Comando> {
+  const perguntas = await db<TurnoRow>(
+    `SELECT id, session_key, prompt, status, response, created_at, answered_at
+     FROM kimiwork_llm_turns WHERE session_key LIKE 'venus:%'
+     ORDER BY created_at DESC LIMIT 20`,
+  );
+  const ordens = await db<Ordem>(
+    `SELECT id, ordem, contexto, status, result, created_at, executed_at
+     FROM luna_ordens ORDER BY created_at DESC LIMIT 20`,
+  );
+  return { perguntas: perguntas.map((r) => ({ ...r, channel: 'geral' as const })), ordens };
+}
+
+export async function criarOrdem(ordem: string, contexto?: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+  if (!ordem || !String(ordem).trim()) return { ok: false, error: 'ordem vazia' };
+  const rows = await db<{ id: string }>(
+    `INSERT INTO luna_ordens (ordem, contexto) VALUES ($1, $2) RETURNING id`,
+    [String(ordem).trim(), contexto?.trim() ? String(contexto).trim() : null],
+  );
+  return { ok: true, id: rows[0].id };
 }
 
 // ---------------------------------------------------------------------------

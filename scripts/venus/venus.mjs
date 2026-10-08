@@ -220,6 +220,82 @@ async function perguntarLuna(pergunta, contexto) {
   );
   return `PERGUNTA REGISTRADA pra Luna (turno ${r.rows[0].id}). Ela responde na varredura dela — não espere no mesmo turno; avise quem perguntou que a Luna assume, e conclua o evento.`;
 }
+// Cadeia de comando LUNA > VÊNUS (decreto owner 2026-10-09): Luna manda por
+// cima — ordem dela é OBRIGATÓRIA e tem prioridade máxima sobre a inbox.
+let currentOrdem = null;
+async function verInbox(limite = 10) {
+  const r = await db(
+    `SELECT id, kind, status, received_at, payload FROM kimiwork_inbox
+     ORDER BY received_at DESC LIMIT $1`,
+    [Math.min(Math.max(Number(limite) || 10, 1), 25)],
+  );
+  if (!r.rows.length) return '(inbox vazia)';
+  return r.rows.map((e) => {
+    const p = e.payload ?? {};
+    const origem = p.author_name ?? p.from?.first_name ?? p.chat_name ?? '?';
+    return `[${e.status}] ${e.kind} · de ${String(origem).slice(0, 30)} · ${String(p.text ?? '').slice(0, 90) || '(sem texto)'} · ${e.received_at}`;
+  }).join('\n');
+}
+async function verRespostasLuna() {  const r = await db(
+    `SELECT id, prompt, response FROM kimiwork_llm_turns
+     WHERE session_key LIKE 'venus:%' AND status='answered' AND answered_at > now() - interval '24 hours'
+     ORDER BY answered_at DESC LIMIT 5`,
+  );
+  if (!r.rows.length) return '(nenhuma resposta da Luna nas últimas 24h)';
+  return r.rows
+    .map((t) => `--- resposta da Luna (turno ${t.id}) à pergunta "${String(t.prompt).slice(0, 140)}":\n${String(t.response).slice(0, 1_200)}`)
+    .join('\n\n');
+}
+async function respostasLunaRecentes() {
+  const r = await db(
+    `SELECT prompt, response FROM kimiwork_llm_turns
+     WHERE session_key LIKE 'venus:%' AND status='answered' AND answered_at > now() - interval '1 hour'
+     ORDER BY answered_at DESC LIMIT 3`,
+  );
+  if (!r.rows.length) return '';
+  return r.rows
+    .map((t) => `Pergunta sua: "${String(t.prompt).slice(0, 120)}"\nLuna respondeu: ${String(t.response).slice(0, 900)}`)
+    .join('\n---\n');
+}
+async function concluirOrdem(resumo) {
+  if (!currentOrdem) return 'ERRO: nenhuma ordem da Luna em execução';
+  await db(
+    `UPDATE luna_ordens SET status='done', result=$2, executed_at=now() WHERE id=$1`,
+    [currentOrdem.id, String(resumo).slice(0, 2_000)],
+  );
+  return `ORDEM CONCLUÍDA (id ${currentOrdem.id}).`;
+}
+async function processarOrdem(ordem) {
+  currentOrdem = ordem;
+  enviosNoEvento = 0;
+  console.log(`[vênus] ORDEM DA LUNA ${ordem.id} recebida — prioridade máxima`);
+  try {
+    const prompt = (
+      `ORDEM DIRETA DA LUNA — sua irmã mais velha e orquestradora. Hierarquia: a Luna SEMPRE manda por cima de você; a ordem dela é lei e tem prioridade máxima.\n\n` +
+      `ORDEM: ${ordem.ordem}${ordem.contexto ? `\nCONTEXTO QUE ELA MANDOU: ${ordem.contexto}` : ''}\n\n` +
+      `Execute com as tools que precisar. Seu relatório final fica registrado pra ela ler — NÃO mande whatsapp sobre a ordem a menos que ela peça explicitamente. ` +
+      `Ao final, OBRIGATORIAMENTE concluir_ordem com o resumo do que executou. Impossível de verdade? concluir_ordem explicando o impedimento.`
+    );
+    const resposta = await run(prompt, { comTools: true });
+    // fail-safe igual ao de evento: esqueceu a tool → a gente registra o resultado
+    const check = await db(`SELECT status FROM luna_ordens WHERE id=$1`, [ordem.id]);
+    if (check.rows[0]?.status === 'processing') {
+      await db(
+        `UPDATE luna_ordens SET status='done', result=$2, executed_at=now() WHERE id=$1`,
+        [ordem.id, `(resgate automático — sem concluir_ordem) ${resposta.slice(0, 1_500)}`],
+      );
+      console.log('[vênus] ordem finalizada sem tool de conclusão — resgate registrou o resultado');
+    }
+  } catch (e) {
+    console.error(`  ✗ erro na ordem ${ordem.id}: ${e.message}`);
+    await db(
+      `UPDATE luna_ordens SET status='error', result=$2, executed_at=now() WHERE id=$1 AND status='processing'`,
+      [ordem.id, `exceção no runtime: ${e.message.slice(0, 300)}`],
+    );
+  } finally {
+    currentOrdem = null;
+  }
+}
 function registrarSolicitacao(dadosJson) {
   const dir = path.join(ROOT, '.brain', 'luna', 'venus');
   fs.mkdirSync(dir, { recursive: true });
@@ -257,6 +333,9 @@ const TOOLS = [
   { type: 'function', function: { name: 'quem_e_quem', description: 'Lista quem é quem: sócios, time, clientes. Use quando não reconhecer o autor da mensagem', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'ver_conversa', description: 'Lê as últimas mensagens do chat (inclusive as SUAS e as da Luna) pra não repetir e poderem conversar', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, limite: { type: 'number' } }, required: ['chat_id'] } } },
   { type: 'function', function: { name: 'perguntar_luna', description: 'Escalona pra Luna responder na varredura (fila kimiwork_llm_turns)', parameters: { type: 'object', properties: { pergunta: { type: 'string' }, contexto: { type: 'string' } }, required: ['pergunta'] } } },
+  { type: 'function', function: { name: 'ver_inbox', description: 'Lista os eventos recentes da caixa de entrada (kimiwork_inbox) com status e payload resumido', parameters: { type: 'object', properties: { limite: { type: 'number' } } } } },
+  { type: 'function', function: { name: 'ver_respostas_luna', description: 'Lê as respostas mais recentes da Luna às suas perguntas (turnos venus:*)', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'concluir_ordem', description: 'OBRIGATÓRIO ao fim de uma ORDEM DA LUNA: marca executada com resumo do que foi feito', parameters: { type: 'object', properties: { resumo: { type: 'string' } }, required: ['resumo'] } } },
   { type: 'function', function: { name: 'concluir_evento', description: 'OBRIGATÓRIO ao fim de cada evento da varredura: marca processado com resumo', parameters: { type: 'object', properties: { resumo: { type: 'string' }, acoes_json: { type: 'string', description: 'array JSON das ações tomadas' } }, required: ['resumo'] } } },
   { type: 'function', function: { name: 'falhar_evento', description: 'Marca o evento corrente como erro (só se impossível processar)', parameters: { type: 'object', properties: { motivo: { type: 'string' } }, required: ['motivo'] } } },
 ];
@@ -269,6 +348,9 @@ const EXEC = {
   quem_e_quem: async () => quemEQuem(),
   ver_conversa: async (a) => verConversa(a.chat_id, a.limite),
   perguntar_luna: perguntarLuna,
+  ver_inbox: async (a) => verInbox(a.limite),
+  ver_respostas_luna: () => verRespostasLuna(),
+  concluir_ordem: async (a) => concluirOrdem(a.resumo),
   concluir_evento: concluirEvento,
   falhar_evento: falharEvento,
 };
@@ -346,7 +428,12 @@ async function processarEvento(evento) {
   currentEvent = evento;
   enviosNoEvento = 0;
   try {
-    const resposta = await run(montarTarefa(evento), { comTools: true });
+    // entrega as respostas recentes da Luna às perguntas dele (a fila sozinha não fala)
+    const respostas = await respostasLunaRecentes();
+    const tarefa = (respostas
+      ? `RESPOSTAS RECENTES DA LUNA às suas perguntas (considere antes de agir; se já viu, ignore):\n${respostas}\n\n=== EVENTO NOVO ===\n`
+      : '') + montarTarefa(evento);
+    const resposta = await run(tarefa, { comTools: true });
     // FAIL-SAFE (bug raiz-quadrada 2026-10-09): texto final NÃO chega ao
     // WhatsApp/Telegram sozinho — só chega se a tool de envio for chamada.
     // Se o turno terminou sem nenhum envio mas gerou resposta, enviamos nós.
@@ -390,6 +477,20 @@ async function varredura() {
       if (!venusAutonomo()) {
         if (ciclos % 10 === 1) console.log(`[vênus] modo desligado (VENUS_AUTONOMO!=true) — aguardando`);
       } else {
+        // ORDEM DA LUNA tem prioridade máxima sobre a inbox (cadeia de comando)
+        const ord = await db(
+          `SELECT id, ordem, contexto FROM luna_ordens WHERE status='pending' ORDER BY created_at LIMIT 1`,
+        );
+        if (ord.rows[0]) {
+          const claim = await db(
+            `UPDATE luna_ordens SET status='processing' WHERE id=$1 AND status='pending' RETURNING id`,
+            [ord.rows[0].id],
+          );
+          if (claim.rows[0]) {
+            await processarOrdem(ord.rows[0]);
+            continue; // próxima ordem ou evento imediatamente
+          }
+        }
         const ev = await db(
           `SELECT id, kind, payload FROM kimiwork_inbox WHERE status='pending' AND kind IN ('whatsapp.message','telegram.message') ORDER BY received_at LIMIT 1`,
         );

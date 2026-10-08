@@ -20,6 +20,8 @@ type Servico = { service: string; pid: number; state: string; seconds_since: num
 type InboxEvent = { id: string; kind: string; payload: Record<string, any>; status: string; received_at: string; processed_at: string | null; processing_by: string | null; result: Record<string, any> | null };
 type Turno = { id: string; session_key: string; prompt: string; status: string; response: string | null; answered_at: string | null; created_at: string };
 type VenusInfo = { status: string; running: boolean; processed_by_venus: number; log: string[] };
+type Ordem = { id: string; ordem: string; contexto: string | null; status: string; result: string | null; created_at: string; executed_at: string | null };
+type Comando = { perguntas: Turno[]; ordens: Ordem[] };
 
 // allowlists espelhadas do store (a validacao final e server-side, fail-closed)
 const ADAPTER_MODES = ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'];
@@ -108,13 +110,16 @@ export default function Painel() {
   const [servicos, setServicos] = useState<Servico[] | null>(null);
   const [servicosAt, setServicosAt] = useState<number>(0);
   const [inbox, setInbox] = useState<InboxEvent[] | null>(null);
-  const [turnos, setTurnos] = useState<Turno[] | null>(null);
+  const [comando, setComando] = useState<Comando | null>(null);
   const [venus, setVenus] = useState<VenusInfo | null>(null);
+  const [ordem, setOrdem] = useState('');
+  const [ordemCtx, setOrdemCtx] = useState('');
+  const [ordering, setOrdering] = useState(false);
   const [tick, setTick] = useState(0);
 
   // UI
   const [inboxTab, setInboxTab] = useState<'pending' | 'processing' | 'done' | 'error'>('pending');
-  const [turnosTab, setTurnosTab] = useState<'pending' | 'answered' | 'failed'>('pending');
+  const [perguntasTab, setPerguntasTab] = useState<'pending' | 'answered' | 'failed'>('pending');
   const [chatSel, setChatSel] = useState('productions');
   const [sender, setSender] = useState<'luna' | 'agent:venus'>('luna');
   const [text, setText] = useState('');
@@ -150,7 +155,7 @@ export default function Painel() {
     run(getJSON<Check[]>('/api/validacao'), setChecks);
     run(getJSON<Servico[]>('/api/servicos').then((s) => { setServicosAt(Date.now()); return s; }), setServicos);
     run(getJSON<InboxEvent[]>('/api/inbox'), setInbox);
-    run(getJSON<Turno[]>('/api/turnos'), setTurnos);
+    run(getJSON<Comando>('/api/comando'), setComando);
     run(getJSON<VenusInfo>('/api/venus'), setVenus);
   }, []);
 
@@ -266,6 +271,18 @@ export default function Painel() {
       setAnswers((a) => ({ ...a, [t.id]: '' }));
       loadAuto();
     } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function enviarOrdem() {
+    if (!ordem.trim()) { toast.error('ordem vazia'); return; }
+    setOrdering(true);
+    try {
+      const r = await postJSON<{ id: string }>('/api/comando', { ordem, contexto: ordemCtx });
+      toast.success('ORDEM registrada — o Vênus executa na proxima varredura', { description: `id ${r.id}` });
+      setOrdem(''); setOrdemCtx('');
+      loadAuto();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setOrdering(false); }
   }
 
   async function invocarTarefa() {
@@ -420,8 +437,109 @@ export default function Painel() {
           </div>
         </Card>
 
-        {/* ---------- 4. ATIVIDADE ---------- */}
-        <Card index={3} className="col-span-12 xl:col-span-6">
+        {/* ---------- 4. CADEIA DE COMANDO LUNA > VÊNUS ---------- */}
+        <Card index={3} className="col-span-12">
+          <Title icon={ArrowLeftRight} extra={
+            <span className="text-[10px] normal-case tracking-normal text-luna">a Luna manda por cima — ordem dela e obrigatoria; pedido dele passa no julgamento dela</span>
+          }>LUNA &gt; VÊNUS — cadeia de comando</Title>
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* esquerda: Vênus pergunta → Luna julga e responde */}
+            <div>
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">Vênus pergunta → a Luna ve se faz sentido e age</div>
+              <div className="relative mb-3 flex gap-1 border-b border-line/70">
+                {(['pending', 'answered', 'failed'] as const).map((t) => (
+                  <button key={t} onClick={() => setPerguntasTab(t)}
+                    className={`relative px-3 py-1.5 text-[12px] transition-colors ${perguntasTab === t ? 'text-luna' : 'text-dim hover:text-fg'}`}>
+                    {t === 'pending' ? 'aguardando a Luna' : t}
+                    {comando && <span className="ml-1 text-[10px] opacity-70">{comando.perguntas.filter((x) => x.status === t).length}</span>}
+                    {perguntasTab === t && <motion.span layoutId="perguntas-tab" className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-luna" />}
+                  </button>
+                ))}
+              </div>
+              {!comando ? <Skeleton rows={3} /> : (() => {
+                const list = comando.perguntas.filter((t) => t.status === perguntasTab);
+                if (list.length === 0) return <Empty>Nenhuma pergunta do Vênus neste estado.</Empty>;
+                return (
+                  <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                    {list.map((t) => (
+                      <li key={t.id} className="rounded-xl border border-line/70 bg-bg/50 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                          <span className="badge badge-info">venus</span>
+                          <span className="mono text-dim">{t.id.slice(0, 8)}</span>
+                          <span className="ml-auto text-dim">{timeAgo(t.created_at)}</span>
+                          <StatusBadge status={t.status} />
+                        </div>
+                        <div className="mt-1 whitespace-pre-wrap text-[13px]">{t.prompt}</div>
+                        {t.status === 'answered' && t.response && (
+                          <div className="mt-2 rounded-lg border border-ok/30 bg-ok/5 p-2 text-[12px] text-ok">{t.response}</div>
+                        )}
+                        {t.status === 'failed' && t.response && (
+                          <div className="mt-2 rounded-lg border border-fail/30 bg-fail/5 p-2 text-[12px] text-fail">{t.response}</div>
+                        )}
+                        {t.status === 'pending' && (
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              className="input flex-1"
+                              placeholder="Resposta da Luna (UPDATE atomico pending -> answered)"
+                              value={answers[t.id] || ''}
+                              onChange={(e) => setAnswers((a) => ({ ...a, [t.id]: e.target.value }))}
+                            />
+                            <button className="btn btn-primary shrink-0" onClick={() => responderTurno(t)}>
+                              <Send size={12} />Responder
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+            {/* direita: Luna ordena → Vênus executa */}
+            <div>
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">Luna ordena → Vênus OBRIGATORIAMENTE executa</div>
+              <div className="mb-3 space-y-2">
+                <textarea
+                  className="input min-h-[56px] resize-y"
+                  placeholder="Ordem direta pro Vênus — ex.: verifique a inbox e me relate AQUI o resultado"
+                  value={ordem} onChange={(e) => setOrdem(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <input className="input flex-1" placeholder="Contexto (opcional)"
+                    value={ordemCtx} onChange={(e) => setOrdemCtx(e.target.value)} />
+                  <button className="btn btn-primary shrink-0" onClick={enviarOrdem} disabled={ordering}>
+                    {ordering ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}Ordenar
+                  </button>
+                </div>
+              </div>
+              {!comando ? <Skeleton rows={3} /> : (() => {
+                if (comando.ordens.length === 0) return <Empty>Nenhuma ordem registrada ainda.</Empty>;
+                return (
+                  <ul className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+                    {comando.ordens.map((o) => (
+                      <li key={o.id} className="rounded-xl border border-line/70 bg-bg/50 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                          <span className="badge badge-luna">luna</span>
+                          <span className="mono text-dim">{o.id.slice(0, 8)}</span>
+                          <span className="ml-auto text-dim">{timeAgo(o.created_at)}</span>
+                          <StatusBadge status={o.status} />
+                        </div>
+                        <div className="mt-1 text-[13px]">{o.ordem}</div>
+                        {o.contexto && <div className="mt-1 text-[11px] text-dim">contexto: {o.contexto}</div>}
+                        {o.result && (
+                          <div className={`mt-2 rounded-lg border p-2 text-[12px] ${o.status === 'error' ? 'border-fail/30 bg-fail/5 text-fail' : 'border-ok/30 bg-ok/5 text-ok'}`}>{o.result}</div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          </div>
+        </Card>
+
+        {/* ---------- 5. ATIVIDADE ---------- */}
+        <Card index={4} className="col-span-12 xl:col-span-6">
           <Title icon={Activity} extra={
             <button className="btn btn-sm -my-1" onClick={loadAtividade}><RefreshCw size={12} />Atualizar</button>
           }>Atividade — saidas recentes</Title>
@@ -464,7 +582,7 @@ export default function Painel() {
         </Card>
 
         {/* ---------- 5. SERVICOS ---------- */}
-        <Card index={4} className="col-span-12 xl:col-span-6">
+        <Card index={5} className="col-span-12 xl:col-span-6">
           <Title icon={Server} extra={<span className="text-[10px] normal-case tracking-normal text-info">countdown = estimativa</span>}>
             Servicos — heartbeats
           </Title>
@@ -501,7 +619,7 @@ export default function Painel() {
         </Card>
 
         {/* ---------- 6. INBOX ---------- */}
-        <Card index={5} className="col-span-12 xl:col-span-6">
+        <Card index={6} className="col-span-12 xl:col-span-6">
           <Title icon={Inbox}>Inbox ao vivo — kimiwork_inbox</Title>
           <div className="relative mb-3 flex gap-1 border-b border-line/70">
             {(['pending', 'processing', 'done', 'error'] as const).map((t) => (
@@ -550,63 +668,8 @@ export default function Painel() {
           )}
         </Card>
 
-        {/* ---------- 7. TURNOS ---------- */}
-        <Card index={6} className="col-span-12 xl:col-span-6">
-          <Title icon={ArrowLeftRight}>Turnos Venus &lt;-&gt; Luna — channel geral</Title>
-          <div className="relative mb-3 flex gap-1 border-b border-line/70">
-            {(['pending', 'answered', 'failed'] as const).map((t) => (
-              <button key={t} onClick={() => setTurnosTab(t)}
-                className={`relative px-3 py-1.5 text-[12px] transition-colors ${turnosTab === t ? 'text-luna' : 'text-dim hover:text-fg'}`}>
-                {t === 'pending' ? 'aguardando a Luna' : t}
-                {turnos && <span className="ml-1 text-[10px] opacity-70">{turnos.filter((x) => x.status === t).length}</span>}
-                {turnosTab === t && <motion.span layoutId="turnos-tab" className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-luna" />}
-              </button>
-            ))}
-          </div>
-          {!turnos ? <Skeleton rows={3} /> : (
-            (() => {
-              const list = turnos.filter((t) => t.status === turnosTab);
-              if (list.length === 0) return <Empty>Nenhum turno neste estado.</Empty>;
-              return (
-                <ul className="space-y-2">
-                  {list.map((t) => (
-                    <li key={t.id} className="rounded-xl border border-line/70 bg-bg/50 px-3 py-2">
-                      <div className="flex flex-wrap items-center gap-2 text-[12px]">
-                        <span className="mono text-dim">{t.id}</span>
-                        <span className="mono text-dim">{t.session_key}</span>
-                        <span className="ml-auto text-dim">{timeAgo(t.created_at)}</span>
-                        <StatusBadge status={t.status} />
-                      </div>
-                      <div className="mt-1 text-[13px]">{t.prompt}</div>
-                      {t.status === 'answered' && t.response && (
-                        <div className="mt-2 rounded-lg border border-ok/30 bg-ok/5 p-2 text-[12px] text-ok">{t.response}</div>
-                      )}
-                      {t.status === 'failed' && t.response && (
-                        <div className="mt-2 rounded-lg border border-fail/30 bg-fail/5 p-2 text-[12px] text-fail">{t.response}</div>
-                      )}
-                      {t.status === 'pending' && (
-                        <div className="mt-2 flex gap-2">
-                          <input
-                            className="input flex-1"
-                            placeholder="Resposta da Luna (UPDATE atomico pending -> answered)"
-                            value={answers[t.id] || ''}
-                            onChange={(e) => setAnswers((a) => ({ ...a, [t.id]: e.target.value }))}
-                          />
-                          <button className="btn btn-primary shrink-0" onClick={() => responderTurno(t)}>
-                            <Send size={12} />Responder
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()
-          )}
-        </Card>
-
         {/* ---------- 8. VENUS ---------- */}
-        <Card index={7} className="col-span-12">
+        <Card index={7} className="col-span-12 xl:col-span-6">
           <Title icon={Sparkles}>Venus — varredura</Title>
           <div className="flex flex-wrap items-center gap-3">
             <span className={`badge ${venus?.status === 'online' ? 'badge-ok' : 'badge-fail'}`}>
