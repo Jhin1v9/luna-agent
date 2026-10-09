@@ -29,3 +29,4 @@ scripts/tmp-*.mjs
 .brain/.tmp_*.json
 worker-restart.err
 *-restart.err
+.aider*

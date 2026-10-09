@@ -149,6 +149,12 @@ const server = http.createServer(async (req, res) => {
       send({ atividade: await atividade() });
     } else if (url.pathname === '/api/contexto' && req.method === 'GET') {
       send({ contexto: await contexto(url.searchParams.get('conversation_id')) });
+    } else if (url.pathname === '/api/venus-supervision' && req.method === 'GET') {
+      const r = await db(
+        `SELECT id, chat_id, left(body, 220) AS body, critic, flagged, luna_verdict, luna_action, created_at, reviewed_at
+         FROM venus_supervision ORDER BY created_at DESC LIMIT 20`,
+      );
+      send({ supervisao: r.rows });
     } else {
       send({ erro: 'rota não encontrada' }, 404);
     }
@@ -240,6 +246,11 @@ const HTML = `<!doctype html>
   </div>
 
   <div class="card" style="grid-column:1/-1">
+    <h2>Guarda da irmã maior — supervisão do O Vênus (crítico por regras, zero tokens)</h2>
+    <div id="supervisao"><span class="dim">carregando…</span></div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
     <h2>📜 Atividade recente (responder de novo com contexto)</h2>
     <div id="atividade"><span class="dim">carregando…</span></div>
   </div>
@@ -270,6 +281,14 @@ async function refresh() {
     return '<div class="item"><div class="meta"><b>' + esc(v.service) + '</b> · pid ' + v.pid + ' · <span class="' + (v.stale ? 'erro' : 'ok') + '">' + (v.stale ? 'PARADO há ' + v.age_s + 's' : 'vivo há ' + v.age_s + 's') + '</span> <span class="badge">' + esc(v.estado) + '</span></div>' +
       (v.next_beat_s != null ? '<div class="dim" style="font-size:12px">próximo beat estimado em ' + v.next_beat_s + 's</div><div class="barra"><div style="width:' + pct + '%"></div></div>' : '') + '</div>';
   }).join('');
+  const sup = await api('/api/venus-supervision');
+  document.getElementById('supervisao').innerHTML = sup.supervisao.map(v =>
+    '<div class="item"><div class="meta"><b>' + esc(v.chat_id) + '</b> · ' + new Date(v.created_at).toLocaleString('pt-BR') +
+    ' · <span class="' + (v.flagged ? 'erro' : 'ok') + '">' + (v.flagged ? 'FLAG: ' + esc((v.critic?.reasons ?? []).join('; ')) : 'passou no crítico') + '</span>' +
+    (v.luna_verdict ? ' · veredito: <b>' + esc(v.luna_verdict) + '</b>' : ' · <span class="dim">aguardando a Luna</span>') + '</div>' +
+    '<div class="body">' + esc(v.body) + '</div>' +
+    (v.luna_action ? '<div class="meta">ação da Luna: ' + esc(v.luna_action) + '</div>' : '') + '</div>'
+  ).join('') || '<span class="dim">nenhuma mensagem dele avaliada ainda</span>';
   const a = await api('/api/atividade');
   document.getElementById('atividade').innerHTML = a.atividade.map(m =>
     '<div class="item"><div class="meta"><b>' + esc(m.sender) + '</b> → ' + esc(m.chat_id) + ' · ' + new Date(m.created_at).toLocaleString('pt-BR') + ' · <span class="' + (m.send_state === 'sent' ? 'ok' : 'erro') + '">' + esc(m.send_state) + '</span></div>' +

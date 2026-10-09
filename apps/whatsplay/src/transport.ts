@@ -33,6 +33,11 @@ export interface UnreadMessage {
   mentioned_luna: boolean;
   /** Quem falou (nome do membro no grupo / contato no privado). */
   author_name?: string | null;
+  /** 📇 Diretório de pessoas (decreto owner 01/10): número, papel e org do
+   *  autor, resolvidos no ingest via contacts.metadata (phone/role/org). */
+  author_phone?: string | null;
+  author_role?: string | null;
+  author_org?: string | null;
   received_at: string;
 }
 
