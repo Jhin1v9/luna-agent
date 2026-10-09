@@ -469,11 +469,17 @@ async function processarEvento(evento) {
 
 async function varredura() {
   console.log(`[vênus] varredura autônoma no ar (poll ${POLL_MS / 1000}s). Modo: VENUS_AUTONOMO no .env`);
+  // Heartbeat contínuo — NÃO só no loop principal: durante o processamento de
+  // um evento (fetch longo pro colibri, minutos) o loop fica await-ed e o beat
+  // parava de bater; o watchdog então achava que o Vênus morreu e dava pm2
+  // restart (crash loop de verdade, 2026-10-09). Com setInterval o beat reflete
+  // "processo vivo"; só fica velho se o event loop travar de verdade.
+  const hb = setInterval(() => { heartbeatVenus().catch(() => {}); }, 25_000);
+  await heartbeatVenus().catch(() => {});
   let ciclos = 0;
   for (;;) {
     ciclos++;
     try {
-      await heartbeatVenus(); // irmã maior enxerga se ele travar/morrer
       if (!venusAutonomo()) {
         if (ciclos % 10 === 1) console.log(`[vênus] modo desligado (VENUS_AUTONOMO!=true) — aguardando`);
       } else {
