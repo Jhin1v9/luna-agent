@@ -558,3 +558,9 @@ Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrument
 - Origem: time interno (Venus) validando as tools do painel — o próprio conteúdo diz que pode apagar. NÃO é demanda de cliente: não gera relatório, não gera aviso no grupo, não entra no placar OnaDance.
 - Disparo legítimo do gatilho por `painel_change` (panelItems 25 vs seenItems 24). Snapshot regravado.
 - autor: Luna (varredura por evento)
+
+## 2026-10-09 (2º evento) — Venus apagou o request de teste; painel volta a 24
+- `cmv19aqrm001bq3031hz148q4` (TESTE VENUS) sumiu do painel — a própria Venus removeu após a validação das tools, como previsto ("pode apagar depois").
+- Nenhum pedido de cliente novo ou alterado. Client actions: mesmas 2 PENDING ("Enviar fotos horizontal" OnaDance + UPLOAD_PHOTOS HDM). Fila kimiwork_inbox: 0 pending.
+- Placar OnaDance inalterado: 4 pedidos em CLIENT_REVIEWING — bola com a Jess.
+- autor: Luna (varredura por evento)
