@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório — Miranda Gestión Contable · Plataforma para Gestoria — Nexo Digital</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --amber: #d97706;
+      --amber-light: #f59e0b;
+      --amber-dark: #b45309;
+      --asphalt: #1a1a1a;
+      --asphalt-light: #2a2a2a;
+      --offwhite: #f7f4ef;
+      --sand: #e8e0d5;
+      --text-secondary: #6b6b6b;
+      --navy: #1e3a5f;
+      --white: #ffffff;
+      --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--offwhite); color: var(--asphalt); line-height: 1.65; }
+    .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Navegação */
+    .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(26,26,26,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-family: 'Playfair Display', serif; font-size: 1.25rem; font-weight: 700; color: var(--offwhite); text-decoration: none; }
+    .nav-logo span { color: var(--amber); }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--amber); }
+    @media (max-width: 768px) { .nav-links { display: none; } }
+
+    /* Hero */
+    .hero { background: linear-gradient(135deg, var(--asphalt) 0%, var(--asphalt-light) 100%); color: var(--offwhite); padding: 9rem 0 5rem; position: relative; overflow: hidden; }
+    .hero::before { content: ''; position: absolute; top: 0; right: 0; width: 600px; height: 600px; background: radial-gradient(circle, rgba(217,119,6,0.15) 0%, transparent 70%); pointer-events: none; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(217,119,6,0.2); color: var(--amber-light); padding: 0.4rem 1rem; border-radius: 50px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.5rem; border: 1px solid rgba(217,119,6,0.3); }
+    .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; line-height: 1.1; margin-bottom: 1.25rem; max-width: 820px; }
+    .hero h1 em { color: var(--amber); font-style: normal; }
+    .hero-subtitle { font-size: 1.2rem; color: rgba(255,255,255,0.7); max-width: 720px; font-weight: 300; line-height: 1.6; }
+    .hero-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); }
+    .hero-meta-item { display: flex; align-items: flex-start; gap: 0.75rem; }
+    .hero-meta-item i { color: var(--amber); margin-top: 0.2rem; }
+    .hero-meta-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.5); margin-bottom: 0.25rem; }
+    .hero-meta-value { font-size: 0.95rem; font-weight: 500; color: var(--offwhite); }
+
+    /* Seções */
+    section { padding: 5rem 0; }
+    .section-header { margin-bottom: 3rem; }
+    .section-kicker { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--amber); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.75rem; }
+    .section-title { font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 3.5vw, 2.5rem); font-weight: 700; color: var(--asphalt); margin-bottom: 1rem; }
+    .section-lead { font-size: 1.1rem; color: var(--text-secondary); max-width: 760px; line-height: 1.7; }
+
+    /* Sumário executivo */
+    .executive { background: var(--white); }
+    .executive-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; }
+    .executive-card { background: var(--offwhite); border-left: 4px solid var(--amber); border-radius: 0 12px 12px 0; padding: 1.5rem; }
+    .executive-card .num { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--amber); line-height: 1; margin-bottom: 0.5rem; }
+    .executive-card h4 { font-size: 0.95rem; font-weight: 600; color: var(--asphalt); margin-bottom: 0.4rem; }
+    .executive-card p { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Visão */
+    .vision { background: var(--asphalt); color: var(--offwhite); }
+    .vision .section-title { color: var(--offwhite); }
+    .vision .section-lead { color: rgba(255,255,255,0.65); }
+    .vision-quote { font-family: 'Playfair Display', serif; font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 600; line-height: 1.4; color: var(--white); border-left: 4px solid var(--amber); padding-left: 1.5rem; margin: 2.5rem 0; max-width: 900px; }
+    .vision-quote small { display: block; font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 400; color: rgba(255,255,255,0.5); margin-top: 0.75rem; }
+    .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 2.5rem; }
+    .principle { background: var(--asphalt-light); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.25rem; }
+    .principle i { color: var(--amber); margin-bottom: 0.6rem; }
+    .principle h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .principle p { font-size: 0.82rem; color: rgba(255,255,255,0.55); }
+
+    /* Módulos */
+    .modules { background: var(--sand); }
+    .module-group { margin-bottom: 2rem; }
+    .module-group h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--asphalt); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .module-group h3 i { color: var(--amber); }
+    .module-chip { display: inline-block; background: var(--white); border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; padding: 0.6rem 1rem; margin: 0 0.5rem 0.5rem 0; font-size: 0.88rem; font-weight: 500; color: var(--asphalt-light); }
+    .module-chip small { display: block; font-weight: 400; color: var(--text-secondary); font-size: 0.78rem; }
+
+    /* Pilares */
+    .pillars { background: var(--white); }
+    .pillar { border: 1px solid rgba(0,0,0,0.06); border-radius: 14px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
+    .pillar-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .pillar-num { width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, var(--amber) 0%, var(--amber-dark) 100%); color: var(--white); font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pillar-head h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--asphalt); }
+    .pillar-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+    .pillar-col h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: var(--amber); margin-bottom: 0.4rem; }
+    .pillar-col p, .pillar-col li { font-size: 0.92rem; color: var(--text-secondary); }
+    .pillar-col ul { margin-left: 1.1rem; }
+    .pillar-col li { padding: 0.15rem 0; }
+
+    /* Roadmap */
+    .roadmap { background: var(--asphalt); color: var(--offwhite); }
+    .roadmap .section-title { color: var(--offwhite); }
+    .roadmap .section-lead { color: rgba(255,255,255,0.65); }
+    .phase { display: grid; grid-template-columns: 130px 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .phase-badge { background: linear-gradient(135deg, var(--amber) 0%, var(--amber-dark) 100%); border-radius: 12px; padding: 1rem; text-align: center; align-self: start; }
+    .phase-badge .ph { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; }
+    .phase-badge .name { font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; }
+    .phase-body h4 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .phase-body ul { margin-left: 1.2rem; font-size: 0.9rem; color: rgba(255,255,255,0.65); }
+    .phase-body li { padding: 0.15rem 0; }
+    @media (max-width: 600px) { .phase { grid-template-columns: 1fr; } }
+
+    /* Checklist */
+    .checklist-section { background: var(--sand); }
+    .check-item { display: flex; gap: 1rem; background: var(--white); border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: var(--shadow-sm); align-items: flex-start; }
+    .check-item i { color: var(--amber); margin-top: 0.2rem; flex-shrink: 0; }
+    .check-item h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.15rem; }
+    .check-item p { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Documento */
+    .doc { background: var(--white); }
+    .doc-box { display: flex; gap: 1.5rem; align-items: center; background: var(--offwhite); border: 1px solid var(--sand); border-radius: 14px; padding: 2rem; flex-wrap: wrap; }
+    .doc-box i { color: var(--amber); flex-shrink: 0; }
+    .doc-info { flex: 1; min-width: 260px; }
+    .doc-info h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; margin-bottom: 0.35rem; }
+    .doc-info p { font-size: 0.9rem; color: var(--text-secondary); }
+    .doc-link { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--asphalt); color: var(--offwhite); text-decoration: none; font-size: 0.9rem; font-weight: 600; padding: 0.8rem 1.4rem; border-radius: 8px; transition: background 0.2s; }
+    .doc-link:hover { background: var(--amber-dark); }
+
+    footer { background: var(--asphalt); color: rgba(255,255,255,0.5); padding: 2.5rem 0; font-size: 0.85rem; }
+    footer .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    footer b { color: var(--offwhite); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="container nav-inner">
+    <a href="/relatorios/" class="nav-logo">Nexo<span>Digital</span></a>
+    <ul class="nav-links">
+      <li><a href="#visao">Visão</a></li>
+      <li><a href="#modulos">Módulos</a></li>
+      <li><a href="#pilares">Pilares</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#reuniao">Reunião</a></li>
+      <li><a href="#documento">Documento</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <div class="hero-badge"><i data-lucide="briefcase" style="width:14px;height:14px"></i> Lead · Pré-venda · Gestoria contábil</div>
+    <h1>Miranda Gestión Contable<br><em>Plataforma de gestão para gestoria</em><br>Documento vivo do projeto</h1>
+    <p class="hero-subtitle">Uma plataforma SaaS desenhada desde o início para o trabalho multiempresa de uma gestoria espanhola: faturação, motor fiscal AEAT/Navarra, compliance VERI*FACTU/SIF, OCR, conciliação bancária, portal do cliente e gestão de honorários — tudo numa única plataforma.</p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <i data-lucide="calendar-days" style="width:18px;height:18px"></i>
+        <div>
+          <div class="hero-meta-label">Reunião de alinhamento</div>
+          <div class="hero-meta-value">1º de outubro de 2026</div>
+        </div>
+      </div>
+      <div class="hero-meta-item">
+        <i data-lucide="file-text" style="width:18px;height:18px"></i>
+        <div>
+          <div class="hero-meta-label">Especificação funcional</div>
+          <div class="hero-meta-value">v1.0 · 50 seções</div>
+        </div>
+      </div>
+      <div class="hero-meta-item">
+        <i data-lucide="flag" style="width:18px;height:18px"></i>
+        <div>
+          <div class="hero-meta-label">Status</div>
+          <div class="hero-meta-value">Lead · Em descoberta</div>
+        </div>
+      </div>
+      <div class="hero-meta-item">
+        <i data-lucide="users" style="width:18px;height:18px"></i>
+        <div>
+          <div class="hero-meta-label">Responsável Nexo</div>
+          <div class="hero-meta-value">Abner & equipe Nexo Digital</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="executive" id="resumo">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="scan-eye" style="width:16px;height:16px"></i> Leitura em 1 minuto</span>
+      <h2 class="section-title">Sumário executivo</h2>
+    </div>
+    <div class="executive-grid">
+      <div class="executive-card">
+        <div class="num">1</div>
+        <h4>Plataforma, não ferramenta</h4>
+        <p>Um sistema único para a Miranda gerir todos os seus clientes: autónomos, SLs e comunidades de bens, cada um como um tenant isolado e seguro.</p>
+      </div>
+      <div class="executive-card">
+        <div class="num">2</div>
+        <h4>Dois motores fiscais</h4>
+        <p>Motor fiscal separado e versionado para AEAT/Território Comum e para Navarra — sem risco de apresentar um cliente no órgão errado.</p>
+      </div>
+      <div class="executive-card">
+        <div class="num">4</div>
+        <h4>Fases até o SaaS</h4>
+        <p>Núcleo → fiscal e automação → compliance e integrações → expansão (laboral, expedientes, extranjería). Nasce para a Miranda, pronta para outras gestorías.</p>
+      </div>
+      <div class="executive-card">
+        <div class="num">28</div>
+        <h4>Telas no protótipo</h4>
+        <p>Antes de programar, um protótipo navegável de alta fidelidade com dados fictícios para a Miranda testar todos os fluxos.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="vision" id="visao">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="compass" style="width:16px;height:16px"></i> Fundamento</span>
+      <h2 class="section-title">A visão — a alma da plataforma</h2>
+    </div>
+    <div class="vision-quote">
+      "Um sistema próprio de gestão para gestoria, com experiência comparável a um software premium de faturação e contabilidade, otimizado para gerir muitos clientes, múltiplos territórios fiscais, documentos, tarefas e serviços administrativos em uma única plataforma."
+      <small>— Especificação funcional v1.0, §1 e §50</small>
+    </div>
+    <p class="section-lead" style="margin-bottom:2rem">O ponto de partida é a amplitude funcional de plataformas como o ContaSimple — mas desenhada desde o primeiro dia para o trabalho multi-cliente de uma gestoria. A referência serve apenas para definir paridade de categorias funcionais e qualidade de experiência: nada de cópia de telas, textos ou código de terceiros.</p>
+    <div class="principles">
+      <div class="principle">
+        <i data-lucide="building-2" style="width:20px;height:20px"></i>
+        <h4>Multiempresa de verdade</h4>
+        <p>Cada cliente é um tenant lógico isolado. Toda consulta filtrada e validada no backend — nenhum cliente enxerga dados de outro.</p>
+      </div>
+      <div class="principle">
+        <i data-lucide="shield-check" style="width:20px;height:20px"></i>
+        <h4>Compliance nativo</h4>
+        <p>VERI*FACTU/SIF tratado como subsistema regulatório próprio: imutabilidade, encadeamento de registros, hash, QR e evidência por versão.</p>
+      </div>
+      <div class="principle">
+        <i data-lucide="sparkles" style="width:20px;height:20px"></i>
+        <h4>OCR com revisão humana</h4>
+        <p>Digitalização extrai fornecedor, NIF, bases e IVA — mas nunca contabiliza no escuro: tudo que é incerto vai para revisão do gestor.</p>
+      </div>
+      <div class="principle">
+        <i data-lucide="trending-up" style="width:20px;height:20px"></i>
+        <h4>Nascida para crescer</h4>
+        <p>Arquitetura separada em platform → gestoria → cliente business. A primeira versão tem só a Miranda; a estrutura já permite virar SaaS.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="modules" id="modulos">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="layout-grid" style="width:16px;height:16px"></i> Escopo do sistema</span>
+      <h2 class="section-title">Os módulos da plataforma</h2>
+      <p class="section-lead">Levantamento completo da especificação funcional, organizado por frente de produto. É o mapa de superfície do sistema — o MVP implementa primeiro o coração disso tudo.</p>
+    </div>
+
+    <div class="module-group">
+      <h3><i data-lucide="folder-kanban" style="width:20px;height:20px"></i> Gestão da carteira</h3>
+      <span class="module-chip">Clientes multiempresa<small>autónomos, SLs, comunidades de bens</small></span>
+      <span class="module-chip">CRM<small>clientes e fornecedores com histórico 360º</small></span>
+      <span class="module-chip">Catálogo de produtos/serviços<small>importação CSV/XLSX, edição em massa</small></span>
+      <span class="module-chip">Dashboard operacional<small>cards e gráficos de receita, honorários e pendências</small></span>
+    </div>
+
+    <div class="module-group">
+      <h3><i data-lucide="receipt" style="width:20px;height:20px"></i> Faturação e compras</h3>
+      <span class="module-chip">Motor de faturação<small>orçamentos, albaranes, faturas, retificativas, recorrentes</small></span>
+      <span class="module-chip">Séries auditáveis<small>sem duplicidade, sequência por empresa/exercício</small></span>
+      <span class="module-chip">Facturae / FACe<small>XML validado, assinatura, envio e estado</small></span>
+      <span class="module-chip">Faturas recebidas e gastos<small>dedutibilidade, bens de investimento</small></span>
+      <span class="module-chip">OCR<small>upload, câmera, confiança e revisão obrigatória</small></span>
+    </div>
+
+    <div class="module-group">
+      <h3><i data-lucide="landmark" style="width:20px;height:20px"></i> Banco e cobrança</h3>
+      <span class="module-chip">Open Banking / PSD2<small>importação e sincronização de contas</small></span>
+      <span class="module-chip">Conciliação inteligente<small>match 1:N e N:1 por valor, data, NIF, IBAN</small></span>
+      <span class="module-chip">Cobranças e aging<small>vencimentos, atraso, alertas 7/15/30 dias</small></span>
+      <span class="module-chip">Remessas SEPA<small>mandatos, XML, devoluções, histórico</small></span>
+    </div>
+
+    <div class="module-group">
+      <h3><i data-lucide="calculator" style="width:20px;height:20px"></i> Fiscal</h3>
+      <span class="module-chip">Motor AEAT<small>303, 390, 130, 111, 190, 115, 180, 347, 349</small></span>
+      <span class="module-chip">Motor Navarra<small>separado, versionado, sem reuso automático</small></span>
+      <span class="module-chip">VERI*FACTU / SIF<small>subsistema regulatório próprio com fila e evidência</small></span>
+      <span class="module-chip">Calendário de obrigações<small>alertas D-30/D-15/D-7/D-3/D-1 configuráveis</small></span>
+      <span class="module-chip">Livros registro<small>fechamento por período com trilha de auditoria</small></span>
+    </div>
+
+    <div class="module-group">
+      <h3><i data-lucide="heart-handshake" style="width:20px;height:20px"></i> Operação da gestoria</h3>
+      <span class="module-chip">Portal do cliente<small>envio de documentos, prazos, honorários, aprovações</small></span>
+      <span class="module-chip">Tarefas e Kanban<small>templates, recorrência, tempo gasto</small></span>
+      <span class="module-chip">Gestão documental<small>Cliente › Ano › Área › Período › Tipo</small></span>
+      <span class="module-chip">Honorários da gestoria<small>MRR, mensalidades, inadimplência, cobrança automática</small></span>
+      <span class="module-chip">Expedientes<small>extranjería, DGT e trâmites — o diferencial da Miranda</small></span>
+      <span class="module-chip">Relatórios<small>P&L, impostos, carteira, produtividade, exportação</small></span>
+    </div>
+  </div>
+</section>
+
+<section class="pillars" id="pilares">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="columns-3" style="width:16px;height:16px"></i> Engenharia do produto</span>
+      <h2 class="section-title">Os pilares técnicos</h2>
+      <p class="section-lead">As decisões de arquitetura que sustentam a proposta — definidas antes do orçamento, não depois do problema.</p>
+    </div>
+
+    <div class="pillar">
+      <div class="pillar-head">
+        <div class="pillar-num">1</div>
+        <h3>Isolamento multi-tenant</h3>
+      </div>
+      <div class="pillar-cols">
+        <div class="pillar-col">
+          <h4>O que é</h4>
+          <p>Cada cliente da gestoria opera como um tenant lógico separado, com todas as entidades de negócio carregando tenant_id, status e versionamento.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Por que importa</h4>
+          <p>Regra crítica da especificação: nenhum usuário cliente visualiza dados de outro. O isolamento é validado no backend, não apenas na interface.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Como construir</h4>
+          <ul>
+            <li>Filtragem por tenant em toda consulta</li>
+            <li>Testes de isolamento obrigatórios antes do go-live</li>
+            <li>Estrutura pronta para SaaS multi-gestoría</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pillar-head">
+        <div class="pillar-num">2</div>
+        <h3>VERI*FACTU / SIF como subsistema</h3>
+      </div>
+      <div class="pillar-cols">
+        <div class="pillar-col">
+          <h4>O que é</h4>
+          <p>Módulo regulatório próprio: fatura emitida não se apaga, correções seguem fluxo legal, registros encadeados com hash/huella e QR.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Por que importa</h4>
+          <p>A regulamentação espanhola de Sistemas Informáticos de Faturação exige integridade, inalterabilidade e rastreabilidade. Tratar como "só mais um PDF" é risco jurídico.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Como construir</h4>
+          <ul>
+            <li>Idempotência no envio à AEAT</li>
+            <li>Fila de reenvio com request/response guardados</li>
+            <li>Usuário nunca edita hash, QR ou registro fiscal</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pillar-head">
+        <div class="pillar-num">3</div>
+        <h3>Motor fiscal dual e versionado</h3>
+      </div>
+      <div class="pillar-cols">
+        <div class="pillar-col">
+          <h4>O que é</h4>
+          <p>TaxEngine AEAT e TaxEngineNavarra separados, parametrizados por território, exercício e versão da regra. Nada de alíquota hardcoded.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Por que importa</h4>
+          <p>Navarra não usa os mesmos modelos nem fluxos da AEAT. Misturar os dois é um dos erros fatais que a especificação proíbe explicitamente.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Como construir</h4>
+          <ul>
+            <li>Tabelas de regra versionadas com vigência</li>
+            <li>A interface mostra claramente o órgão do cliente</li>
+            <li>Workflow: pré-cálculo → revisão → bloqueio → apresentação → justificante</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pillar-head">
+        <div class="pillar-num">4</div>
+        <h3>Segurança, RGPD e auditoria</h3>
+      </div>
+      <div class="pillar-cols">
+        <div class="pillar-col">
+          <h4>O que é</h4>
+          <p>RBAC por módulo/ação/cliente, MFA, criptografia em trânsito e repouso, secrets em vault e audit log imutável de toda ação fiscal relevante.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Por que importa</h4>
+          <p>A plataforma operará dados fiscais sensíveis de dezenas de empresas. RGPD e conservação legal de dados fiscais são requisitos de produto, não extras.</p>
+        </div>
+        <div class="pillar-col">
+          <h4>Como construir</h4>
+          <ul>
+            <li>Privacy by design e minimização</li>
+            <li>Backup criptografado com cópia separada (RPO ≤ 24h)</li>
+            <li>Logs críticos protegidos contra alteração</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="roadmap" id="roadmap">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="map" style="width:16px;height:16px"></i> Trajetória proposta</span>
+      <h2 class="section-title">Roadmap — do papel à plataforma</h2>
+      <p class="section-lead">O caminho em etapas definido na especificação. Cada fase termina com entrega demonstrável e critérios de aceite claros.</p>
+    </div>
+
+    <div class="phase">
+      <div class="phase-badge">
+        <div class="ph">Etapa A</div>
+        <div class="name">Descoberta</div>
+      </div>
+      <div class="phase-body">
+        <h4>Mapa funcional, arquitetura proposta e backlog</h4>
+        <ul>
+          <li>Levantamento de dúvidas, riscos e integrações</li>
+          <li>Respostas às 25 perguntas técnicas da especificação</li>
+          <li>Proposta fechada com escopo e cronograma</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-badge">
+        <div class="ph">Etapa B</div>
+        <div class="name">UX/UI + Protótipo</div>
+      </div>
+      <div class="phase-body">
+        <h4>Protótipo navegável de alta fidelidade</h4>
+        <ul>
+          <li>Sitemap, wireframes e design system (azul marinho, bege e branco)</li>
+          <li>28 telas obrigatórias, desktop da gestoria + portal do cliente</li>
+          <li>Fluxo de demonstração completo: documento → OCR → gasto → conciliação → fatura → fiscal → portal</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-badge">
+        <div class="ph">Fases 1–2</div>
+        <div class="name">MVP</div>
+      </div>
+      <div class="phase-body">
+        <h4>Núcleo + fiscal e automação</h4>
+        <ul>
+          <li>Fase 1 — núcleo: autenticação, multiempresa, CRM, faturação, gastos, documentos, dashboard, tarefas, portal, honorários</li>
+          <li>Fase 2 — fiscal: livros, motores AEAT e Navarra, calendário, OCR, banco, conciliação, SEPA</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-badge">
+        <div class="ph">Fases 3–4</div>
+        <div class="name">Expansão</div>
+      </div>
+      <div class="phase-body">
+        <h4>Compliance avançado e novos módulos</h4>
+        <ul>
+          <li>Fase 3 — SIF/VERI*FACTU, Facturae/FACe, assinatura, APIs e automações</li>
+          <li>Fase 4 — laboral/nóminas, expedientes, extranjería, DGT, app móvel</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="checklist-section" id="reuniao">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="list-checks" style="width:16px;height:16px"></i> Checklist da reunião</span>
+      <h2 class="section-title">O que vamos alinhar com a Miranda</h2>
+      <p class="section-lead">Os pontos que transformam este documento em proposta fechada. Quanto mais concreto o número, mais preciso o orçamento.</p>
+    </div>
+
+    <div class="check-item">
+      <i data-lucide="users" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Carteira e volume</h4>
+        <p>Quantos clientes ativos hoje, tipos (autónomos vs. sociedades), território de cada um (AEAT vs. Navarra) e crescimento esperado em 12 meses.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <i data-lucide="wallet" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Honorários e mensalidades</h4>
+        <p>Como a Miranda cobra hoje (por cliente, planos, extras), para dimensionar o módulo de honorários e o portal de cobrança.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <i data-lucide="file-check" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Prioridade do compliance</h4>
+        <p>Se a faturação produtiva já nasce sujeita a VERI*FACTU/SIF, a Fase 3 pode precisar ser antecipada — validamos juntos antes de fechar o cronograma.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <i data-lucide="plug" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Integrações existentes</h4>
+        <p>Banco(s) usados pelos clientes, provedor de OCR preferido, uso atual de certificados digitais e qualquer ferramenta que precise de migração.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <i data-lucide="key-round" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Propriedade e portabilidade</h4>
+        <p>Código-fonte, domínio, cloud e contas de terceiros no nome da Miranda — portabilidade total e sem lock-in, como exige a especificação.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <i data-lucide="rocket" style="width:18px;height:18px"></i>
+      <div>
+        <h4>Visão SaaS de longo prazo</h4>
+        <p>Ambição de vender a plataforma para outras gestorías no futuro — isso define decisões de arquitetura desde o primeiro sprint.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc" id="documento">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-kicker"><i data-lucide="book-open" style="width:16px;height:16px"></i> Documento-base</span>
+      <h2 class="section-title">Especificação funcional completa</h2>
+    </div>
+    <div class="doc-box">
+      <i data-lucide="file-text" style="width:40px;height:40px"></i>
+      <div class="doc-info">
+        <h3>Especificação Funcional v1.0 — Sistema de Gestão para Gestoria</h3>
+        <p>50 seções: visão do produto, perfis de usuário, arquitetura multiempresa, módulos fiscais e de faturação, VERI*FACTU/SIF, modelo de dados com 44 entidades, regras de negócio críticas, MVP recomendado, critérios de aceite e fontes oficiais consultadas (AEAT, BOE, Facturae). Documento de referência para a Etapa A de descoberta.</p>
+      </div>
+      <a class="doc-link" href="especificacao_sistema_gestoria_miranda.md"><i data-lucide="arrow-right" style="width:16px;height:16px"></i> Ler especificação completa</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div><b>Nexo Digital</b> · Relatório do lead — Miranda Gestión Contable</div>
+    <div>Documento vivo · atualizado em 1 de outubro de 2026</div>
+  </div>
+</footer>
+
+<script>
+  lucide.createIcons();
+</script>
+</body>
+</html>

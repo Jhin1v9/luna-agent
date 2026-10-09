@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar de Concorrentes — Agentes de IA · Luna · Nexo Digital</title>
+<meta name="description" content="Análise comparativa de concorrentes de agentes de IA (Wereplai, Sonora Intelligence, CuteOPS) vs Luna — o que eles não fazem e a Luna faz.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased font-sans">
+
+<!-- Hero -->
+<header class="relative overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-950/60 via-slate-950 to-slate-950"></div>
+  <div class="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl"></div>
+  <div class="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-fuchsia-500/10 blur-3xl"></div>
+  <div class="relative max-w-5xl mx-auto px-6 py-16 sm:py-20">
+    <div class="flex items-center gap-2 text-indigo-400 text-sm font-medium tracking-wide uppercase">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+      Luna · Nexo Digital — material interno
+    </div>
+    <h1 class="mt-4 text-4xl sm:text-5xl font-extrabold tracking-tight">
+      Radar de Concorrentes<br>
+      <span class="bg-gradient-to-r from-indigo-400 to-fuchsia-400 bg-clip-text text-transparent">Agentes de IA no mercado hispânico</span>
+    </h1>
+    <p class="mt-6 text-lg text-slate-300 max-w-3xl">
+      Pedido do Abner (Production, 01/10/2026): <strong class="text-white">"pegar o que essas empresas NÃO fazem e oferecer com a Luna — esse é nosso ponto forte."</strong>
+      Análise verificada no site oficial de cada empresa. Preços conferidos em 01/10/2026.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <span class="badge bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">3 concorrentes analisados a fundo</span>
+      <span class="badge bg-amber-500/15 text-amber-300 border border-amber-500/30">+5 no radar rápido</span>
+      <span class="badge bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">todos os preços com fonte</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 pb-20 space-y-16">
+
+  <!-- TL;DR -->
+  <section class="card !bg-indigo-500/5 !border-indigo-500/20">
+    <h2 class="text-2xl font-bold text-white">Resumo executivo</h2>
+    <p class="mt-3 text-slate-300 leading-relaxed">
+      Nenhum dos três é concorrente direto da Luna. <strong class="text-white">Wereplai</strong> é um script vertical de agenda para salões (39€/mês, não é LLM livre).
+      <strong class="text-white">Sonora Intelligence</strong> faz voz 24/7 com bom marketing, mas esconde o preço atrás de call de vendas e não mostra execução de tarefas.
+      <strong class="text-white">CuteOPS</strong> nem é agente de IA — é software de gestão (agenda/caixa), compete com Booksy/Fresha.
+      A lacuna comum aos três: <strong class="text-indigo-300">nenhum executa trabalho de verdade, nenhum tem memória duradoura entre sessões, nenhum opera time + clientes no mesmo cérebro.</strong>
+    </p>
+  </section>
+
+  <!-- Concorrentes -->
+  <section>
+    <h2 class="text-2xl font-bold text-white mb-6">Análise a fundo</h2>
+    <div class="grid gap-6 md:grid-cols-3">
+
+      <!-- Wereplai -->
+      <article class="card flex flex-col">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xl font-bold text-white">Wereplai</h3>
+          <span class="badge bg-emerald-500/15 text-emerald-300">preço público</span>
+        </div>
+        <p class="mt-1 text-sm text-indigo-300">wereplai.com</p>
+        <dl class="mt-4 space-y-3 text-sm text-slate-300 flex-1">
+          <div><dt class="font-semibold text-slate-100">O que é</dt><dd>Agente de WhatsApp <em>vertical</em> de agendamento (citas) para peluquerías e barberías: agenda, lembretes anti-falta, integração com Booksy.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Preço</dt><dd><strong class="text-white">39€/mês + IVA</strong> — plano único, sem permanência, 30 dias de garantia.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Como responde</dt><dd>Só com o que o dono configura (serviços, preços, horários). <strong class="text-white">Não é LLM livre</strong> — fora do script, manda falar com o humano.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Empresa</dt><dd>SERCASYSTEM SOLUCIONES SL (Espanha), RGPD, servidores europeus, setup em call de 15 min.</dd></div>
+        </dl>
+        <div class="mt-5 pt-4 border-t border-white/10">
+          <p class="text-xs font-semibold uppercase tracking-wide text-rose-400">Não faz</p>
+          <ul class="mt-2 text-sm text-slate-400 space-y-1 list-disc list-inside">
+            <li>Memória duradoura entre execuções</li>
+            <li>Execução de tarefas (deploy, código, SQL, relatórios)</li>
+            <li>Operação multi-grupo (time + clientes)</li>
+            <li>Voz / Telegram / painel de pedidos</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- Sonora -->
+      <article class="card flex flex-col">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xl font-bold text-white">Sonora Intelligence</h3>
+          <span class="badge bg-rose-500/15 text-rose-300">preço oculto</span>
+        </div>
+        <p class="mt-1 text-sm text-indigo-300">sonoraintelligence.com</p>
+        <dl class="mt-4 space-y-3 text-sm text-slate-300 flex-1">
+          <div><dt class="font-semibold text-slate-100">O que é</dt><dd>Agentes de voz IA 24/7 ("inteligência adaptativa e empatia digital") + assistentes de WhatsApp e Telegram para vendas e suporte.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Preço</dt><dd><strong class="text-white">Não publica.</strong> Só via discovery call com "especialista" — barreira: o cliente não sabe quanto custa sem falar com vendas.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Features declaradas</dt><dd>Plantillas aprovadas por Meta, envio proativo, CRM + webhooks, menus inline e comandos, atende grupos, pagamentos/links/notificações, escala.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Observação</dt><dd>Marketing forte, conteúdo concreto fraco: nada de case, preço ou demo pública verificável no site.</dd></div>
+        </dl>
+        <div class="mt-5 pt-4 border-t border-white/10">
+          <p class="text-xs font-semibold uppercase tracking-wide text-rose-400">Não faz (público)</p>
+          <ul class="mt-2 text-sm text-slate-400 space-y-1 list-disc list-inside">
+            <li>Preço transparente (call de vendas obrigatória)</li>
+            <li>Evidência de memória duradoura por cliente</li>
+            <li>Execução operacional de verdade</li>
+            <li>Painel de pedidos / relatórios de cliente</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- CuteOPS -->
+      <article class="card flex flex-col">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xl font-bold text-white">CuteOPS</h3>
+          <span class="badge bg-slate-500/20 text-slate-300">outra categoria</span>
+        </div>
+        <p class="mt-1 text-sm text-indigo-300">cuteops.com</p>
+        <dl class="mt-4 space-y-3 text-sm text-slate-300 flex-1">
+          <div><dt class="font-semibold text-slate-100">O que é</dt><dd><strong class="text-white">Software de gestão</strong> para centros de beleza: agenda, caixa, confirmações, comissões de equipe. Não é agente de IA conversacional.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Concorrência real</dt><dd>Booksy, Fresha, Square Appointments — SaaS de gestão de salão.</dd></div>
+          <div><dt class="font-semibold text-slate-100">Preço</dt><dd>Varia por plano (categoria padrão do setor: 5–80€/mês conforme porte).</dd></div>
+        </dl>
+        <div class="mt-5 pt-4 border-t border-white/10">
+          <p class="text-xs font-semibold uppercase tracking-wide text-rose-400">Não faz</p>
+          <ul class="mt-2 text-sm text-slate-400 space-y-1 list-disc list-inside">
+            <li>Nada de IA conversacional ou voz</li>
+            <li>Sem atendimento autônomo de clientes</li>
+            <li>Sem execução de tarefas externas</li>
+          </ul>
+          <p class="mt-3 text-sm text-slate-400"><strong class="text-slate-200">Leitura:</strong> entra como contexto de mercado, não como ameaça direta. O cliente que compra CuteOPS ainda precisa de alguém para atender.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Tabela comparativa -->
+  <section>
+    <h2 class="text-2xl font-bold text-white mb-6">Comparativo direto — o que cada um entrega</h2>
+    <div class="card overflow-x-auto !p-0">
+      <table class="w-full text-sm min-w-[640px]">
+        <thead>
+          <tr class="text-left text-slate-400 border-b border-white/10">
+            <th class="p-4 font-semibold">Capacidade</th>
+            <th class="p-4 font-semibold text-indigo-300">Luna</th>
+            <th class="p-4 font-semibold">Wereplai</th>
+            <th class="p-4 font-semibold">Sonora</th>
+            <th class="p-4 font-semibold">CuteOPS</th>
+          </tr>
+        </thead>
+        <tbody class="text-slate-300">
+          <tr class="border-b border-white/5"><td class="p-4">LLM livre (responde o inesperado)</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-rose-400">Não — script fechado</td><td class="p-4 text-slate-500">não claro</td><td class="p-4 text-rose-400">Não aplica</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Voz / chamadas</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-emerald-400">Sim (core)</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">WhatsApp + Telegram</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-amber-400">Só WhatsApp</td><td class="p-4 text-emerald-400">Sim</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Memória duradoura entre execuções</td><td class="p-4 text-emerald-400 font-bold">Sim (.brain)</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-rose-400">Não evidencia</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Execução de tarefas de verdade (código, deploy, SQL, relatórios)</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-rose-400">Não evidencia</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Operação time + clientes no mesmo cérebro</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-amber-400">Parcial (grupos)</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Integração com painel de pedidos</td><td class="p-4 text-emerald-400 font-bold">Sim (Nexo)</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-amber-400">CRM genérico</td><td class="p-4 text-rose-400">Não</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Relatórios obrigatórios de cliente ativo</td><td class="p-4 text-emerald-400 font-bold">Sim</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-amber-400">Só gestão interna</td></tr>
+          <tr class="border-b border-white/5"><td class="p-4">Preço transparente</td><td class="p-4 text-emerald-400 font-bold">Sim (setup + mensal)</td><td class="p-4 text-emerald-400">Sim — 39€/mês</td><td class="p-4 text-rose-400">Não</td><td class="p-4 text-amber-400">Sim</td></tr>
+          <tr><td class="p-4">Setup</td><td class="p-4">Onboarding pelo time Nexo</td><td class="p-4">Call de 15 min</td><td class="p-4">Discovery call + plano a medida</td><td class="p-4">Auto-cadastro</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-xs text-slate-500">Lenda: verde = entrega · âmbar = parcial / diferente · vermelho = não entrega. "Não evidencia" = o site oficial não mostra a capacidade.</p>
+  </section>
+
+  <!-- Nosso ponto forte -->
+  <section class="card !bg-gradient-to-br !from-indigo-500/10 !to-fuchsia-500/5 !border-indigo-500/25">
+    <h2 class="text-2xl font-bold text-white">O que NENHUM deles faz — nosso ponto forte (decreto do Abner)</h2>
+    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">1 · Memória entre execuções</p>
+        <p class="mt-1 text-sm text-slate-300">A Luna lembra do que aconteceu ontem, semana passada, mês passado. Scripts concorrentes reiniciam do zero a cada conversa.</p>
+      </div>
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">2 · Execução, não só conversa</p>
+        <p class="mt-1 text-sm text-slate-300">Deploy, código, SQL, relatório, auditoria de site: a tarefa é feita de verdade e o resultado volta no grupo. Concorrente responde; a Luna entrega.</p>
+      </div>
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">3 · Um cérebro, time + clientes</p>
+        <p class="mt-1 text-sm text-slate-300">Grupo do time, grupos de cliente, privado — a mesma Luna sabe quem é quem e o que cada projeto pede. Diretório de pessoas + fichas de cliente.</p>
+      </div>
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">4 · Integração com o painel Nexo</p>
+        <p class="mt-1 text-sm text-slate-300">Pedido do cliente entra no painel, a Luna reconcilia painel × relatório × WhatsApp. Ninguém no mercado hispânico entrega isso no pacote.</p>
+      </div>
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">5 · Voz + texto no mesmo cérebro</p>
+        <p class="mt-1 text-sm text-slate-300">Chamadas de voz e mensagens compartilham memória e contexto — não são dois produtos plugados com gambiarras.</p>
+      </div>
+      <div class="rounded-xl bg-slate-900/60 p-4 border border-white/5">
+        <p class="font-semibold text-indigo-300">6 · Preço e escopo à vista</p>
+        <p class="mt-1 text-sm text-slate-300">Setup 490/990/1900€ + mensal 89/189/349€, sem permanência. O cliente sabe quanto custa antes da primeira call — diferente de quem esconde preço.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Radar rápido -->
+  <section>
+    <h2 class="text-2xl font-bold text-white mb-2">Radar rápido — outros players do nicho</h2>
+    <p class="text-sm text-slate-400 mb-6">Leitura de superfície (site público, sem call). Serve pra mapear a categoria; análise a fundo sob demanda.</p>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="card !p-5"><p class="font-bold text-white">Ringover AIRO</p><p class="text-sm text-slate-400 mt-1">Voz 24/7 multilíngue. 98–390€/mês por pacote de minutos (0,39–0,49€/min). Forte em call-center.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">CloudTalk AI</p><p class="text-sm text-slate-400 mt-1">Recepcionista IA a partir de €0 (50 min grátis) e especialista a 349€/mês. Foco inbound/routing.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">Bookio</p><p class="text-sm text-slate-400 mt-1">Agente de voz p/ reservas; diz resolver 92% das chamadas repetitivas. Preço sob consulta.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">Kosmo (México)</p><p class="text-sm text-slate-400 mt-1">Mesma IA atende WhatsApp/Instagram E voz. Add-on a partir de ~$12.497 MXN/mês de base.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">ZeeClip</p><p class="text-sm text-slate-400 mt-1">Gestão + "recepcionista virtual" 24/7 para salões. Híbrido gestão/atendimento.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">ConverFlow AI</p><p class="text-sm text-slate-400 mt-1">Vertical HVAC/Roofing hispânico nos EUA. Prova que verticalização por nicho funciona — mesma tese do Abner.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">MiWebAhora <span class="text-xs font-normal text-amber-400">· novo (Enoque, 01/10)</span></p><p class="text-sm text-slate-400 mt-1">Builder de sites com IA (Freename AG, Suíça): descreve o negócio e a assistente "Lina" monta a web em 60s. Plano grátis c/ distintivo, Básico 9€/mês, edição via WhatsApp/Instagram, GEO p/ Google+ChatGPT. Ameaça do low-end: os autónomos que pagariam setup 490€ são exatamente o plano grátis deles. Contra-ataque Nexo: done-for-you + suporte real + agente operacional. (E o nome da assistente deles é Lina — coincidência invejosa 😄)</p></div>
+    </div>
+  </section>
+
+  <!-- Checklist de comprovações (Enoque) -->
+  <section>
+    <h2 class="text-2xl font-bold text-white mb-2">Checklist de comprovações — segurança de agentes de IA</h2>
+    <p class="text-sm text-slate-400 mb-6">Lista do Enoque (Production, 01/10/2026), organizada pela Luna como due diligence: as 9 comprovações de segurança a exigir de qualquer vendor de agente de IA — e das nossas próprias entregas.</p>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="card !p-5"><p class="font-bold text-white">1 · XSS em campos</p><p class="text-sm text-slate-400 mt-1">Input do usuário refletido em telas/painéis sem sanitização. Teste: injetar <code class="text-rose-300">&lt;script&gt;</code> em nome/mensagem e ver se executa em outra view.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">2 · Rotas de API sem validação de ID</p><p class="text-sm text-slate-400 mt-1">IDOR: trocar o id na rota e acessar dado de outro cliente (/api/conversa/123 → 124). O sistema valida posse do recurso?</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">3 · Chaves de API expostas</p><p class="text-sm text-slate-400 mt-1">Key embutida no JS do front ou commitada no GitHub = acesso fácil. Varrer repo público e bundle antes de contratar — GitHub é a 1ª fonte de vazamento.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">4 · Banco sem regras de acesso</p><p class="text-sm text-slate-400 mt-1">SQL injection: input cru chegando na query. Exigir prepared statements, credenciais fora do código e princípio do menor privilégio no banco.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">5 · Sem limite de tentativas de login</p><p class="text-sm text-slate-400 mt-1">Se o login aceita 1000 tentativas, robôs forçam até entrar. Exigir rate limit, lockout e 2FA no painel do vendor.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">6 · Prompt injection</p><p class="text-sm text-slate-400 mt-1">Usuário ou conteúdo externo redireciona o agente ("ignore instruções anteriores"). Agente seguro tem escopo fechado e confirmação humana pra ações sensíveis.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">7 · Escuta/leitura de e-mails e mensagens</p><p class="text-sm text-slate-400 mt-1">Se o agente lê mensagens de clientes, um texto malicioso vira instrução (cruzamento com o item 6). Exigir separação dado-instrução e sandbox de conteúdo.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">8 · Pacotes inventados (supply chain)</p><p class="text-sm text-slate-400 mt-1">Agente que executa código pode instalar bibliotecas maliciosas ou typosquatting. Exigir pin de versões, registro interno e revisão do que foi instalado.</p></div>
+      <div class="card !p-5"><p class="font-bold text-white">9 · RLS (Row-Level Security)</p><p class="text-sm text-slate-400 mt-1">Banco multi-tenant: usuário A nunca lê a linha do usuário B, mesmo com query válida. Exigir RLS nativo ou isolamento equivalente auditável.</p></div>
+    </div>
+    <div class="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/5 p-5">
+      <p class="text-sm text-amber-200/90"><strong class="text-amber-200">Padrão Nexo:</strong> este checklist vira parte da avaliação de todo concorrente novo que entrar no radar — e espelho interno: a Luna opera fail-closed, sem segredos em logs, e o repositório segue o protocolo de segurança do Enoque (15:11, 01/10).</p>
+    </div>
+  </section>
+
+  <!-- Recomendações -->
+  <section class="card">
+    <h2 class="text-2xl font-bold text-white">Recomendações pra Nexo</h2>
+    <ol class="mt-4 space-y-3 text-slate-300 list-decimal list-inside text-sm sm:text-base">
+      <li><strong class="text-white">Comunicação comercial:</strong> vender a Luna como "agente operacional" (executa + lembra + integra), NÃO como "chatbot". Todos os concorrentes disputam o chão de "atendimento"; o andar de cima está vazio.</li>
+      <li><strong class="text-white">Transparência de preço como arma:</strong> Sonora esconde o preço — nós mostramos. Na landing, manter preço à vista com garantia de 30 dias.</li>
+      <li><strong class="text-white">Verticalização embutida (tese do Abner):</strong> a base da Luna suporta empacotar verticais (ex.: "citas" para salões) mantendo memória + execução. Wereplai prova o mercado; nós entregamos mais por vertical.</li>
+      <li><strong class="text-white">Roubar o bom:</strong> onboarding de 15 min do Wereplai e a clareza de proposta do Bookio ("92% das chamadas repetitivas resolvidas") — métricas concretas na nossa landing.</li>
+      <li><strong class="text-white">Manter o radar:</strong> posso repetir essa análise por nicho novo sempre que o time mandar link. Um chat por assunto, decreto mantido.</li>
+    </ol>
+  </section>
+
+  <footer class="pt-8 border-t border-white/10 text-sm text-slate-500">
+    <p>Gerado pela Luna (Nexo Digital) · 01/10/2026 · fontes: sites oficiais wereplai.com, sonoraintelligence.com, cuteops.com + busca de mercado. Preços e features conferidos nesta data e podem mudar.</p>
+    <p class="mt-1">Material interno do time — não compartilhar fora da Nexo.</p>
+  </footer>
+</main>
+</body>
+</html>

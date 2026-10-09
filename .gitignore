@@ -30,3 +30,7 @@ scripts/tmp-*.mjs
 worker-restart.err
 *-restart.err
 .aider*
+tmp/
+apps/whatsplay/tmp/
+.tmp-check/
+scripts/tmp-*.json
