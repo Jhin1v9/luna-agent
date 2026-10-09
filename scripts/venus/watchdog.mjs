@@ -5,8 +5,9 @@
 //
 // A cada 30s:
 //   1. bate o próprio heartbeat (service_heartbeats 'venus-watchdog')
-//   2. checa o colibri (cérebro do Vênus) — se fora do ar, NÃO adianta religar:
-//      alerta o owner no Telegram (com throttle) pra a Luna assumir no cover
+//   2. checa o colibri (cérebro do Vênus) — se fora do ar, TENTA religar
+//      (Start-Process do START-HERE.bat, throttle de 5min, máx 3 tentativas
+//      seguidas); se não voltar, alerta o owner e a Luna assume no cover
 //   3. checa o beat de 'venus-varredura' — se >90s sem batida e colibri ok:
 //      pm2 restart venus-varredura (com throttle de 3min entre tentativas);
 //      se não voltar depois de 3 tentativas, alerta o owner
@@ -25,6 +26,9 @@ const PM2_CLI = 'C:/Users/Abner/AppData/Roaming/npm/node_modules/pm2/bin/pm2';
 const STALE_S = 90;
 const LOOP_MS = 30_000;
 const RESTART_THROTTLE_MS = 180_000;
+const COLIBRI_RESTART_THROTTLE_MS = 300_000; // 5min entre tentativas de religar o colibri
+const COLIBRI_BAT = 'C:\\Users\\Abner\\Downloads\\colibri-main\\START-HERE.bat';
+const COLIBRI_DIR = 'C:\\Users\\Abner\\Downloads\\colibri-main';
 const ALERT_THROTTLE_MS = 900_000; // 15min entre alertas repetidos
 
 function envAll() {
@@ -45,6 +49,8 @@ async function db(query, params = []) {
 
 let ultimoRestart = 0;
 let restartsSeguidos = 0;
+let ultimoRestartColibri = 0;
+let restartsColibriSeguidos = 0;
 let ultimoAlerta = 0;
 let alertasColibri = 0;
 
@@ -97,6 +103,17 @@ function religarVenus() {
   child.on('error', (e) => log(`falha ao religar: ${e.message}`));
 }
 
+function religarColibri() {
+  log('colibri FORA — religando (Start-Process START-HERE.bat)');
+  const ps = [
+    '-NoProfile', '-Command',
+    `Start-Process -FilePath '${COLIBRI_BAT}' -WorkingDirectory '${COLIBRI_DIR}'`,
+  ];
+  const child = spawn('powershell', ps, { windowsHide: true });
+  child.on('close', (code) => log(`religar colibri retornou exit ${code}`));
+  child.on('error', (e) => log(`falha ao religar o colibri: ${e.message}`));
+}
+
 async function ciclo(n) {
   const colibri = await colibriOk();
   const vivo = await venusAlive();
@@ -104,9 +121,28 @@ async function ciclo(n) {
 
   if (!colibri) {
     alertasColibri++;
-    await alertar(`O colibri (cérebro do Vênus) está FORA DO AR. O Vênus não consegue pensar — a Luna assume as respostas do zap enquanto isso. Reinicie o colibri (janela do START-HERE.bat).`);
+    const now = Date.now();
+    // tenta religar o colibri; desiste depois de 3 tentativas seguidas e alerta
+    if (
+      restartsColibriSeguidos < 3 &&
+      now - ultimoRestartColibri >= COLIBRI_RESTART_THROTTLE_MS
+    ) {
+      ultimoRestartColibri = now;
+      restartsColibriSeguidos++;
+      religarColibri();
+      return; // dá tempo do colibri subir antes de tentar de novo
+    }
+    if (restartsColibriSeguidos >= 3) {
+      await alertar(`Tentei religar o colibri ${restartsColibriSeguidos}x e ele não voltou. O Vênus não consegue pensar — a Luna assume as respostas do zap. Verifica a janela do START-HERE.bat.`);
+    } else {
+      await alertar(`O colibri (cérebro do Vênus) está FORA DO AR. Já tentei religar — a Luna assume as respostas do zap enquanto isso.`);
+    }
     return; // religar o venus sem cérebro só gera erro em massa
   }
+  if (restartsColibriSeguidos > 0) {
+    log(`colibri voltou após ${restartsColibriSeguidos} tentativa(s) de religar`);
+  }
+  restartsColibriSeguidos = 0;
   alertasColibri = 0;
 
   if (!vivo) {
