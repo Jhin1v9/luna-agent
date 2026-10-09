@@ -16,7 +16,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const REPO_ENV = path.join(ROOT, '.env');
 const COLIBRI = (process.env.VENUS_BASE_URL ?? 'http://127.0.0.1:8000/v1').replace(/\/$/, '');
 const MODEL = process.env.VENUS_MODEL ?? 'qwen3-coder-30b-a3b-colibri';
-const MAX_ROUNDS = 6;
+const MAX_ROUNDS = 10;
 const POLL_MS = 60_000;
 const PRODUCTIONS_CHAT_ID = '🏆Production - 2026🙏🏻';
 
