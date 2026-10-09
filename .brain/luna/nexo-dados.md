@@ -75,3 +75,29 @@
    Kimi entra sempre pelo Tailscale. Relatórios estáticos: /home/nexo/Documentos/VPS/VPS/relatorios/public/
    (bind mount no container nexo_relatorios — atualização live, sem rebuild; auth própria: clientes por e-mail
    em data/users.json, equipe por e-mail+senha).
+
+## Sistema de notificações do workspace (GRAVADO 2026-10-02)
+
+- Enoque montou o sistema de envio de notificação sobre a base existente, com templates
+  prontos e detecção de idioma da pessoa (e-mail vai no idioma certo).
+- Decisão de produto (Abner): campos de notificação (e-mail + telefone) ficam SEPARADOS do
+  e-mail de login, configuráveis por perfil no cadastro do cliente.
+- PENDENTE pra fechar: preencher os e-mails/telefones REAIS dos clientes (Jess notificada a
+  partir de 02/10). Pop-up pra obrigar preenchimento foi adiado por decisão do Enoque.
+- Futuro (decidido em conversa): integração WhatsApp — solicitação do cliente chega pra equipe;
+  resposta da equipe vai pro grupo/privado da pessoa. Alternativa barata citada: APIs ou SMTP+WhatsApp.
+- Futuro (ideia do Abner): sistema de medição do consumo de tokens/recursos da Luna,
+  integrado ao relatório quando a operação crescer.
+
+---
+
+## 2026-10-02 20:30 UTC — Infra: apps atualizadas na VPS + plano de novos apps (Enoque)
+
+- Várias apps atualizadas hoje na VPS, "tudo em dia, não deveria estar falhando nada" — update de
+  infra/brain será subido em breve.
+- **Plano:** preparar 20-22 apps novas/bases. Fluxo: base no Google Drive → GitHub → avaliar VPS.
+  Meta: 25-30 apps novas até novembro (se sair algum nicho, aproveitar).
+- autor: Luna (registro do comunicado do Enoque no Production)
+
+## 2026-10-07 — Portfólio de apps: CeroDudas
+- Mencionada no Production: "CeroDudas — Calculadoras Laborales para España" — provável app nova do pipeline do Enoque (20-22 apps em preparo). Registrada como candidata; confirmar com Enoque.

@@ -781,3 +781,41 @@ Cliente enviou hero e vídeo vertical da Jess via Drive e solicitou trocar a ima
 }
 ```
 
+## 2026-10-08 — Luna
+
+Time (Production) confirmou plano de trocar a imagem do slider do hero da onadance.com por vídeo vertical de 41s da Jess (materiais já no Drive). Luna pediu contexto quando "temporal/a de 10" estava ambíguo, não inventou resposta; ao esclarecer, registrou a tarefa com pontos de análise (duração, mobile-first, desktop depois). Cliente satisfeito e engajado ("tou adorando").
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com — slider do hero",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Completar tarefa no Dashboard Pro: trocar a imagem do slider do hero da onadance.com pelo vídeo vertical de 41s da Jess (pasta Nexo > Cliente > Jess no Drive); revisar duração (41s é longo para hero mobile) e decidir corte/versão desktop depois.",
+  "quality_score": 5,
+  "summary": "Time (Production) confirmou plano de trocar a imagem do slider do hero da onadance.com por vídeo vertical de 41s da Jess (materiais já no Drive). Luna pediu contexto quando \"temporal/a de 10\" estava ambíguo, não inventou resposta; ao esclarecer, registrou a tarefa com pontos de análise (duração, mobile-first, desktop depois). Cliente satisfeito e engajado (\"tou adorando\").",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-10-08 — Luna
+
+DUPLICATA do turno aa40876e — mesma conversa (slider do hero da onadance.com, vídeo vertical 41s). Classificação idêntica: resuelto, positivo, follow-up = completar tarefa no Dashboard Pro.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "onadance.com — slider do hero",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "DUPLICATA do turno aa40876e (mesma transcrição). Completar tarefa no Dashboard Pro: trocar a imagem do slider do hero da onadance.com pelo vídeo vertical de 41s da Jess (Drive Nexo > Cliente > Jess); revisar duração (41s longo para hero mobile) e decidir corte/versão desktop depois.",
+  "quality_score": 5,
+  "summary": "DUPLICATA do turno aa40876e — mesma conversa (slider do hero da onadance.com, vídeo vertical 41s). Classificação idêntica: resuelto, positivo, follow-up = completar tarefa no Dashboard Pro.",
+  "client_signal": "pedido"
+}
+```
+
