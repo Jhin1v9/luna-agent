@@ -48,10 +48,38 @@ export const COLLECT_UNREAD_CHATS_SCRIPT = `(sel) => {
   return out;
 }`;
 
+/**
+ * Expansor de "ler mais" — decreto owner 2026-10-09: "SEMPRE identificar antes
+ * de ler, já clicar, abrir a msg e já era. Clicar certeiramente, sem ter como
+ * errar. Tem outro ler mais no mesmo texto? Clica de novo."
+ *
+ * Como é impecável: o clique é feito por DOM (.click()) SOMENTE em elementos
+ * DENTRO do row da mensagem cujo texto seja EXATAMENTE "ler mais"/"leer más"/
+ * "read more" (nó folha, zero filhos). Escopo fechado = alvo certo, sem
+ * coordenadas de mouse, sem como clicar no lugar errado. Expandir pode revelar
+ * OUTRO "ler mais" (texto com bloco citado longo, por ex.) — então o loop
+ * reclica até não existir mais (máx 4 passadas). Só depois o texto é lido,
+ * agora completo, sem corte.
+ */
+const EXPANDIR_LER_MAIS_JS = `
+  const EXPAND_RE = /^(ler mais|leer m\\u00e1s|read more)$/i;
+  const expandirRow = async (row) => {
+    for (let passada = 0; passada < 4; passada++) {
+      const alvos = Array.from(row.querySelectorAll('span, div, button'))
+        .filter((el) => el.children.length === 0 && EXPAND_RE.test((el.textContent || '').trim()));
+      if (alvos.length === 0) break;
+      for (const alvo of alvos) alvo.click();
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  };
+`;
+
 export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
+  ${EXPANDIR_LER_MAIS_JS}
   const rows = Array.from(document.querySelectorAll(sel.messageRow)).slice(-30);
   const SELF = /^(tú|você|voce|you|tu)$/i;
-  return rows.map((row) => {
+  return Promise.all(rows.map(async (row) => {
+    await expandirRow(row);
     // Bloco citado (reply) — quando existe, seus spans selecionáveis são
     // EXCLUÍDOS do texto da mensagem nova. Antes o textContent puxava o
     // preview da citação junto: quem respondia a msg da Luna com um emoji
@@ -80,13 +108,15 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
     // fora do msg-container, então não pega falso positivo.
     const imgEl = direction === 'inbound' ? row.querySelector('img[src^="blob:"]') : null;
     return { direction, sender, author, text, quoted: quotedEl ? (quotedEl.textContent || '').trim() : null, img: imgEl ? imgEl.src : null };
-  });
+  }));
 }`;
 
 export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
+  ${EXPANDIR_LER_MAIS_JS}
   const rows = Array.from(document.querySelectorAll(sel.messageRow)).slice(-lim);
   const SELF = /^(tú|você|voce|you|tu)$/i;
-  return rows.map((row) => {
+  return Promise.all(rows.map(async (row) => {
+    await expandirRow(row);
     const textEl = row.querySelector(sel.messageText);
     let direction = row.querySelector('[data-testid="tail-in"]') ? 'inbound'
       : row.querySelector('[data-testid="tail-out"]') ? 'outbound' : null;
@@ -102,7 +132,7 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
     const authorEl = row.querySelector('[data-testid="author"]');
     const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
     return { sender, author, direction, text: textEl ? (textEl.textContent || '').trim() : '', mid: row.getAttribute('data-id') || '' };
-  });
+  }));
 }`;
 
 
