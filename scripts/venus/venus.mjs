@@ -261,6 +261,61 @@ async function perguntarLuna(pergunta, contexto) {
 // Cadeia de comando LUNA > VÊNUS (decreto owner 2026-10-09): Luna manda por
 // cima — ordem dela é OBRIGATÓRIA e tem prioridade máxima sobre a inbox.
 let currentOrdem = null;
+
+// ── PAINEL NEXO (decreto owner 2026-10-09): Vênus cria solicitação de CLIENTE
+// direto no painel com o perfil da Luna (NEXO_API_USERNAME/PASSWORD do .env).
+// Login NextAuth com cache de cookie em memória; fail-closed (só orgs mapeadas).
+const PAINEL_BASE = 'https://vps.nexo-digital.app';
+const PAINEL_ORGS = {
+  'jess-onadance': { org: 'cmshyy4nq0001eix2h7a8ose8', projeto: 'cmshyy4os0003eix2tlfuic2o', nome: 'Ona Dance (Jess)' },
+  'hdm-industrial': { org: 'cmtldsn6500067ahwsohd46vr', projeto: 'cmtldsn7400087ahwhrmgflvd', nome: 'HDM Industrial' },
+  'jr-reformas-juninho': { org: 'cmtinm4vf0001v1q1xu8otif3', projeto: 'cmtinm4we0003v1q13h2zbkf0', nome: 'JR Reformas (Juninho)' },
+};
+let painelCookie = null;
+async function painelLogin() {
+  const c1 = await fetch(`${PAINEL_BASE}/nexo/api/auth/csrf`);
+  const csrf = await c1.json();
+  const jar = c1.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+  const res = await fetch(`${PAINEL_BASE}/nexo/api/auth/callback/credentials`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: jar },
+    body: new URLSearchParams({
+      csrfToken: csrf.csrfToken,
+      email: envLine('NEXO_API_USERNAME') ?? '',
+      password: envLine('NEXO_API_PASSWORD') ?? '',
+      callbackUrl: `${PAINEL_BASE}/nexo/pt`,
+    }).toString(),
+    redirect: 'manual',
+    signal: AbortSignal.timeout(20_000),
+  });
+  const session = res.headers.getSetCookie().map((c) => c.split(';')[0]).find((c) => c.startsWith('nexo.session-token='));
+  if (!session) throw new Error('login no painel falhou (sessão não veio)');
+  painelCookie = `nexo.csrf-token=${csrf.csrfToken}; ${session}`;
+  return painelCookie;
+}
+async function painelFetch(path, opts = {}) {
+  if (!painelCookie) await painelLogin();
+  let r = await fetch(`${PAINEL_BASE}${path}`, { ...opts, headers: { cookie: painelCookie, ...(opts.headers ?? {}) }, signal: AbortSignal.timeout(25_000) });
+  if (r.status === 401 || r.status === 403) {
+    await painelLogin(); // sessão expirada — reloga e tenta de novo
+    r = await fetch(`${PAINEL_BASE}${path}`, { ...opts, headers: { cookie: painelCookie, ...(opts.headers ?? {}) }, signal: AbortSignal.timeout(25_000) });
+  }
+  return r;
+}
+async function criarSolicitacaoPainel(cliente, conteudo) {
+  const alvo = PAINEL_ORGS[pastaCliente(cliente) ?? ''];
+  if (!alvo) return `ERRO: cliente "${String(cliente).slice(0, 40)}" sem org mapeada no painel. Use um de: ${Object.keys(PAINEL_ORGS).join(', ')}`;
+  const texto = String(conteudo ?? '').trim();
+  if (texto.length < 10) return 'ERRO: descreva o pedido do cliente com pelo menos 10 caracteres';
+  const r = await painelFetch('/nexo/api/admin/requests', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ organizationId: alvo.org, projectId: alvo.projeto, content: texto, status: 'CLIENT_REVIEWING' }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) return `ERRO ao criar solicitação no painel (HTTP ${r.status}): ${JSON.stringify(data).slice(0, 200)}`;
+  return `SOLICITAÇÃO CRIADA NO PAINEL (${alvo.nome}) — id ${data.data?.id ?? '?'} — "${texto.slice(0, 80)}". A equipe Nexo vê no painel admin.`;
+}
 async function verInbox(limite = 10) {
   const r = await db(
     `SELECT id, kind, status, received_at, payload FROM kimiwork_inbox
@@ -368,6 +423,7 @@ const TOOLS = [
   { type: 'function', function: { name: 'enviar_mensagem_whatsapp', description: 'Responde no WhatsApp (grupo ou DM). Guard-rail valida antes.', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, texto: { type: 'string' }, conversation_id: { type: 'string', description: 'opcional — vem no payload do evento' } }, required: ['chat_id', 'texto'] } } },
   { type: 'function', function: { name: 'enviar_mensagem_telegram', description: 'Responde no Telegram (grupo do time)', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, texto: { type: 'string' }, reply_to_message_id: { type: 'number' } }, required: ['chat_id', 'texto'] } } },
   { type: 'function', function: { name: 'registrar_solicitacao', description: 'Registra pedido novo de CLIENTE em JSONL local (nunca use pra conversa interna do time)', parameters: { type: 'object', properties: { dados_json: { type: 'string' } }, required: ['dados_json'] } } },
+  { type: 'function', function: { name: 'criar_solicitacao_painel', description: 'Cria a solicitação do CLIENTE DE VERDADE no painel Nexo (apps/workspace) com o perfil da equipe. SEMPRE prefira esta pra pedido de cliente — registrar_solicitacao é só anotação local. Clientes: jess (Ona Dance), hdm, juninho', parameters: { type: 'object', properties: { cliente: { type: 'string' }, conteudo: { type: 'string', description: 'descrição completa do pedido do cliente' } }, required: ['cliente', 'conteudo'] } } },
   { type: 'function', function: { name: 'quem_e_quem', description: 'Lista quem é quem: sócios, time, clientes. Use quando não reconhecer o autor da mensagem', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'ver_conversa', description: 'Lê as últimas mensagens do chat (inclusive as SUAS e as da Luna) pra não repetir e poderem conversar', parameters: { type: 'object', properties: { chat_id: { type: 'string' }, limite: { type: 'number' } }, required: ['chat_id'] } } },
   { type: 'function', function: { name: 'perguntar_luna', description: 'Escalona pra Luna responder na varredura (fila kimiwork_llm_turns)', parameters: { type: 'object', properties: { pergunta: { type: 'string' }, contexto: { type: 'string' } }, required: ['pergunta'] } } },
@@ -383,6 +439,7 @@ const EXEC = {
   enviar_mensagem_whatsapp: (a) => sendWhatsapp(a.chat_id, a.texto, a.conversation_id),
   enviar_mensagem_telegram: (a) => sendTelegram(a.chat_id, a.texto, a.reply_to_message_id),
   registrar_solicitacao: async (a) => registrarSolicitacao(a.dados_json),
+  criar_solicitacao_painel: (a) => criarSolicitacaoPainel(a.cliente, a.conteudo),
   quem_e_quem: async () => quemEQuem(),
   ver_conversa: async (a) => verConversa(a.chat_id, a.limite),
   perguntar_luna: perguntarLuna,
@@ -507,10 +564,10 @@ function montarTarefa(evento, fila) {
       `Você é a linha de frente, O Vênus. ANTES de responder: identifique com quem está falando — ` +
       `se não reconhecer o author_name, use quem_e_quem (Abner é o criador e DONO da Nexo; Nonoke e Elias também são donos; Enoque é time; cliente é outra coisa). ` +
       `Use ver_conversa no chat_id pra ver o que já foi dito, inclusive as respostas SUAS e da Luna — vocês podem conversar entre si pelo grupo, sem repetir. ` +
-      `Regras: (1) só use registrar_solicitacao pra pedido de CLIENTE, nunca pra conversa interna do time; ` +
+      `Regras: (1) pedido novo de CLIENTE (mudança no site, loja, conteúdo, foto, bug) → CRIE a solicitação de verdade com criar_solicitacao_painel (cliente: jess, hdm ou juninho + descrição completa do pedido) — confirme pra pessoa que entrou no painel da Nexo; registrar_solicitacao só pra rascunho local; ` +
       `(2) responda no WhatsApp se fizer sentido — você é O Vênus (homem, irmão da Luna), e TODA mensagem sua sai assinada "-venus" automaticamente. ` +
       `ATENÇÃO: sua resposta final em texto NÃO é enviada sozinha — você PRECISA chamar enviar_mensagem_whatsapp com o texto, senão a pessoa nunca recebe; ` +
-      `(3) difícil/crise/julgamento → perguntar_luna (contexto completo e serializado, nunca objeto) e AVISE a pessoa que a Luna assume; ` +
+      `(3) difícil/crise/julgamento → perguntar_luna (contexto completo e serializado, nunca objeto) e AVISE a pessoa que a Luna assume. IMPORTANTE: a Luna pode estar INDISPONÍVEL (quota) — se ela não responder a tempo, DECIDA SOZINHO com bom senso, anote o que decidiu em registrar_solicitacao (dados_json com tema "decisao_sem_luna") e siga; nunca deixe a pessoa sem resposta por esperar a Luna; ` +
       `(4) ao final, OBRIGATORIAMENTE concluir_evento com resumo e ações. Se for impossível, falhar_evento com motivo.`
     );
   }
