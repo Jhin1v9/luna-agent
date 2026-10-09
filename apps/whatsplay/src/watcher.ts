@@ -354,19 +354,47 @@ export class IngestWatcher {
    *  Retorna 'ingested' (achou texto) ou 'empty' (só mídia/sem texto). */
   private async extractAndIngest(badge: ChatBadge): Promise<'ingested' | 'empty'> {
     const messages = await this.deps.transport.readConversation(badge.chat_id, 10);
-    const inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
+    let inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
+    // ECO-FILTER (incidente 2026-10-09 — "Vênus respondendo a msm coisa toda
+    // hora"): mensagens NOSSAS (Luna/Vênus) às vezes são capturadas como
+    // inbound (fallback de direção do WA Web) e viram evento — o Vênus
+    // respondia às próprias respostas em loop. Aqui comparamos com os corpos
+    // outbound recentes desta conversa e descartamos o que for eco.
+    try {
+      const conv = await this.deps.pool.query(
+        `SELECT body FROM messages
+         WHERE metadata->>'chat_id' = $1 AND direction='outbound'
+         GROUP BY body
+         ORDER BY MAX(created_at) DESC
+         LIMIT 8`,
+        [badge.chat_id],
+      );
+      const norm = (s: string) => String(s).toLowerCase().replace(/\s+/g, ' ').trim();
+      const outboundBodies = conv.rows.map((r) => norm(r.body));
+      const antes = inbound.length;
+      inbound = inbound.filter((m) => {
+        const t = norm(m.text);
+        return !outboundBodies.some((o) => o === t || (t.length > 40 && o.includes(t.slice(0, Math.min(80, t.length)))));
+      });
+      if (antes > inbound.length) {
+        this.deps.log.info({ chat: badge.chat_name, ecados: antes - inbound.length }, 'watcher: eco(s) de mensagem nossa descartado(s) do inbound');
+      }
+    } catch { /* filtro é best-effort — nunca derruba o ingest */ }
     if (inbound.length === 0) {
-      this.deps.log.info({ chat: badge.chat_name }, 'watcher: sem texto inbound (mídia?) — ignorado');
+      this.deps.log.info({ chat: badge.chat_name }, 'watcher: sem texto inbound (mídia ou só eco) — ignorado');
       return 'empty';
     }
     const last = inbound[inbound.length - 1]!;
+    // AUTOR POR MENSAGEM (incidente 2026-10-09 — "confundindo eu com Enoque"):
+    // juntar os textos com espaço misturava quem falou o quê; igual ao sweep,
+    // cada fala sai prefixada com o autor.
     const msg: UnreadMessage = {
       chat_id: badge.chat_id,
       chat_name: badge.chat_name,
       is_group: badge.is_group,
       text: inbound
         .slice(-3)
-        .map((m) => m.text)
+        .map((m) => `${(m as { author?: string | null }).author ?? m.sender ?? 'contato'}: ${m.text}`)
         .join(' '),
       external_id: `wa:${badge.chat_id}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
       mentioned_luna: extractMention(last.text),

@@ -161,7 +161,40 @@ async function falharEvento(motivo) {
 }
 
 // ── envio de mensagens ──
+// Defesa em profundidade (incidente 2026-10-09): NUNCA deixar sintaxe de
+// tool-call cair no WhatsApp/Telegram — mesmo que o parser do run() falhe,
+// o envio é recusado aqui.
+const TOOLCALL_LEAK_RE = /<function=|<tool_call>|<\/parameter>|<\/?parameter=/i;
+function guardToolCallLeak(texto) {
+  if (TOOLCALL_LEAK_RE.test(texto)) {
+    return 'BLOQUEADO: o texto contém sintaxe de comando interno (<function=...>). NUNCA envie isso — comandos internos são executados por você como tools, nunca digitados pra pessoa. Reformule a mensagem SEM o comando.';
+  }
+  return null;
+}
+// Anti-repetição (reclamação owner 2026-10-09 "para de responder a msm coisa
+// toda hora"): se ele já mandou essa mesma resposta no chat recentemente,
+// recusa o envio — ele recebe o bloqueio como resultado da tool e muda de
+// abordagem (ou conclui sem repetir).
+const normMsg = (s) => String(s).toLowerCase().replace(/\s+/g, ' ').replace(/-?\s*venus\s*$/, '').trim();
+async function respostaRepetida(convId, texto) {
+  try {
+    const r = await db(
+      `SELECT body FROM messages WHERE conversation_id=$1 AND direction='outbound' AND sender='agent:venus' ORDER BY created_at DESC LIMIT 3`,
+      [convId],
+    );
+    const alvo = normMsg(texto);
+    if (alvo.length < 30) return false; // mensagens curtas não entram no filtro
+    return r.rows.some((x) => {
+      const ant = normMsg(x.body);
+      if (ant === alvo) return true;
+      const n = Math.floor(Math.min(ant.length, alvo.length) * 0.7);
+      return n >= 30 && ant.slice(0, n) === alvo.slice(0, n);
+    });
+  } catch { return false; }
+}
 async function sendWhatsapp(chatId, texto, conversationId) {
+  const vazamento = guardToolCallLeak(texto);
+  if (vazamento) { logRun({ guard_blocked: texto.slice(0, 200) }); return vazamento; }
   const bloqueio = guardTexto(texto);
   if (bloqueio) { logRun({ guard_blocked: texto.slice(0, 200) }); return bloqueio; }
   // assinatura automática: TODA mensagem dele sai assinada "-venus" (decreto owner)
@@ -175,6 +208,9 @@ async function sendWhatsapp(chatId, texto, conversationId) {
     convId = conv.rows[0]?.conversation_id;
   }
   if (!convId) return 'ERRO: conversation_id não encontrada para este chat_id — use perguntar_luna pra escalar';
+  if (await respostaRepetida(convId, texto)) {
+    return 'BLOQUEADO anti-repetição: você JÁ enviou essa mesma resposta neste chat. Não repita — se o tema já foi respondido, ou conclua o evento sem enviar, ou responda SÓ o que for novo.';
+  }
   const ins = await db(
     `INSERT INTO messages (conversation_id, direction, channel, sender, body, send_state, metadata)
      VALUES ($1, 'outbound', 'whatsapp', 'agent:venus', $2, 'queued', $3) RETURNING id`,
@@ -187,6 +223,8 @@ async function sendWhatsapp(chatId, texto, conversationId) {
   return `MENSAGEM WHATSAPP ENFILEIRADA (id ${ins.rows[0].id}). Guard-rail ok.`;
 }
 async function sendTelegram(chatId, texto, replyTo) {
+  const vazamento = guardToolCallLeak(texto);
+  if (vazamento) { logRun({ guard_blocked: texto.slice(0, 200) }); return vazamento; }
   const bloqueio = guardTexto(texto);
   if (bloqueio) { logRun({ guard_blocked: texto.slice(0, 200) }); return bloqueio; }
   const res = await fetch(`https://api.telegram.org/bot${telegramToken()}/sendMessage`, {
@@ -386,11 +424,56 @@ async function run(tarefa, { comTools }) {
       }
       continue;
     }
+    // TOOL-CALL EMULADO NO TEXTO — incidente 2026-10-09: o qwen3-coder às
+    // vezes ESCREVE a chamada no content ("<function=ver_conversa>…") em vez
+    // de usar o canal nativo, e o texto cru foi parar no grupo do WhatsApp.
+    // Aqui a emulação vira execução REAL: executamos as tools extraídas e o
+    // texto-ensaio (pensamento alto) é descartado, nunca enviado.
+    const emuladas = extrairToolCallsEmuladas(msg.content);
+    if (emuladas.length) {
+      messages.push({ role: 'assistant', content: msg.content });
+      console.log(`  ⚙ rodada ${rodada}: ${emuladas.length} tool-call(s) EMULADA(S) no texto — convertendo em execução real`);
+      for (const tc of emuladas) {
+        console.log(`    → ${tc.name}(${JSON.stringify(tc.args).slice(0, 140)})`);
+        let resultado;
+        try { resultado = await EXEC[tc.name]?.(tc.args) ?? `ERRO: tool desconhecida ${tc.name}`; }
+        catch (e) { resultado = `ERRO na tool: ${e.message}`; }
+        console.log(`      → ${String(resultado).slice(0, 160)}`);
+        messages.push({ role: 'user', content: `[resultado da tool ${tc.name}]: ${String(resultado).slice(0, 2_000)}` });
+      }
+      continue;
+    }
     console.log('\n=== RESPOSTA VÊNUS ===\n' + (msg.content ?? '(vazio)'));
     logRun({ tarefa: tarefa.slice(0, 200), resposta: (msg.content ?? '').slice(0, 2_000), tokens: resp.usage });
     return msg.content ?? '';
   }
   throw new Error(`estourou ${MAX_ROUNDS} rodadas de tool-call`);
+}
+
+/** Extrai chamadas de tool escritas no texto (formato <function=N>…</function>
+ *  com <parameter=K>V</parameter>, ou <tool_call>{"name":…}</tool_call>).
+ *  Retorna [] quando o texto é resposta normal. */
+function extrairToolCallsEmuladas(content) {
+  if (!content || typeof content !== 'string') return [];
+  if (!/<function=|<tool_call>/i.test(content)) return [];
+  const out = [];
+  const reFn = /<function=([\w]+)>([\s\S]*?)<\/function>/g;
+  let m;
+  while ((m = reFn.exec(content)) !== null) {
+    const args = {};
+    const reP = /<parameter=([\w]+)>([\s\S]*?)<\/parameter>/g;
+    let pm;
+    while ((pm = reP.exec(m[2])) !== null) args[pm[1]] = pm[2].trim();
+    out.push({ name: m[1], args });
+  }
+  const reTc = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+  while ((m = reTc.exec(content)) !== null) {
+    try {
+      const j = JSON.parse(m[1].trim());
+      if (j && typeof j === 'object' && j.name) out.push({ name: j.name, args: j.arguments ?? {} });
+    } catch { /* JSON inválido — ignora */ }
+  }
+  return out;
 }
 
 // ── varredura autônoma ──
