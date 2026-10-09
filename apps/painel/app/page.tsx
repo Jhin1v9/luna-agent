@@ -20,6 +20,7 @@ type Servico = { service: string; pid: number; state: string; seconds_since: num
 type InboxEvent = { id: string; kind: string; payload: Record<string, any>; status: string; received_at: string; processed_at: string | null; processing_by: string | null; result: Record<string, any> | null };
 type Turno = { id: string; session_key: string; prompt: string; status: string; response: string | null; answered_at: string | null; created_at: string };
 type VenusInfo = { status: string; running: boolean; processed_by_venus: number; log: string[] };
+type VenusErros = { incidencias: { id: string; kind: string; received_at: string; motivo: string | null; por: string | null }[]; log: string[] };
 type Ordem = { id: string; ordem: string; contexto: string | null; status: string; result: string | null; created_at: string; executed_at: string | null };
 type Comando = { perguntas: Turno[]; ordens: Ordem[] };
 
@@ -112,6 +113,8 @@ export default function Painel() {
   const [inbox, setInbox] = useState<InboxEvent[] | null>(null);
   const [comando, setComando] = useState<Comando | null>(null);
   const [venus, setVenus] = useState<VenusInfo | null>(null);
+  const [venusErros, setVenusErros] = useState<VenusErros | null>(null);
+  const [venusTab, setVenusTab] = useState<'log' | 'erros'>('log');
   const [ordem, setOrdem] = useState('');
   const [ordemCtx, setOrdemCtx] = useState('');
   const [ordering, setOrdering] = useState(false);
@@ -157,6 +160,7 @@ export default function Painel() {
     run(getJSON<InboxEvent[]>('/api/inbox'), setInbox);
     run(getJSON<Comando>('/api/comando'), setComando);
     run(getJSON<VenusInfo>('/api/venus'), setVenus);
+    run(getJSON<VenusErros>('/api/venus-erros'), setVenusErros);
   }, []);
 
   const loadAtividade = useCallback(async () => {
@@ -698,9 +702,48 @@ export default function Painel() {
               </button>
             </div>
           </div>
-          <pre ref={logRef} className="mono mt-3 max-h-52 overflow-y-auto whitespace-pre-wrap rounded-xl border border-line/70 bg-bg/70 p-3 text-dim">
-            {venus?.log.join('\n') ?? '...'}
-          </pre>
+          <div className="mt-3 flex items-center gap-1 border-b border-line/70">
+            {(['log', 'erros'] as const).map((t) => (
+              <button key={t} onClick={() => setVenusTab(t)}
+                className={`px-3 py-1.5 text-[12px] font-medium ${venusTab === t ? 'border-b-2 border-luna text-txt' : 'text-dim hover:text-txt'}`}>
+                {t === 'log' ? 'Log da varredura' : `Erros & incidências${venusErros && (venusErros.incidencias.length + venusErros.log.length) > 0 ? ` (${venusErros.incidencias.length + venusErros.log.length})` : ''}`}
+              </button>
+            ))}
+          </div>
+          {venusTab === 'log' ? (
+            <pre ref={logRef} className="mono mt-3 max-h-52 overflow-y-auto whitespace-pre-wrap rounded-xl border border-line/70 bg-bg/70 p-3 text-dim">
+              {venus?.log.join('\n') ?? '...'}
+            </pre>
+          ) : (
+            <div className="mt-3 max-h-64 space-y-3 overflow-y-auto rounded-xl border border-line/70 bg-bg/70 p-3">
+              {venusErros?.incidencias.length ? (
+                <div>
+                  <div className="mb-1.5 text-[11px] uppercase tracking-wider text-dim">Incidências — inbox em error (48h)</div>
+                  <ul className="space-y-1.5">
+                    {venusErros.incidencias.map((i) => (
+                      <li key={i.id} className="rounded-lg border border-line/60 p-2">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="badge badge-fail">error</span>
+                          <span className="text-dim">{i.kind}</span>
+                          <span className="text-dim">{new Date(i.received_at).toLocaleString('pt-BR')}</span>
+                          {i.por && <span className="text-dim">por: {i.por}</span>}
+                        </div>
+                        <div className="mt-1 text-[12px] text-txt">{i.motivo ?? '(sem motivo registrado)'}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="text-[12px] text-dim">Sem incidências em 48h.</div>
+              )}
+              {venusErros?.log.length ? (
+                <div>
+                  <div className="mb-1.5 text-[11px] uppercase tracking-wider text-dim">Linhas de erro recentes (logs pm2)</div>
+                  <pre className="mono whitespace-pre-wrap text-[11px] text-fail">{venusErros.log.join('\n')}</pre>
+                </div>
+              ) : null}
+            </div>
+          )}
         </Card>
       </main>
 

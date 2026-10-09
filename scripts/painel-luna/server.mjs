@@ -121,6 +121,42 @@ async function readBody(req) {
   return data ? JSON.parse(data) : {};
 }
 
+// ── Erros do Vênus pro painel (decreto owner 2026-10-09: "pega o log do venus
+// e deixa tudo na parte de erros do painel") — une incidências da inbox com
+// as linhas de erro dos logs pm2, pra gente trabalhar em cima depois.
+const PM2_LOGS = path.join(process.env.USERPROFILE ?? 'C:\\Users\\Abner', '.pm2', 'logs');
+const ERRO_PATTERNS = /(✗|ERRO|erro no ciclo|erro processando|erro na ordem|fetch failed|BLOQUEADO|estourou|ECONNREFUSED|timeout)/i;
+const RUIDO_PATTERNS = /NODE\.CMD|SyntaxError: Invalid or unexpected token|electron/i;
+function tailLog(file, maxBytes = 200_000) {
+  try {
+    const size = fs.statSync(file).size;
+    const buf = Buffer.alloc(Math.min(size, maxBytes));
+    const fd = fs.openSync(file, 'r');
+    fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+    fs.closeSync(fd);
+    return buf.toString('utf8').split(/\r?\n/);
+  } catch { return []; }
+}
+async function venusErros() {
+  // 1) incidências: eventos que cairam em error (motivo gravado no result)
+  const inc = await db(
+    `SELECT id, kind, received_at, result->>'motivo' AS motivo, result->>'processed_by' AS por
+     FROM kimiwork_inbox WHERE status='error' AND received_at > now() - interval '48 hours'
+     ORDER BY received_at DESC LIMIT 30`,
+  );
+  // 2) linhas de erro dos logs (out tem os "[vênus] erro no ciclo"; error log
+  // tem ruído do NODE.CMD do daimon — filtrado)
+  const linhas = [];
+  for (const [fonte, file] of [['out', 'venus-varredura-out.log'], ['err', 'venus-varredura-error.log']]) {
+    for (const ln of tailLog(path.join(PM2_LOGS, file))) {
+      const t = ln.trim();
+      if (!t || !ERRO_PATTERNS.test(t) || RUIDO_PATTERNS.test(t)) continue;
+      linhas.push({ fonte, linha: t.slice(0, 300) });
+    }
+  }
+  return { incidencias: inc.rows, log: linhas.slice(-60) };
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
   const send = (obj, code = 200) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
@@ -155,6 +191,8 @@ const server = http.createServer(async (req, res) => {
          FROM venus_supervision ORDER BY created_at DESC LIMIT 20`,
       );
       send({ supervisao: r.rows });
+    } else if (url.pathname === '/api/venus-erros' && req.method === 'GET') {
+      send(await venusErros());
     } else {
       send({ erro: 'rota não encontrada' }, 404);
     }
@@ -251,6 +289,11 @@ const HTML = `<!doctype html>
   </div>
 
   <div class="card" style="grid-column:1/-1">
+    <h2>🩸 Erros & incidências do Vênus (inbox em error + logs pm2 — pra trabalharmos em cima)</h2>
+    <div id="venusErros"><span class="dim">carregando…</span></div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
     <h2>📜 Atividade recente (responder de novo com contexto)</h2>
     <div id="atividade"><span class="dim">carregando…</span></div>
   </div>
@@ -289,6 +332,16 @@ async function refresh() {
     '<div class="body">' + esc(v.body) + '</div>' +
     (v.luna_action ? '<div class="meta">ação da Luna: ' + esc(v.luna_action) + '</div>' : '') + '</div>'
   ).join('') || '<span class="dim">nenhuma mensagem dele avaliada ainda</span>';
+  const ve = await api('/api/venus-erros');
+  const incHtml = (ve.incidencias ?? []).map(v =>
+    '<div class="item"><div class="meta"><b>' + esc(v.kind) + '</b> · ' + new Date(v.received_at).toLocaleString('pt-BR') +
+    ' · <span class="erro">error</span>' + (v.por ? ' · por: ' + esc(v.por) : '') + '</div>' +
+    '<div class="body">' + esc(v.motivo ?? '(sem motivo registrado)') + '</div></div>').join('');
+  const logHtml = (ve.log ?? []).map(v =>
+    '<div class="meta">[' + esc(v.fonte) + '] ' + esc(v.linha) + '</div>').join('');
+  document.getElementById('venusErros').innerHTML =
+    (incHtml ? '<h2 style="margin-top:4px">Incidências (48h)</h2>' + incHtml : '<span class="dim">sem incidências em 48h</span>') +
+    (logHtml ? '<h2 style="margin-top:12px">Últimas linhas de erro (logs)</h2>' + logHtml : '');
   const a = await api('/api/atividade');
   document.getElementById('atividade').innerHTML = a.atividade.map(m =>
     '<div class="item"><div class="meta"><b>' + esc(m.sender) + '</b> → ' + esc(m.chat_id) + ' · ' + new Date(m.created_at).toLocaleString('pt-BR') + ' · <span class="' + (m.send_state === 'sent' ? 'ok' : 'erro') + '">' + esc(m.send_state) + '</span></div>' +

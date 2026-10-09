@@ -394,7 +394,25 @@ async function run(tarefa, { comTools }) {
 }
 
 // ── varredura autônoma ──
-function montarTarefa(evento) {
+// contextoFila: { pendentes, mais_antigo } — pra ele saber se tá demorando
+// (decreto owner 2026-10-09: "fila e hora pra ele saber se está demorando")
+function contextoFilaTxt(evento, fila) {
+  if (!evento.received_at) return '';
+  const chegou = new Date(evento.received_at);
+  const esperaMin = Math.max(0, Math.round((Date.now() - chegou.getTime()) / 60_000));
+  const pendentes = fila?.pendentes ?? 1;
+  const atrasado = esperaMin >= 15;
+  return (
+    `⏱️ CONTEXTO DE FILA: esta mensagem chegou às ${chegou.toLocaleTimeString('pt-BR')} (há ~${esperaMin} min). ` +
+    `Agora na fila: ${pendentes} evento(s) aguardando/rodando, o mais antigo de ${fila?.mais_antigo ? new Date(fila.mais_antigo).toLocaleTimeString('pt-BR') : '—'}. ` +
+    (atrasado
+      ? `VOCÊ ESTÁ ATRASADO (+${esperaMin} min) — reconheça o atraso com naturalidade ("fui ver umas coisas aqui", sem drama), responda o essencial e entregue. `
+      : `Você está no prazo. `) +
+    `QUALIDADE > VELOCIDADE: não corra — pense, consulte quem_e_quem/ver_conversa se precisar, e responda certo. Uma resposta boa em 5 min vale mais que 3 ruins em 1.\n\n`
+  );
+}
+
+function montarTarefa(evento, fila) {
   const p = evento.payload ?? {};
   if (evento.kind === 'whatsapp.message') {
     return (
@@ -402,6 +420,7 @@ function montarTarefa(evento) {
       `De: ${p.author_name ?? 'desconhecido'}. Mensagem: "${String(p.text ?? '').slice(0, 800)}"\n` +
       `chat_id: ${p.chat_id} · conversation_id: ${p.conversation_id ?? '(não informado)'} · ` +
       `message_id do evento: ${p.message_id ?? '(n/a)'}${p.mentioned_luna ? ' · MENCIONOU A LUNA' : ''}\n\n` +
+      contextoFilaTxt(evento, fila) +
       `Você é a linha de frente, O Vênus. ANTES de responder: identifique com quem está falando — ` +
       `se não reconhecer o author_name, use quem_e_quem (Abner é o criador e DONO da Nexo; Nonoke e Elias também são donos; Enoque é time; cliente é outra coisa). ` +
       `Use ver_conversa no chat_id pra ver o que já foi dito, inclusive as respostas SUAS e da Luna — vocês podem conversar entre si pelo grupo, sem repetir. ` +
@@ -417,6 +436,7 @@ function montarTarefa(evento) {
       `Menção nova no grupo do time no Telegram. De: ${p.from?.first_name ?? p.author_name ?? 'desconhecido'}. ` +
       `Mensagem: "${String(p.text ?? '').slice(0, 800)}"\n` +
       `chat_id: ${p.chat_id} · message_id: ${p.message_id ?? '(n/a)'}\n\n` +
+      contextoFilaTxt(evento, fila) +
       `Você é o Vênus, linha de frente. Responda com enviar_mensagem_telegram CITANDO a mensagem (reply_to_message_id). ` +
       `Se a menção pedir tarefa difícil/decisão → perguntar_luna. Ao final, OBRIGATORIAMENTE concluir_evento.`
     );
@@ -424,7 +444,7 @@ function montarTarefa(evento) {
   return `Evento de kind desconhecido (${evento.kind}). Avalie o payload e decida: responder ou falhar_evento.`;
 }
 
-async function processarEvento(evento) {
+async function processarEvento(evento, fila) {
   currentEvent = evento;
   enviosNoEvento = 0;
   try {
@@ -432,7 +452,7 @@ async function processarEvento(evento) {
     const respostas = await respostasLunaRecentes();
     const tarefa = (respostas
       ? `RESPOSTAS RECENTES DA LUNA às suas perguntas (considere antes de agir; se já viu, ignore):\n${respostas}\n\n=== EVENTO NOVO ===\n`
-      : '') + montarTarefa(evento);
+      : '') + montarTarefa(evento, fila);
     const resposta = await run(tarefa, { comTools: true });
     // FAIL-SAFE (bug raiz-quadrada 2026-10-09): texto final NÃO chega ao
     // WhatsApp/Telegram sozinho — só chega se a tool de envio for chamada.
@@ -468,6 +488,22 @@ async function processarEvento(evento) {
 }
 
 async function varredura() {
+  // TRAVA ANTI-DUPLICATA (decreto owner 2026-10-09: "não pode ter 2 vênus
+  // rodando, mata meu pc"): se o PID registrado no heartbeat ainda existe,
+  // outro Vênus está vivo — aborta. pm2 restart mata o antes de subir o novo,
+  // então o PID antigo nunca existe quando o novo boota legítimo.
+  {
+    const r = await db(`SELECT pid, seen_at FROM service_heartbeats WHERE service='venus-varredura'`);
+    if (r.rows[0] && r.rows[0].pid !== process.pid) {
+      const beatFresco = Date.now() - new Date(r.rows[0].seen_at).getTime() < 90_000;
+      let pidVivo = false;
+      if (beatFresco) { try { process.kill(Number(r.rows[0].pid), 0); pidVivo = true; } catch { /* morto */ } }
+      if (pidVivo) {
+        console.log(`[vênus] JÁ EXISTE UM VÊNUS VIVO (pid ${r.rows[0].pid}, beat fresco) — abortando pra não ter 2 rodando e matar o PC do owner`);
+        process.exit(1);
+      }
+    }
+  }
   console.log(`[vênus] varredura autônoma no ar (poll ${POLL_MS / 1000}s). Modo: VENUS_AUTONOMO no .env`);
   // Heartbeat contínuo — NÃO só no loop principal: durante o processamento de
   // um evento (fetch longo pro colibri, minutos) o loop fica await-ed e o beat
@@ -498,7 +534,7 @@ async function varredura() {
           }
         }
         const ev = await db(
-          `SELECT id, kind, payload FROM kimiwork_inbox WHERE status='pending' AND kind IN ('whatsapp.message','telegram.message') ORDER BY received_at LIMIT 1`,
+          `SELECT id, kind, payload, received_at FROM kimiwork_inbox WHERE status='pending' AND kind IN ('whatsapp.message','telegram.message') ORDER BY received_at LIMIT 1`,
         );
         if (ev.rows[0]) {
           const claim = await db(
@@ -506,8 +542,14 @@ async function varredura() {
             [ev.rows[0].id],
           );
           if (claim.rows[0]) {
+            // contexto de fila pro Vênus saber se tá demorando (decreto owner:
+            // msg chegam com fila e hora; qualidade > velocidade)
+            const fila = await db(
+              `SELECT count(*)::int AS pendentes, min(received_at) AS mais_antigo
+               FROM kimiwork_inbox WHERE status IN ('pending','processing') AND kind IN ('whatsapp.message','telegram.message')`,
+            );
             console.log(`[vênus] evento ${ev.rows[0].kind} ${ev.rows[0].id} claimado — processando`);
-            await processarEvento(ev.rows[0]);
+            await processarEvento(ev.rows[0], fila.rows[0]);
             console.log(`[vênus] evento ${ev.rows[0].id} finalizado`);
             continue; // processa o próximo imediatamente
           }

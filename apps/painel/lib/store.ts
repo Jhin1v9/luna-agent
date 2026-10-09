@@ -32,6 +32,14 @@ export interface Turno {
   answered_at: string | null; created_at: string;
 }
 export interface VenusInfo { status: string; running: boolean; processed_by_venus: number; log: string[] }
+// Erros & incidências do Vênus (decreto owner 2026-10-09: "pega o log do venus
+// e deixa tudo na parte de erros do painel") — inbox em error + linhas de erro
+// dos logs pm2, pra gente trabalhar em cima depois.
+export interface VenusIncidencia {
+  id: string; kind: string; received_at: string;
+  motivo: string | null; por: string | null;
+}
+export interface VenusErros { incidencias: VenusIncidencia[]; log: string[] }
 export interface Ordem {
   id: string; ordem: string; contexto: string | null;
   status: 'pending' | 'processing' | 'done' | 'error' | 'ignored';
@@ -382,6 +390,33 @@ export async function getVenus(): Promise<VenusInfo> {
     processed_by_venus: processed[0]?.n ?? 0,
     log: tailVenusLog(),
   };
+}
+
+export async function getVenusErros(): Promise<VenusErros> {
+  const incidencias = await db<VenusIncidencia>(
+    `SELECT id, kind, received_at, result->>'motivo' AS motivo, result->>'processed_by' AS por
+     FROM kimiwork_inbox WHERE status='error' AND received_at > now() - interval '48 hours'
+     ORDER BY received_at DESC LIMIT 30`,
+  );
+  const ERRO_RE = /(✗|ERRO|erro no ciclo|erro processando|erro na ordem|fetch failed|BLOQUEADO|estourou|ECONNREFUSED|timeout)/i;
+  const RUIDO_RE = /NODE\.CMD|SyntaxError: Invalid or unexpected token|electron/i;
+  const linhas: string[] = [];
+  const dir = path.dirname(VENUS_LOG);
+  for (const f of ['venus-varredura-out.log', 'venus-varredura-error.log']) {
+    try {
+      const file = path.join(dir, f);
+      const size = fs.statSync(file).size;
+      const buf = Buffer.alloc(Math.min(size, 200_000));
+      const fd = fs.openSync(file, 'r');
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+      fs.closeSync(fd);
+      for (const ln of buf.toString('utf8').split(/\r?\n/)) {
+        const t = ln.trim();
+        if (t && ERRO_RE.test(t) && !RUIDO_RE.test(t)) linhas.push(`[${f === 'venus-varredura-out.log' ? 'out' : 'err'}] ${t.slice(0, 280)}`);
+      }
+    } catch { /* log ausente — ignora */ }
+  }
+  return { incidencias, log: linhas.slice(-60) };
 }
 
 export function invocarTarefa(texto: string): { ok: boolean; error?: string } {
