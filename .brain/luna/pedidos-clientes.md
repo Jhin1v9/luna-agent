@@ -552,3 +552,9 @@ Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrument
 - **Placar OnaDance:** os 4 pedidos abertos (orden, imagens pixeladas, hero carrossel, sticker agotado) estão AGORA TODOS em CLIENT_REVIEWING — a bola está 100% com a Jess.
 - Client actions: sem mudança (2 pendentes, incl. "Enviar fotos horizontal" criada 07/10 — continua PENDING mesmo com o hero em revisão; a Jess ainda não enviou as fotos horizontais).
 - autor: Luna (varredura por evento)
+
+## 2026-10-09 — Request de TESTE da Venus no painel (não é pedido de cliente)
+- `cmv19aqrm001bq3031hz148q4` — "TESTE VENUS - validacao de tools, pode apagar depois" — criado direto em CLIENT_REVIEWING às 17:45 UTC.
+- Origem: time interno (Venus) validando as tools do painel — o próprio conteúdo diz que pode apagar. NÃO é demanda de cliente: não gera relatório, não gera aviso no grupo, não entra no placar OnaDance.
+- Disparo legítimo do gatilho por `painel_change` (panelItems 25 vs seenItems 24). Snapshot regravado.
+- autor: Luna (varredura por evento)
