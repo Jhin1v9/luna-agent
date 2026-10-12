@@ -1,0 +1,52 @@
+{
+  "name": "@luna/dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend Express + WebSocket do NEXO Dashboard",
+  "main": "luna-server.js",
+  "scripts": {
+    "start": "node luna-server.js",
+    "dev": "node luna-server.js",
+    "build": "echo 'No build step required for dashboard backend'",
+    "migrate": "node migrate.js",
+    "server": "node server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.2.0",
+    "@luna/kernel": "workspace:*",
+    "@xenova/transformers": "^2.17.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
+    "chokidar": "^3.6.0",
+    "chrome-cookies-secure": "^3.0.2",
+    "cors": "^2.8.5",
+    "dompurify": "^3.4.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "googleapis": "^171.4.0",
+    "imap": "^0.8.19",
+    "jsdom": "^29.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "jszip": "^3.10.1",
+    "mailparser": "^3.9.8",
+    "multer": "^2.1.1",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
+    "node-nlp": "^5.0.0-alpha.5",
+    "node-telegram-bot-api": "^0.67.0",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.21.0",
+    "sharp": "0.32.6",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.1",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}

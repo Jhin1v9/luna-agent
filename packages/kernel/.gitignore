@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment
+.env
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+/test-screenshots
+*.test.ts
+*.test.js
+
+# Playwright MCP
+.playwright-mcp/
+
+# Build artifacts (keep dist for deployment)
+# dist/ is INCLUDED for web deployment
+backup-merge-inteligente-*/
+backup-src-*/
+kimi-cookies.json
+
+# Installer-generated files
+pm2-ecosystem.config.js
+apply-fix.js
+
+# Runtime data
+chrome-profile/
+sessions/
+ARTIFACTS/
+cookies/
+.luna-runtime.json
+*.runtime.json
+*.bak.*
+
+# Local audit/docs
+AUDITORIA_*.md
+.worktrees/

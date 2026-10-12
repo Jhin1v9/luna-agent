@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexo Digital — Sistema de Créditos · How-To</title>
+  <style>
+    :root {
+      --bg: #ffffff; --bg-code: #f6f8fa; --border: #d0d7de;
+      --text: #1f2328; --text-secondary: #656d76; --text-code: #24292f;
+      --accent: #0969da; --accent-hover: #0550ae;
+      --green: #1a7f37; --orange: #bc4c00;
+      --radius: 8px; --mono: ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117; --bg-code: #161b22; --border: #30363d;
+        --text: #e6edf3; --text-secondary: #8b949e; --text-code: #e6edf3;
+        --accent: #58a6ff; --accent-hover: #79c0ff;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 2rem; border-bottom: 2px solid var(--border); padding-bottom: .5rem; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.5rem; margin: 2rem 0 .75rem; border-bottom: 1px solid var(--border); padding-bottom: .3rem; }
+    h3 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+    p, li { margin-bottom: .5rem; }
+    ul, ol { padding-left: 1.5rem; margin-bottom: .75rem; }
+    code { font-family: var(--mono); font-size: .875rem; background: var(--bg-code); padding: .15rem .35rem; border-radius: 4px; white-space: nowrap; }
+    pre { background: var(--bg-code); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; overflow-x: auto; font-family: var(--mono); font-size: .8125rem; line-height: 1.5; margin: .75rem 0; }
+    pre code { background: none; padding: 0; }
+    .note { border-left: 3px solid var(--accent); padding: .75rem 1rem; margin: 1rem 0; background: var(--bg-code); border-radius: 0 var(--radius) var(--radius) 0; }
+    .warn { border-left-color: var(--orange); }
+    table { border-collapse: collapse; width: 100%; margin: .75rem 0; }
+    th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); }
+    th { background: var(--bg-code); font-weight: 600; }
+    .badge { display: inline-block; padding: .12rem .5rem; border-radius: 12px; font-size: .75rem; font-weight: 600; }
+    .b-get { background: #ddf4ff; color: #0969da; }
+    .b-post { background: #dafbe1; color: #1a7f37; }
+    .b-put { background: #fff8c5; color: #9a6700; }
+    .b-auth { background: #faf0fe; color: #8250df; }
+  </style>
+</head>
+<body>
+
+<h1>Sistema de Créditos Nexo Digital</h1>
+<p>Guía de uso del sistema de créditos, suscripciones y tickets de servicio. Todas las APIs son servidas por <code>nexo-dashboard-backend</code> en
+<code>https://vps.nexo-digital.app:3500</code> (proxy a <code>127.0.0.1:13500</code>).</p>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>1. Conceptos</h2>
+
+<table>
+  <tr><th>Término</th><th>Significado</th></tr>
+  <tr><td><strong>Plan</strong></td><td>Define créditos mensuales, precio, hosting y nivel de soporte (básico, profesional, premium, enterprise).</td></tr>
+  <tr><td><strong>Suscripción</strong></td><td>Asocia un <code>clientId</code> (ID de organización) a un plan. Tiene estado (<code>active</code>/<code>cancelled</code>), periodo actual y auto-renovación.</td></tr>
+  <tr><td><strong>Crédito</strong></td><td>Unidad de trabajo. 1 crédito ≈ 1 hora de trabajo del equipo. Se asignan, consumen y reservan.</td></tr>
+  <tr><td><strong>Ticket</strong></td><td>Solicitud de servicio del cliente. Flujo: pendiente → cotizado (créditos estimados) → aprobado (reserva) → en_progreso → completado.</td></tr>
+  <tr><td><strong>Auto-assign</strong></td><td>Asignación mensual automática de créditos a todas las suscripciones activas.</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>2. Planes disponibles</h2>
+
+<pre><code>GET /api/credits/plans</code></pre>
+
+<table>
+  <tr><th>Plan</th><th>Créditos/mes</th><th>Precio/mes</th><th>Hosting</th><th>Soporte</th></tr>
+  <tr><td><code>basico</code></td><td>0</td><td>$29</td><td>—</td><td>standard</td></tr>
+  <tr><td><code>profesional</code></td><td>900</td><td>$59</td><td>Incluido</td><td>extended</td></tr>
+  <tr><td><code>premium</code></td><td>2.400</td><td>$119</td><td>Incluido</td><td>priority</td></tr>
+  <tr><td><code>enterprise</code></td><td>Personalizado</td><td>$0</td><td>—</td><td>dedicated</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>3. APIs — Lado Cliente (público, sin auth)</h2>
+
+<h3>3.1 Saldo del cliente</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/client/:clientId/balance</code></pre>
+<div class="note">Retorna <code>credits</code> (balance, totalAssigned, totalConsumed, totalReserved), <code>subscription</code> activa, <code>plan</code> contratado y <code>nextAssignment</code> (fecha y monto de la próxima recarga).</div>
+
+<h3>3.2 Historial de transacciones</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/client/:clientId/transactions
+<span class="badge b-get">GET</span> /api/credits/client/:clientId/transactions?type=asignacion&from=2026-07-01&to=2026-07-31</code></pre>
+<div class="note">Devuelve el array <code>transactions</code> y <code>groupedByMonth</code> agrupado por mes con totales.</div>
+
+<h3>3.3 Perfil unificado</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/client/:clientId/profile</code></pre>
+<div class="note">Retorna organización, créditos, suscripción, proyectos, contratos, tickets, usuarios del equipo y últimas 20 transacciones. <strong>Es el endpoint que usa el portal del cliente (workspace-cliente).</strong></div>
+
+<h3>3.4 Tickets</h3>
+<pre><code><span class="badge b-get">GET</span>  /api/service-tickets/client/:clientId     <i>— listar tickets del cliente</i>
+<span class="badge b-post">POST</span> /api/service-tickets                        <i>— crear ticket (clientId, title, description, category, priority)</i>
+<span class="badge b-post">POST</span> /api/service-tickets/:id/approve             <i>— aprobar ticket (cliente, reserva créditos)</i></code></pre>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>4. APIs — Lado Admin <span class="badge b-auth">Requiere auth</span></h2>
+
+<p>Autenticación: <code>Authorization: Bearer &lt;token&gt;</code> (JWT de sesión) o <code>x-internal-token: nexo-digital-2026</code> (fallback).</p>
+
+<h3>4.1 Resumen global</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/admin/summary</code></pre>
+<div class="note">Total de clientes con créditos, balance/reservado/consumido/asignado global, tickets pendientes y activos.</div>
+
+<h3>4.2 Dashboard de todos los clientes</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/admin/clients</code></pre>
+<div class="note">Array de clientes con su <code>creditId</code>, balance, suscripción y conteo de tickets pendientes/activos.</div>
+
+<h3>4.3 Perfil completo del cliente (admin)</h3>
+<pre><code><span class="badge b-get">GET</span> /api/credits/admin/client/:clientId/profile</code></pre>
+<div class="note">Igual que el perfil del cliente + <code>creditHistory</code> completo, <code>internalCredits</code> consumidos por el equipo, y transacciones de equipo.</div>
+
+<h3>4.4 Ajustar créditos</h3>
+<pre><code><span class="badge b-post">POST</span> /api/credits/admin/client/:clientId/adjust</code></pre>
+<p><strong>Body:</strong> <code>{ amount, description, referenceType, referenceId }</code></p>
+<div class="note">Cantidad positiva = asigna créditos. Negativa = descuenta. <strong>No permite saldo negativo.</strong> Tipos de referencia: <code>plan</code>, <code>admin</code>, <code>ticket</code>.</div>
+
+<h3>4.5 Gestionar suscripción</h3>
+<pre><code><span class="badge b-post">POST</span> /api/credits/admin/client/:clientId/subscription</code></pre>
+<p><strong>Body:</strong> <code>{ planId, autoRenew?, hostingAddon? }</code></p>
+<div class="note">Asigna/actualiza la suscripción del cliente. Estado inicial: <code>active</code>.</div>
+
+<h3>4.6 Asignación mensual automática</h3>
+<pre><code><span class="badge b-post">POST</span> /api/credits/admin/auto-assign-monthly</code></pre>
+<p><strong>Body:</strong> <code>{ clientId? }</code> (opcional; si se omite, aplica a <strong>todas</strong> las suscripciones activas).</p>
+<div class="note">Suma <code>plan.creditsPerMonth</code> al balance de cada suscripción activa. Debe ejecutarse manualmente (no hay cron integrado).</div>
+
+<h3>4.7 Gestión de planes</h3>
+<pre><code><span class="badge b-post">POST</span> /api/credits/admin/plans</code></pre>
+<p><strong>Body:</strong> <code>{ id, name, description, creditsPerMonth, priceMonthly, hostingIncluded, supportLevel, features[] }</code></p>
+
+<h3>4.8 Uso del equipo (team-usage)</h3>
+<pre><code><span class="badge b-post">POST</span> /api/credits/admin/client/:clientId/team-usage</code></pre>
+<p><strong>Body:</strong> <code>{ userId, amount, description, projectId? }</code></p>
+<div class="note warn"><strong>amount debe ser negativo.</strong> Registra el consumo en Prisma (<code>CreditTransaction</code> tipo <code>usage</code>) y en el dashboard como <code>consumo_team</code>. No descuenta del balance del cliente.</div>
+
+<h3>4.9 Tickets (admin)</h3>
+<pre><code><span class="badge b-get">GET</span>  /api/service-tickets/all                   <i>— todos los tickets</i>
+<span class="badge b-post">POST</span> /api/service-tickets/:id/quote             <i>— cotizar (estimatedCredits > 0, cambia a "cotizado")</i>
+<span class="badge b-put">PUT</span>  /api/service-tickets/:id/status            <i>— cambiar estado (status, actualCredits?, assignedTo?)</i></code></pre>
+<div class="note">Al poner status <code>completado</code>, los créditos reservados se convierten en consumo.</div>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>5. Flujo de trabajo</h2>
+
+<h3>5.1 Crear organización con plan</h3>
+<p>Cuando se crea una organización en workspace-nexo (<code>POST /api/admin/organizations</code>):</p>
+<ol>
+  <li>Se crea Organization → Project → Contract.</li>
+  <li>Se crea el usuario admin con bcrypt (rol seleccionable: ADMIN, MANAGER, MEMBER, VIEWER).</li>
+  <li>Se asigna <strong>suscripción</strong> en el dashboard backend (<code>/credits/admin/client/:id/subscription</code>).</li>
+  <li>Se asignan los <strong>créditos iniciales</strong> del plan en el dashboard backend (<code>/credits/admin/client/:id/adjust</code>).</li>
+  <li>Se sincronizan los créditos hacia <strong>Prisma</strong> (workspace-nexo): <code>CreditTransaction</code> tipo <code>plan</code> + <code>WorkspaceUser.credits</code>.</li>
+</ol>
+
+<h3>5.2 Ciclo de vida de un ticket</h3>
+<pre><code>Cliente crea ticket
+  └─ POST /service-tickets  { clientId, title, description, category, priority }
+      → status: "pendiente"
+
+Admin cotiza
+  └─ POST /service-tickets/:id/quote  { estimatedCredits }
+      → status: "cotizado"
+
+Cliente aprueba
+  └─ POST /service-tickets/:id/approve
+      → Reserva créditos del balance (type: "reserva")
+      → status: "aprobado"
+
+Admin ejecuta
+  └─ PUT /service-tickets/:id/status  { status: "en_progreso" }
+
+Admin completa
+  └─ PUT /service-tickets/:id/status  { status: "completado", actualCredits }
+      → Convierte reserva en consumo
+      → Si actualCredits < estimatedCredits, devuelve diferencia</code></pre>
+
+<h3>5.3 Asignación mensual</h3>
+<pre><code>POST /api/credits/admin/auto-assign-monthly
+POST /api/credits/admin/auto-assign-monthly  { "clientId": "org-123" }</code></pre>
+<div class="note warn">El endpoint NO se ejecuta automáticamente. Debe invocarse manualmente cada mes (o configurar un cron externo).</div>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>6. Ejemplos con cURL</h2>
+
+<h3>6.1 Ejemplos — Cliente</h3>
+
+<pre><code><i># Ver saldo</i>
+curl -s https://vps.nexo-digital.app:3500/api/credits/client/<b>org-123</b>/balance | jq
+
+<i># Ver historial</i>
+curl -s https://vps.nexo-digital.app:3500/api/credits/client/<b>org-123</b>/transactions | jq
+
+<i># Perfil unificado</i>
+curl -s https://vps.nexo-digital.app:3500/api/credits/client/<b>org-123</b>/profile | jq
+
+<i># Crear ticket</i>
+curl -s -X POST https://vps.nexo-digital.app:3500/api/service-tickets \
+  -H 'Content-Type: application/json' \
+  -d '{"clientId":"<b>org-123</b>","title":"Actualizar SSL","description":"Renovar certificado","category":"hosting","priority":"alta"}' | jq
+
+<i># Aprobar ticket</i>
+curl -s -X POST https://vps.nexo-digital.app:3500/api/service-tickets/<b>ticket-id</b>/approve | jq</code></pre>
+
+<h3>6.2 Ejemplos — Admin</h3>
+
+<pre><code>TOKEN="nexo-digital-2026"
+BASE="https://vps.nexo-digital.app:3500"
+
+<i># Resumen global</i>
+curl -s "$BASE/api/credits/admin/summary" -H "x-internal-token: $TOKEN" | jq
+
+<i># Dashboard de clientes</i>
+curl -s "$BASE/api/credits/admin/clients" -H "x-internal-token: $TOKEN" | jq
+
+<i># Ajustar créditos (+500)</i>
+curl -s -X POST "$BASE/api/credits/admin/client/<b>org-123</b>/adjust" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" \
+  -d '{"amount":500,"description":"Bono de bienvenida"}' | jq
+
+<i># Asignar suscripción</i>
+curl -s -X POST "$BASE/api/credits/admin/client/<b>org-123</b>/subscription" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" \
+  -d '{"planId":"premium","autoRenew":true,"hostingAddon":true}' | jq
+
+<i># Auto-assign mensual</i>
+curl -s -X POST "$BASE/api/credits/admin/auto-assign-monthly" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" | jq
+
+<i># Cotizar ticket</i>
+curl -s -X POST "$BASE/api/service-tickets/<b>ticket-id</b>/quote" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" \
+  -d '{"estimatedCredits":5}' | jq
+
+<i># Cambiar estado de ticket</i>
+curl -s -X PUT "$BASE/api/service-tickets/<b>ticket-id</b>/status" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" \
+  -d '{"status":"completado","actualCredits":4}' | jq
+
+<i># Perfil completo con historial</i>
+curl -s "$BASE/api/credits/admin/client/<b>org-123</b>/profile" \
+  -H "x-internal-token: $TOKEN" | jq
+
+<i># Registrar uso interno del equipo</i>
+curl -s -X POST "$BASE/api/credits/admin/client/<b>org-123</b>/team-usage" \
+  -H 'Content-Type: application/json' -H "x-internal-token: $TOKEN" \
+  -d '{"userId":"<b>user-id</b>","amount":-3,"description":"Ajustes de CSS"}' | jq</code></pre>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>7. Estados y transiciones de tickets</h2>
+
+<table>
+  <tr><th>Estado</th><th>Significado</th><th>Transición</th></tr>
+  <tr><td><code>pendiente</code></td><td>Recién creado por el cliente</td><td>→ cotizar</td></tr>
+  <tr><td><code>cotizado</code></td><td>Admin asignó créditos estimados</td><td>→ aprobar (cliente)</td></tr>
+  <tr><td><code>aprobado</code></td><td>Cliente aprobó, créditos reservados del balance</td><td>→ en_progreso</td></tr>
+  <tr><td><code>en_progreso</code></td><td>Equipo trabajando</td><td>→ completado</td></tr>
+  <tr><td><code>completado</code></td><td>Finalizado. Reserva → consumo. Si <code>actualCredits &lt; estimatedCredits</code>, se devuelve diferencia.</td><td>—</td></tr>
+  <tr><td><code>cancelado</code></td><td>Cancelado. Si tenía reserva, se libera.</td><td>—</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>8. Tipos de transacción</h2>
+
+<table>
+  <tr><th>Tipo</th><th>Origen</th><th>Efecto en balance</th></tr>
+  <tr><td><code>asignacion</code></td><td>Admin (adjust, auto-assign, creación de org)</td><td>+ amount</td></tr>
+  <tr><td><code>reserva</code></td><td>Aprobar ticket</td><td>− amount (se reserva)</td></tr>
+  <tr><td><code>consumo</code></td><td>Completar ticket</td><td>— (la reserva se convierte)</td></tr>
+  <tr><td><code>ajuste</code></td><td>Admin adjust con amount &lt; 0</td><td>− amount</td></tr>
+  <tr><td><code>rollover</code></td><td>Propagación de saldo entre periodos (manual)</td><td>+ amount</td></tr>
+  <tr><td><code>consumo_team</code></td><td>Admin team-usage</td><td>Sin efecto (solo registro)</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>9. Notas importantes</h2>
+<ul>
+  <li><strong>Doble sistema:</strong> Los créditos se gestionan en el dashboard backend (JSON en disco) y se sincronizan a Prisma (workspace-nexo) al crear organización. El portal del cliente lee de ambos: <code>/api/credits/balance</code> (Prisma) + <code>/api/credits/profile</code> (dashboard).</li>
+  <li><strong>Auto-asignación mensual:</strong> No hay cron automático. Debe ejecutarse <code>POST /api/credits/admin/auto-assign-monthly</code> manualmente al inicio de cada mes.</li>
+  <li><strong>Saldo negativo:</strong> El sistema rechaza ajustes que resulten en saldo negativo. Los tickets requieren saldo suficiente para aprobarse.</li>
+  <li><strong>Auth:</strong> Endpoints admin requieren token interno (<code>x-internal-token</code>) o JWT de sesión. El valor del token interno es el mismo que <code>DASHBOARD_API_KEY</code> en workspace-nexo.</li>
+  <li><strong>URL base:</strong> <code>https://vps.nexo-digital.app:3500</code> (pública, vía Caddy reverse proxy a <code>127.0.0.1:13500</code>).</li>
+</ul>
+
+</body>
+</html>

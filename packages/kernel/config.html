@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌙 Luna Kernel — Painel de Configurações</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            luna: {
+              900: '#0f0f23',
+              800: '#1a1a2e',
+              700: '#16213e',
+              600: '#0f3460',
+              500: '#e94560',
+              400: '#ff6b6b',
+              300: '#ffd700',
+              100: '#f0f0f5',
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .tab-active { border-bottom: 3px solid #e94560; color: #e94560; }
+    .tab-inactive { border-bottom: 3px solid transparent; color: #9ca3af; }
+    .tab-inactive:hover { color: #e94560; }
+    .glass { background: rgba(26, 26, 46, 0.85); backdrop-filter: blur(12px); }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .risk-shake { animation: shake 0.5s ease-in-out; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .btn-loading { opacity: 0.7; pointer-events: none; }
+    .btn-loading::after { content: '...'; }
+  </style>
+</head>
+<body class="bg-luna-900 text-luna-100 min-h-screen">
+
+  <!-- Header -->
+  <header class="glass sticky top-0 z-50 border-b border-luna-700">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🌙</span>
+        <div>
+          <h1 class="text-xl font-bold text-white">Luna Kernel <span class="text-luna-500">v4.0</span></h1>
+          <p class="text-xs text-gray-400">Painel de Configurações — NEXO DIGITAL S.L.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="statusIndicator" class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-luna-800 border border-luna-600">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 pulse-dot" id="statusDot"></span>
+          <span id="statusText">Conectando...</span>
+        </span>
+        <button onclick="exportEnv()" class="text-xs bg-luna-600 hover:bg-luna-500 text-white px-3 py-1.5 rounded-lg transition">
+          📥 Exportar .env
+        </button>
+        <label class="text-xs bg-luna-700 hover:bg-luna-600 text-white px-3 py-1.5 rounded-lg transition cursor-pointer">
+          📤 Importar .env
+          <input type="file" id="envImport" accept=".env" class="hidden" onchange="importEnv(this)">
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="glass border-b border-luna-700 sticky top-[73px] z-40">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="flex gap-1 overflow-x-auto scrollbar-hide">
+        <button onclick="showTab('setup')" id="tab-setup" class="tab-active px-4 py-3 text-sm font-medium whitespace-nowrap transition">⚙️ Setup</button>
+        <button onclick="showTab('prompt')" id="tab-prompt" class="tab-inactive px-4 py-3 text-sm font-medium whitespace-nowrap transition">🧠 System Prompt</button>
+        <button onclick="showTab('tutorial')" id="tab-tutorial" class="tab-inactive px-4 py-3 text-sm font-medium whitespace-nowrap transition">📖 Tutorial</button>
+        <button onclick="showTab('status')" id="tab-status" class="tab-inactive px-4 py-3 text-sm font-medium whitespace-nowrap transition">🔍 Status</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+
+    <!-- Loading state -->
+    <div id="loadingPanel" class="flex items-center justify-center py-20">
+      <div class="text-center">
+        <div class="w-10 h-10 border-2 border-luna-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p class="text-sm text-gray-400">Carregando configurações do servidor...</p>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="errorPanel" class="hidden bg-red-900/20 border border-red-700/50 rounded-xl p-6 text-center">
+      <p class="text-2xl mb-2">❌</p>
+      <p class="text-red-300 font-semibold mb-1">Erro ao conectar com o servidor</p>
+      <p class="text-sm text-gray-400" id="errorMsg">Verifique se o luna-server.js está rodando.</p>
+      <button onclick="loadConfig()" class="mt-3 text-xs bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
+        🔄 Tentar novamente
+      </button>
+    </div>
+
+    <!-- TAB: SETUP -->
+    <section id="panel-setup" class="hidden fade-in space-y-6">
+      <!-- Bot Telegram -->
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>🤖</span> Bot do Telegram
+          </h2>
+          <span class="text-xs bg-red-900/60 text-red-300 px-2 py-1 rounded">Obrigatório</span>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">TELEGRAM_BOT_TOKEN <span class="text-red-400">*</span></label>
+            <div class="relative">
+              <input type="password" id="TELEGRAM_BOT_TOKEN" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" 
+                class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition pr-10"
+                oninput="markDirty()">
+              <button onclick="toggleVisibility('TELEGRAM_BOT_TOKEN')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">👁</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Pegue em <a href="https://t.me/BotFather" target="_blank" class="text-luna-400 hover:underline">@BotFather</a> → /newbot → copie o token</p>
+          </div>
+          <div class="flex items-center gap-3 p-3 bg-luna-900/50 rounded-lg border border-luna-700/50">
+            <span class="text-2xl">💡</span>
+            <div>
+              <p class="text-sm text-gray-300">Bot oficial da Luna: <strong class="text-luna-300">@lunanexobot</strong></p>
+              <p class="text-xs text-gray-500">Adicione o bot no seu grupo ou converse diretamente. Em grupo, todos usam a mesma conta.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard API -->
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>📊</span> Dashboard NEXO PRO
+          </h2>
+          <span class="text-xs bg-red-900/60 text-red-300 px-2 py-1 rounded">Obrigatório</span>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">INTERNAL_API_TOKEN <span class="text-red-400">*</span></label>
+          <div class="relative">
+            <input type="password" id="INTERNAL_API_TOKEN" placeholder="seu_token_aqui" 
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition pr-10"
+              oninput="markDirty()">
+            <button onclick="toggleVisibility('INTERNAL_API_TOKEN')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">👁</button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Token da API interna. Usado para criar tarefas, leads e consultar finanças no dashboard.</p>
+        </div>
+      </div>
+
+      <!-- Kimi Bridge -->
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>🧠</span> Kimi Web Bridge
+          </h2>
+          <span class="text-xs bg-luna-600/40 text-luna-300 px-2 py-1 rounded">Opcional</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_TIMEOUT (ms)</label>
+            <input type="number" id="KIMI_TIMEOUT" placeholder="120000"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_MAX_PAGES</label>
+            <input type="number" id="KIMI_MAX_PAGES" placeholder="5"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_IDLE_TIMEOUT (ms)</label>
+            <input type="number" id="KIMI_IDLE_TIMEOUT" placeholder="600000"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_COOLDOWN_MS</label>
+            <input type="number" id="KIMI_COOLDOWN_MS" placeholder="5000"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_MAX_TYPE_LENGTH</label>
+            <input type="number" id="KIMI_MAX_TYPE_LENGTH" placeholder="500"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">KIMI_LOG_MAX_MB</label>
+            <input type="number" id="KIMI_LOG_MAX_MB" placeholder="10"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Context & Chrome -->
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>⚡</span> Avançado
+          </h2>
+          <span class="text-xs bg-luna-600/40 text-luna-300 px-2 py-1 rounded">Opcional</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">LUNA_COMPACT_THRESHOLD</label>
+            <input type="number" id="LUNA_COMPACT_THRESHOLD" placeholder="24"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+            <p class="text-xs text-gray-500 mt-1">Mensagens antes de compactar contexto</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5">LUNA_COMPACT_TOKEN_THRESHOLD</label>
+            <input type="number" id="LUNA_COMPACT_TOKEN_THRESHOLD" placeholder="120000"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm text-gray-400 mb-1.5">LUNA_CHROME_PATH</label>
+            <input type="text" id="LUNA_CHROME_PATH" placeholder="/usr/bin/google-chrome (deixe em branco para auto-detectar)"
+              class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-2.5 text-sm font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition"
+              oninput="markDirty()">
+          </div>
+          <div class="md:col-span-2 flex items-center gap-3">
+            <input type="checkbox" id="LUNA_DEBUG" class="w-4 h-4 rounded border-luna-600 bg-luna-900 text-luna-500 focus:ring-luna-500"
+              onchange="markDirty()">
+            <label for="LUNA_DEBUG" class="text-sm text-gray-300">Modo Debug (logs detalhados no console)</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- File paths info -->
+      <div class="bg-luna-800/50 rounded-xl border border-luna-700/50 p-4">
+        <p class="text-xs text-gray-500 font-mono">
+          <span class="text-luna-400">.env:</span> <span id="envPath">-</span><br>
+          <span class="text-luna-400">luna-soul:</span> <span id="soulPath">-</span>
+        </p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3">
+        <button id="btnSave" onclick="saveAll()" class="flex-1 bg-luna-500 hover:bg-luna-400 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+          <span>💾</span> Salvar no Servidor
+        </button>
+        <button onclick="restartLuna()" class="px-6 bg-luna-700 hover:bg-luna-600 text-gray-300 hover:text-white font-semibold py-3 rounded-xl transition border border-luna-600">
+          🔄 Reiniciar Luna
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB: SYSTEM PROMPT -->
+    <section id="panel-prompt" class="hidden fade-in space-y-6">
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>🧠</span> System Prompt Master
+          </h2>
+          <div class="flex gap-2">
+            <button onclick="resetPrompt()" class="text-xs bg-luna-700 hover:bg-luna-600 text-white px-3 py-1.5 rounded-lg transition">
+              🔄 Reset para Original
+            </button>
+            <button id="btnSavePrompt" onclick="savePrompt()" class="text-xs bg-luna-500 hover:bg-luna-400 text-white px-3 py-1.5 rounded-lg transition">
+              💾 Salvar no Servidor
+            </button>
+          </div>
+        </div>
+
+        <!-- Warning -->
+        <div id="riskWarning" class="mb-4 p-4 bg-red-900/20 border border-red-700/50 rounded-lg">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">⚠️</span>
+            <div>
+              <p class="text-sm font-semibold text-red-300">Aviso de Risco</p>
+              <p class="text-xs text-gray-400 mt-1">Este é o prompt que a Luna recebe em CADA conversa. Alterar aqui pode quebrar o comportamento da agente. Use com cuidado. O botão <strong>Reset</strong> restaura o prompt original funcional. O botão <strong>Salvar</strong> escreve DIRETAMENTE no arquivo <code>luna-soul.cjs</code>.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex gap-4 mb-3 text-xs text-gray-500">
+          <span id="promptChars">0 caracteres</span>
+          <span id="promptLines">0 linhas</span>
+          <span id="promptStatus" class="text-luna-400">● Carregando...</span>
+        </div>
+
+        <textarea id="systemPrompt" rows="25" 
+          class="w-full bg-luna-900 border border-luna-600 rounded-lg px-4 py-3 text-xs font-mono text-luna-300 focus:border-luna-500 focus:outline-none transition resize-y leading-relaxed"
+          oninput="updatePromptStats(); markDirty();"></textarea>
+      </div>
+    </section>
+
+    <!-- TAB: TUTORIAL -->
+    <section id="panel-tutorial" class="hidden fade-in space-y-6">
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <h2 class="text-xl font-bold text-white mb-3">📖 Como usar a Luna Kernel</h2>
+        <p class="text-sm text-gray-300 leading-relaxed">
+          A Luna é uma agente autônoma que roda no seu PC (Linux). Ela conversa pelo Telegram e executa tarefas reais: cria projetos, edita arquivos, navega na web, gerencia o dashboard da NEXO DIGITAL. <strong>Todos no grupo usam a mesma conta</strong> — quando um pedir algo, a Luna executa no PC do Abner.
+        </p>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="w-8 h-8 rounded-full bg-luna-600 flex items-center justify-center text-sm font-bold">1</span>
+          <h3 class="text-lg font-semibold text-white">Iniciar a Luna</h3>
+        </div>
+        <div class="space-y-3">
+          <p class="text-sm text-gray-300">Via terminal, na pasta da Luna:</p>
+          <div class="bg-luna-900 rounded-lg p-4 font-mono text-xs text-luna-300 border border-luna-700 overflow-x-auto">
+            <span style="color:#ff6b6b">cd</span> ~/.luna-kernel<br>
+            <span style="color:#6b7280"># Modo direto (mostra logs no terminal)</span><br>
+            <span style="color:#60a5fa">node</span> telegram-luna-adapter.cjs<br><br>
+            <span style="color:#6b7280"># Ou via PM2 (background, recomendado)</span><br>
+            <span style="color:#60a5fa">pm2</span> start telegram-luna-adapter.cjs --name luna-kernel<br>
+            <span style="color:#60a5fa">pm2</span> save<br>
+            <span style="color:#60a5fa">pm2</span> startup
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="w-8 h-8 rounded-full bg-luna-600 flex items-center justify-center text-sm font-bold">2</span>
+          <h3 class="text-lg font-semibold text-white">Usar no Telegram</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-3">
+            <p class="text-sm text-gray-300">Adicione o bot ao seu grupo:</p>
+            <div class="bg-luna-900 rounded-lg p-3 font-mono text-xs text-luna-300 border border-luna-700">
+              Bot: <a href="https://t.me/lunanexobot" target="_blank" class="text-luna-400 hover:underline">@lunanexobot</a>
+            </div>
+            <p class="text-sm text-gray-300">Comandos principais:</p>
+            <ul class="text-sm text-gray-400 space-y-1.5 ml-1">
+              <li><code class="bg-luna-900 px-1.5 py-0.5 rounded text-luna-300">/kimi</code> — Liga/desliga modo persistente</li>
+              <li><code class="bg-luna-900 px-1.5 py-0.5 rounded text-luna-300">/kimi on</code> — Liga (Luna responde tudo)</li>
+              <li><code class="bg-luna-900 px-1.5 py-0.5 rounded text-luna-300">/kimi off</code> — Desliga (ignora mensagens)</li>
+              <li><code class="bg-luna-900 px-1.5 py-0.5 rounded text-luna-300">/status</code> — Status da Luna</li>
+            </ul>
+          </div>
+          <div class="bg-luna-900/50 rounded-lg p-4 border border-luna-700/50">
+            <p class="text-sm font-semibold text-white mb-2">💡 Dicas de uso em grupo:</p>
+            <ul class="text-xs text-gray-400 space-y-2">
+              <li>• Quando <strong>/kimi on</strong> está ativo, QUALQUER mensagem no grupo é processada pela Luna</li>
+              <li>• A Luna executa no PC do Abner — cuidado com comandos destrutivos</li>
+              <li>• Use <strong>"Luna, ..."</strong> no início da frase para garantir atenção</li>
+              <li>• A Luna lembra contexto entre mensagens no mesmo chat</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="w-8 h-8 rounded-full bg-luna-600 flex items-center justify-center text-sm font-bold">3</span>
+          <h3 class="text-lg font-semibold text-white">O que a Luna pode fazer?</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">🛠️ Criar Projetos</p><p class="text-xs text-gray-400">"Cria um app React de lista de tarefas" → ela cria arquivos, instala deps, configura Tailwind, tira screenshot</p></div>
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">📁 Gerenciar Arquivos</p><p class="text-xs text-gray-400">"Leia o arquivo X", "Edite a função Y", "Crie uma pasta Z" — tudo no PC real</p></div>
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">🌐 Navegar na Web</p><p class="text-xs text-gray-400">"Pesquisa como usar Docker" → ela busca, lê artigos, resume</p></div>
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">📊 Dashboard NEXO</p><p class="text-xs text-gray-400">"Cria tarefa: revisar site cliente X, prioridade alta" → criada no sistema</p></div>
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">🔧 Auto-correção</p><p class="text-xs text-gray-400">Se um projeto quebra, ela lê o erro, corrige e testa sozinha</p></div>
+          <div class="space-y-2"><p class="text-sm font-medium text-luna-300">📜 Scripts Workflow</p><p class="text-xs text-gray-400">Para tarefas complexas, ela pode executar scripts bash/python/node completos</p></div>
+        </div>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="w-8 h-8 rounded-full bg-luna-600 flex items-center justify-center text-sm font-bold">4</span>
+          <h3 class="text-lg font-semibold text-white">Exemplos de comandos</h3>
+        </div>
+        <div class="space-y-3">
+          <div class="bg-luna-900 rounded-lg p-3 border border-luna-700"><p class="text-xs text-luna-400 mb-1">Criar projeto:</p><p class="text-sm text-gray-300">"Luna, cria um site de portfolio em React com Tailwind, com header, about, projects e contact"</p></div>
+          <div class="bg-luna-900 rounded-lg p-3 border border-luna-700"><p class="text-xs text-luna-400 mb-1">Dashboard:</p><p class="text-sm text-gray-300">"Cria tarefa: Reunião com cliente Santander, prioridade alta, para amanhã"</p></div>
+          <div class="bg-luna-900 rounded-lg p-3 border border-luna-700"><p class="text-xs text-luna-400 mb-1">Pesquisa:</p><p class="text-sm text-gray-300">"Pesquisa as melhores práticas de SEO para 2025 e me faz um resumo"</p></div>
+          <div class="bg-luna-900 rounded-lg p-3 border border-luna-700"><p class="text-xs text-luna-400 mb-1">Correção:</p><p class="text-sm text-gray-300">"O projeto em ~/Documentos/meu-app não tá rodando, conserta pra mim"</p></div>
+        </div>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="w-8 h-8 rounded-full bg-luna-600 flex items-center justify-center text-sm font-bold">5</span>
+          <h3 class="text-lg font-semibold text-white">👨‍👦 Compartilhar com a família</h3>
+        </div>
+        <div class="space-y-3">
+          <p class="text-sm text-gray-300">Baixe o pacote Self-Host e copie para outro PC:</p>
+          <div class="bg-luna-900 rounded-lg p-4 font-mono text-xs text-luna-300 border border-luna-700 overflow-x-auto">
+            <span style="color:#6b7280"># No PC de origem (este PC)</span><br>
+            <span style="color:#60a5fa">cd</span> ~/Downloads<br>
+            <span style="color:#60a5fa">unzip</span> luna-selfhost.zip -d luna-kernel<br>
+            <span style="color:#60a5fa">cd</span> luna-kernel<br>
+            <span style="color:#60a5fa">npm</span> install<br>
+            <span style="color:#60a5fa">node</span> luna-server.js<br><br>
+            <span style="color:#6b7280"># Acesse: http://localhost:3458</span><br>
+            <span style="color:#6b7280"># Login: abner / Senha: 7741</span>
+          </div>
+          <p class="text-sm text-gray-300">O pacote já vem com o <code>.env</code> pré-configurado. Todos usam a mesma conta e tokens.</p>
+        </div>
+      </div>
+
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <h3 class="text-lg font-semibold text-white mb-3">🔧 Problemas comuns</h3>
+        <div class="space-y-3 text-sm">
+          <div class="flex gap-3"><span class="text-red-400 font-mono text-xs whitespace-nowrap">Timeout 30000ms</span><p class="text-gray-400">Kimi Web demorou. A Luna tenta novamente automaticamente. Verifique se Chrome está na porta 9222.</p></div>
+          <div class="flex gap-3"><span class="text-red-400 font-mono text-xs whitespace-nowrap">ERR_ABORTED</span><p class="text-gray-400">Página do Kimi caiu. A Luna limpa páginas antigas e recria. Normalmente resolve sozinho.</p></div>
+          <div class="flex gap-3"><span class="text-red-400 font-mono text-xs whitespace-nowrap">npm not found</span><p class="text-gray-400">Node.js não está instalado ou não está no PATH. Reinstale o Node.js v20+.</p></div>
+          <div class="flex gap-3"><span class="text-red-400 font-mono text-xs whitespace-nowrap">Bot não responde</span><p class="text-gray-400">Verifique se o TELEGRAM_BOT_TOKEN está correto. Verifique se o bot não foi bloqueado pelo Telegram.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: STATUS -->
+    <section id="panel-status" class="hidden fade-in space-y-6">
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <span>🔍</span> Testar Conexões
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button onclick="testTelegram()" id="btnTestTelegram" class="bg-luna-900 hover:bg-luna-700 border border-luna-600 rounded-xl p-4 text-left transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xl">🤖</span>
+              <span id="telegramStatus" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">Não testado</span>
+            </div>
+            <p class="text-sm font-medium text-white">Telegram Bot</p>
+            <p class="text-xs text-gray-500 mt-1">Verifica se o token está válido</p>
+          </button>
+
+          <button onclick="testNode()" id="btnTestNode" class="bg-luna-900 hover:bg-luna-700 border border-luna-600 rounded-xl p-4 text-left transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xl">📦</span>
+              <span id="nodeStatus" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">Não testado</span>
+            </div>
+            <p class="text-sm font-medium text-white">Node.js</p>
+            <p class="text-xs text-gray-500 mt-1">Verifica versão do Node.js</p>
+          </button>
+
+          <button onclick="testChrome()" id="btnTestChrome" class="bg-luna-900 hover:bg-luna-700 border border-luna-600 rounded-xl p-4 text-left transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-2xl">🌐</span>
+              <span id="chromeStatus" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">Não testado</span>
+            </div>
+            <p class="text-sm font-medium text-white">Chrome/Chromium</p>
+            <p class="text-xs text-gray-500 mt-1">Verifica se Chrome está instalado</p>
+          </button>
+        </div>
+
+        <div id="testResults" class="mt-4 hidden">
+          <div class="bg-luna-900 rounded-lg p-4 border border-luna-700 font-mono text-xs text-luna-300">
+            <pre id="testOutput"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Info -->
+      <div class="bg-luna-800 rounded-xl border border-luna-700 p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">📋 Informações do Sistema</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div class="space-y-2">
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">Navegador</span><span id="sysBrowser" class="text-luna-300 font-mono text-xs">-</span></div>
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">Sistema Operacional</span><span id="sysOS" class="text-luna-300 font-mono text-xs">-</span></div>
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">Resolução</span><span id="sysResolution" class="text-luna-300 font-mono text-xs">-</span></div>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">Servidor API</span><span id="sysApi" class="text-luna-300 font-mono text-xs">-</span></div>
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">.env</span><span id="sysEnv" class="text-luna-300 font-mono text-xs">-</span></div>
+            <div class="flex justify-between py-2 border-b border-luna-700/50"><span class="text-gray-400">Versão</span><span class="text-luna-300 font-mono text-xs">v4.0.0</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-luna-700 mt-8 py-6">
+    <div class="max-w-6xl mx-auto px-4 text-center">
+      <p class="text-xs text-gray-500">🌙 Luna Kernel v4.0 — NEXO DIGITAL S.L. — Privado</p>
+      <p class="text-xs text-gray-600 mt-1">Bot: <a href="https://t.me/lunanexobot" target="_blank" class="text-luna-500 hover:underline">@lunanexobot</a></p>
+    </div>
+  </footer>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <div class="bg-luna-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm">
+      <span id="toastIcon">✅</span>
+      <span id="toastMsg">Salvo!</span>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // API CLIENT
+    // ============================================================
+    const API_BASE = '';
+    let originalPrompt = '';
+    let isDirty = false;
+    let loadedEnv = {};
+
+    async function apiGet(path) {
+      const res = await fetch(API_BASE + path);
+      return res.json();
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(API_BASE + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return res.json();
+    }
+
+    // ============================================================
+    // LOAD CONFIG FROM SERVER
+    // ============================================================
+    async function loadConfig() {
+      document.getElementById('loadingPanel').classList.remove('hidden');
+      document.getElementById('errorPanel').classList.add('hidden');
+      document.getElementById('panel-setup').classList.add('hidden');
+
+      try {
+        const data = await apiGet('/api/config');
+        if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
+
+        loadedEnv = data.env || {};
+
+        // Fill env fields
+        const envKeys = [
+          'TELEGRAM_BOT_TOKEN', 'INTERNAL_API_TOKEN',
+          'KIMI_TIMEOUT', 'KIMI_MAX_PAGES', 'KIMI_IDLE_TIMEOUT',
+          'KIMI_COOLDOWN_MS', 'KIMI_MAX_TYPE_LENGTH', 'KIMI_LOG_MAX_MB',
+          'LUNA_COMPACT_THRESHOLD', 'LUNA_COMPACT_TOKEN_THRESHOLD',
+          'LUNA_CHROME_PATH', 'LUNA_DEBUG'
+        ];
+        envKeys.forEach(key => {
+          const el = document.getElementById(key);
+          if (el) {
+            if (el.type === 'checkbox') el.checked = loadedEnv[key] === 'true';
+            else if (loadedEnv[key]) el.value = loadedEnv[key];
+          }
+        });
+
+        // Fill system prompt
+        if (data.systemPromptFound) {
+          document.getElementById('systemPrompt').value = data.systemPrompt;
+          originalPrompt = data.systemPrompt;
+          document.getElementById('promptStatus').textContent = '● Prompt do servidor';
+          document.getElementById('promptStatus').className = 'text-luna-400';
+        } else {
+          document.getElementById('systemPrompt').value = data.systemPrompt || '';
+          document.getElementById('promptStatus').textContent = '⚠️ Prompt não encontrado no luna-soul.cjs';
+          document.getElementById('promptStatus').className = 'text-yellow-400';
+        }
+        updatePromptStats();
+
+        // File paths
+        if (data.paths) {
+          document.getElementById('envPath').textContent = data.paths.env;
+          document.getElementById('soulPath').textContent = data.paths.soul;
+          document.getElementById('sysEnv').textContent = data.paths.env;
+        }
+
+        // Update status indicator
+        document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-green-500 pulse-dot';
+        document.getElementById('statusText').textContent = 'Conectado ao servidor';
+
+        // System info
+        document.getElementById('sysBrowser').textContent = navigator.userAgent.split(')')[0] + ')';
+        document.getElementById('sysOS').textContent = navigator.platform;
+        document.getElementById('sysResolution').textContent = `${window.screen.width}x${window.screen.height}`;
+        document.getElementById('sysApi').textContent = '✅ Online';
+
+        // Show setup panel
+        document.getElementById('loadingPanel').classList.add('hidden');
+        document.getElementById('panel-setup').classList.remove('hidden');
+
+        isDirty = false;
+      } catch (e) {
+        document.getElementById('loadingPanel').classList.add('hidden');
+        document.getElementById('errorPanel').classList.remove('hidden');
+        document.getElementById('errorMsg').textContent = e.message;
+        document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-red-500';
+        document.getElementById('statusText').textContent = 'Erro de conexão';
+      }
+    }
+
+    // ============================================================
+    // TABS
+    // ============================================================
+    function showTab(name) {
+      ['setup', 'prompt', 'tutorial', 'status'].forEach(t => {
+        document.getElementById('panel-' + t).classList.add('hidden');
+        document.getElementById('tab-' + t).classList.remove('tab-active');
+        document.getElementById('tab-' + t).classList.add('tab-inactive');
+      });
+      document.getElementById('panel-' + name).classList.remove('hidden');
+      document.getElementById('tab-' + name).classList.add('tab-active');
+      document.getElementById('tab-' + name).classList.remove('tab-inactive');
+    }
+
+    // ============================================================
+    // SAVE / LOAD
+    // ============================================================
+    function markDirty() {
+      isDirty = true;
+      document.getElementById('btnSave').classList.add('ring-2', 'ring-luna-500');
+      document.getElementById('btnSavePrompt').classList.add('ring-2', 'ring-luna-500');
+    }
+
+    function collectEnv() {
+      const env = {};
+      const envKeys = [
+        'TELEGRAM_BOT_TOKEN', 'INTERNAL_API_TOKEN',
+        'KIMI_TIMEOUT', 'KIMI_MAX_PAGES', 'KIMI_IDLE_TIMEOUT',
+        'KIMI_COOLDOWN_MS', 'KIMI_MAX_TYPE_LENGTH', 'KIMI_LOG_MAX_MB',
+        'LUNA_COMPACT_THRESHOLD', 'LUNA_COMPACT_TOKEN_THRESHOLD',
+        'LUNA_CHROME_PATH', 'LUNA_DEBUG'
+      ];
+      envKeys.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) {
+          if (el.type === 'checkbox') env[key] = el.checked ? 'true' : 'false';
+          else env[key] = el.value;
+        }
+      });
+      return env;
+    }
+
+    async function saveAll() {
+      const btn = document.getElementById('btnSave');
+      btn.classList.add('btn-loading');
+      btn.textContent = '💾 Salvando';
+
+      try {
+        const env = collectEnv();
+        const data = await apiPost('/api/config', { env });
+        if (data.ok) {
+          loadedEnv = env;
+          isDirty = false;
+          btn.classList.remove('ring-2', 'ring-luna-500');
+          showToast('💾 Configurações salvas no .env!', '✅');
+        } else {
+          showToast('❌ Erro: ' + (data.error || 'desconhecido'), '❌');
+        }
+      } catch (e) {
+        showToast('❌ Erro de rede: ' + e.message, '❌');
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.innerHTML = '<span>💾</span> Salvar no Servidor';
+      }
+    }
+
+    async function savePrompt() {
+      const btn = document.getElementById('btnSavePrompt');
+      const promptText = document.getElementById('systemPrompt').value;
+
+      if (!confirm('⚠️ TEM CERTEZA?\n\nIsso vai SOBRESCREVER o system prompt no arquivo luna-soul.cjs.\nSe quebrar algo, use o botão RESET para restaurar.\n\nContinuar?')) {
+        return;
+      }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '💾 Salvando';
+
+      try {
+        const data = await apiPost('/api/config', { systemPrompt: promptText });
+        if (data.ok) {
+          originalPrompt = promptText;
+          isDirty = false;
+          btn.classList.remove('ring-2', 'ring-luna-500');
+          document.getElementById('promptStatus').textContent = '● Salvo no servidor';
+          document.getElementById('promptStatus').className = 'text-green-400';
+          showToast('🧠 System prompt salvo no luna-soul.cjs!', '✅');
+        } else {
+          showToast('❌ Erro: ' + (data.error || 'desconhecido'), '❌');
+        }
+      } catch (e) {
+        showToast('❌ Erro de rede: ' + e.message, '❌');
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '💾 Salvar no Servidor';
+      }
+    }
+
+    async function resetPrompt() {
+      if (!originalPrompt) {
+        showToast('⚠️ Prompt original não carregado. Recarregue a página.', '⚠️');
+        return;
+      }
+      if (!confirm('Restaurar o prompt original do servidor?\n\nQualquer alteração não salva será perdida.')) return;
+
+      document.getElementById('systemPrompt').value = originalPrompt;
+      updatePromptStats();
+      document.getElementById('promptStatus').textContent = '● Prompt original restaurado';
+      document.getElementById('promptStatus').className = 'text-luna-400';
+      showToast('🔄 Prompt original restaurado (não salvo ainda — clique em Salvar)', '✅');
+    }
+
+    function updatePromptStats() {
+      const text = document.getElementById('systemPrompt').value;
+      document.getElementById('promptChars').textContent = text.length.toLocaleString() + ' caracteres';
+      document.getElementById('promptLines').textContent = text.split('\n').length + ' linhas';
+    }
+
+    async function restartLuna() {
+      if (!confirm('Reiniciar a Luna?\n\nO bot do Telegram vai ficar offline por alguns segundos.')) return;
+      try {
+        const data = await apiPost('/api/restart', {});
+        if (data.ok) {
+          showToast('🔄 Luna reiniciada! ' + (data.message || ''), '✅');
+        } else {
+          showToast('❌ ' + (data.error || 'Erro ao reiniciar'), '❌');
+        }
+      } catch (e) {
+        showToast('❌ Erro: ' + e.message, '❌');
+      }
+    }
+
+    // ============================================================
+    // EXPORT / IMPORT .env
+    // ============================================================
+    function exportEnv() {
+      const env = collectEnv();
+      let content = '# Luna Kernel v4.0 — Environment Configuration\n';
+      content += '# Generated by Luna Config Panel\n';
+      content += '# NEXO DIGITAL S.L.\n\n';
+      Object.entries(env).forEach(([k, v]) => {
+        if (v) content += `${k}=${v}\n`;
+      });
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '.env';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('📥 .env exportado!', '✅');
+    }
+
+    function importEnv(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const lines = e.target.result.split('\n');
+        lines.forEach(line => {
+          const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+          if (match) {
+            const [, key, val] = match;
+            const el = document.getElementById(key);
+            if (el) {
+              if (el.type === 'checkbox') el.checked = val === 'true';
+              else el.value = val;
+            }
+          }
+        });
+        markDirty();
+        showToast('📤 .env importado! Clique em Salvar para aplicar.', '✅');
+      };
+      reader.readAsText(file);
+      input.value = '';
+    }
+
+    // ============================================================
+    // STATUS TESTS
+    // ============================================================
+    async function testTelegram() {
+      const token = document.getElementById('TELEGRAM_BOT_TOKEN').value;
+      const badge = document.getElementById('telegramStatus');
+      const btn = document.getElementById('btnTestTelegram');
+      if (!token) {
+        badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+        badge.textContent = 'Token vazio';
+        return;
+      }
+      badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-900/60 text-yellow-300';
+      badge.textContent = 'Testando...';
+      btn.disabled = true;
+
+      try {
+        const data = await apiPost('/api/test/telegram', { token });
+        if (data.ok) {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-green-900/60 text-green-300';
+          badge.textContent = `@${data.bot.username}`;
+          showTestOutput(`✅ Bot OK\nNome: ${data.bot.first_name}\nUsername: @${data.bot.username}\nID: ${data.bot.id}`);
+        } else {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+          badge.textContent = 'Falhou';
+          showTestOutput(`❌ Erro: ${data.error}`);
+        }
+      } catch (e) {
+        badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+        badge.textContent = 'Erro de rede';
+        showTestOutput(`❌ Erro: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function testNode() {
+      const badge = document.getElementById('nodeStatus');
+      badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-900/60 text-yellow-300';
+      badge.textContent = 'Testando...';
+      try {
+        const data = await apiGet('/api/test/node');
+        if (data.ok && data.sufficient) {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-green-900/60 text-green-300';
+          badge.textContent = data.version;
+          showTestOutput(`✅ ${data.message}`);
+        } else if (data.ok) {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-900/60 text-yellow-300';
+          badge.textContent = data.version;
+          showTestOutput(`⚠️ ${data.message}`);
+        } else {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+          badge.textContent = 'Não encontrado';
+          showTestOutput(`❌ ${data.error}`);
+        }
+      } catch (e) {
+        badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+        badge.textContent = 'Erro';
+        showTestOutput(`❌ ${e.message}`);
+      }
+    }
+
+    async function testChrome() {
+      const badge = document.getElementById('chromeStatus');
+      badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-900/60 text-yellow-300';
+      badge.textContent = 'Testando...';
+      try {
+        const data = await apiGet('/api/test/chrome');
+        if (data.ok) {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-green-900/60 text-green-300';
+          badge.textContent = 'Instalado';
+          showTestOutput(`✅ Chrome encontrado\nComando: ${data.command}\nVersão: ${data.version}`);
+        } else {
+          badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+          badge.textContent = 'Não encontrado';
+          showTestOutput(`❌ ${data.error}`);
+        }
+      } catch (e) {
+        badge.className = 'text-xs px-2 py-1 rounded-full bg-red-900/60 text-red-300';
+        badge.textContent = 'Erro';
+        showTestOutput(`❌ ${e.message}`);
+      }
+    }
+
+    function showTestOutput(text) {
+      document.getElementById('testResults').classList.remove('hidden');
+      document.getElementById('testOutput').textContent = text;
+    }
+
+    // ============================================================
+    // UTILS
+    // ============================================================
+    function toggleVisibility(id) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    function showToast(msg, icon) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = icon;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 4000);
+    }
+
+    // Warn before leaving if unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // Init
+    loadConfig();
+  </script>
+</body>
+</html>

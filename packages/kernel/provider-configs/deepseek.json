@@ -1,0 +1,41 @@
+{
+  "name": "deepseek",
+  "displayName": "DeepSeek Chat",
+  "baseUrl": "https://chat.deepseek.com",
+  "modeUrls": {
+    "instant": "https://chat.deepseek.com/",
+    "thinking": "https://chat.deepseek.com/"
+  },
+  "selectors": {
+    "input": "textarea[placeholder='Message DeepSeek'], textarea[placeholder='Mensagem para DeepSeek'], textarea._27c9245, textarea",
+    "sendButton": "div[role='button'].ds-button--primary.ds-button--filled.ds-button--circle, button[type='submit']",
+    "stopButton": "div[role='button'].ds-button--primary svg[class*='stop'], div[role='button'].ds-button--primary [class*='stop'], [class*='ds-stop-button']",
+    "newChat": "a[href='/'], button:has-text('New chat'), button:has-text('Nova conversa')",
+    "generatingIndicator": ".ds-loading, [class*='loading'], [class*='generating'], .ds-spin",
+    "responseContainer": ".ds-message._63c77b1, .ds-message",
+    "assistantMessage": ".ds-message:last-child",
+    "codeBlock": "pre code, .ds-markdown pre code, .ds-message pre code",
+    "messageList": ".ds-virtual-list-items._6f2c522, .ds-virtual-list-items",
+    "loginIndicator": ".login-btn, a[href*='login'], .login-form",
+    "appContent": "textarea[placeholder='Message DeepSeek'], textarea[placeholder='Mensagem para DeepSeek']",
+    "thinking": "",
+    "actionButtons": ""
+  },
+  "apiEndpoints": [
+    "/api/chat",
+    "/api/v0/chat",
+    "/api/chat/completions",
+    "/api/v0/chat/completion"
+  ],
+  "features": {
+    "autoLogin": false,
+    "supportsStreaming": true,
+    "supportsThinking": true,
+    "loginMethod": "manual",
+    "genericExtraction": true
+  },
+  "cookies": {
+    "masterCookies": "deepseek-master-cookies.json",
+    "masterLocalStorage": "deepseek-master-localstorage.json"
+  }
+}

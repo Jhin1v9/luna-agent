@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Luna DOM Observer",
+  "version": "2.10.8",
+  "description": "Real-time Kimi Web DOM observer — streams tool calls and responses to Luna server",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "offscreen",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.kimi.ai/*",
+    "https://kimi.ai/*",
+    "https://www.kimi.moonshot.cn/*",
+    "https://kimi.moonshot.cn/*",
+    "https://chat.deepseek.com/*",
+    "https://deepseek.com/*",
+    "http://localhost:*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.kimi.ai/*",
+        "https://kimi.ai/*",
+        "https://www.kimi.moonshot.cn/*",
+        "https://kimi.moonshot.cn/*",
+        "https://chat.deepseek.com/*",
+        "https://deepseek.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": [
+        "https://www.kimi.ai/*",
+        "https://kimi.ai/*",
+        "https://www.kimi.moonshot.cn/*",
+        "https://kimi.moonshot.cn/*",
+        "https://chat.deepseek.com/*",
+        "https://deepseek.com/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

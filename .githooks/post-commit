@@ -1,0 +1,13 @@
+#!/bin/bash
+# Luna living-memory hook: queue the commit hash for luna-brain-sync and
+# kick the drain in the background. Must be instant — never blocks the commit.
+# Commits made by the sync itself carry [brain-sync] and are skipped (anti-loop).
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PENDING="$REPO_ROOT/packages/kernel/.brain/.pending-commits"
+SUBJECT="$(git log -1 --pretty=%s 2>/dev/null)"
+case "$SUBJECT" in
+  *\[brain-sync\]*) exit 0 ;;
+esac
+git rev-parse HEAD >> "$PENDING" 2>/dev/null || true
+# Kick the drain detached; the script's flock serializes concurrent kicks.
+setsid bash "$REPO_ROOT/scripts/luna-brain-sync.sh" >/dev/null 2>&1 < /dev/null &

@@ -1,0 +1,372 @@
+{
+  "version": "1.1",
+  "lastUpdated": "2026-05-19T18:25:00.000Z",
+  "entries": [
+    {
+      "id": "changelog-workspace-file-viewer-v2",
+      "version": "3.4.0",
+      "title": "Workspace File Viewer v2 — Editor + Syntax Highlighting",
+      "description": "Novo visualizador/editor de arquivos no Workspace com: (1) Syntax highlighting com highlight.js para JSON, JS, TS, Python, CSS, SQL, YAML, Bash, PHP, Dockerfile, GraphQL e mais — modo Preview/Código; (2) Indicador visual de alterações não salvas (● + texto no header); (3) Atalhos de teclado: Ctrl+S para salvar, ESC para fechar; (4) Scrollbars customizadas no editor; (5) Preview de Markdown renderizado com headers, bold, listas, links, code blocks; (6) Preview de HTML em iframe com sandbox + botão Abrir no navegador; (7) Botão Luna com contexto enriquecido — o arquivo inteiro é injetado no prompt da IA. Endpoints backend: GET/PUT /api/workspace/clients/:id/content.",
+      "category": "feature",
+      "emoji": "📁",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T18:25:00.000Z",
+      "tags": [
+        "workspace",
+        "file-viewer",
+        "editor",
+        "syntax-highlighting",
+        "highlight.js",
+        "markdown",
+        "html-preview",
+        "luna-context"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-nlu-expansion-137-intents",
+      "version": "3.3.0",
+      "title": "NLU Expansion: 36 → 137 Intents",
+      "description": "Expansão massiva do modelo NLU da Luna de 36 para 137 intents cobrindo todos os domínios do NEXO: email (19 intents incluindo rascunhos, favoritos, spam, lixeira), tarefas (16 intents incluindo P0/P1, atrasadas, por projeto/responsável), financeiro (16 intents incluindo extrato, balanço, projeção, reconciliação), whatsapp (13 intents), workspace (10 intents), sistema (12 intents), clientes (6), leads (6), projetos (7), orçamentos (7), ideias (7), instagram (3), github (3), vercel (2), segurança (5) e operações (5). Todos os intents possuem exemplos de treinamento em PT/ES/CA e schemas no SmartFormModal. O comando \"rascunhos pendentes\" agora funciona corretamente.",
+      "category": "feature",
+      "emoji": "🧠",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T16:35:47.447715.000Z",
+      "tags": [
+        "nlu",
+        "intents",
+        "expansão",
+        "machine-learning",
+        "i18n"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-workspace-leads-active-learning",
+      "version": "3.2.0",
+      "title": "Workspace Unificado + Active Learning NLU",
+      "description": "A sidebar do Workspace agora mostra Leads e Clientes unificados do clients-registry.json. Leads não convertidos abrem um preview panel com botão 'Converter em Cliente' que cria automaticamente a pasta no workspace com estrutura padrão (01_orcamentos a 07_entregas) + README.md. Além disso, Active Learning no SmartFormModal: quando NLU retorna score < 0.85, o usuário pode corrigir a intent, re-treinando o modelo via /api/luna/learn.",
+      "category": "feature",
+      "emoji": "🎯",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T17:20:00.000Z",
+      "tags": [
+        "workspace",
+        "leads",
+        "active-learning",
+        "nlu",
+        "unificação"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-executor-ajuda-navegar",
+      "version": "3.2.0",
+      "title": "ActionExecutor: Comandos sistema.ajuda + sistema.navegar",
+      "description": "Novas ações no ActionExecutor: 'ajuda' responde com lista de capacidades da Luna e 'navegar' redireciona para páginas do dashboard. Além disso, 'task_done' agora retorna erro quando não encontra a tarefa (não cria mais automaticamente uma tarefa concluída desconhecida).",
+      "category": "feature",
+      "emoji": "🧭",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T17:00:00.000Z",
+      "tags": [
+        "action-executor",
+        "ajuda",
+        "navegação",
+        "task_done"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-luna-fluxo-unificado",
+      "version": "3.2.0",
+      "title": "Luna: Fluxo Floating Button + Chat Unificado",
+      "description": "O LunaFloatingButton agora usa o mesmo endpoint /api/luna/chat que a página dedicada de chat, com fallback automático para o SmartFormModal quando a intenção detectada requer preenchimento de formulário. NLU e ActionExecutor sincronizados para evitar divergências entre os dois fluxos de interação.",
+      "category": "fix",
+      "emoji": "🔧",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T16:45:00.000Z",
+      "tags": [
+        "luna",
+        "floating-button",
+        "chat",
+        "nlu",
+        "action-executor"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-ux-polimento-19",
+      "version": "3.2.0",
+      "title": "Polimento UX — Modal Responsivo, Auth JWT & Labels",
+      "description": "Correções de usabilidade críticas: SmartFormModal agora scrolla internamente (max-h-[90vh]) mantendo header/footer fixos; requisições do modal enviam token JWT explicitamente no header Authorization; label 'Assunto:' no EmailCompose corrigido para não transbordar sobre o placeholder (w-14 shrink-0); payloads NLU 100% alinhados com schemas do backend.",
+      "category": "improvement",
+      "emoji": "🎨",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-19T16:00:00.000Z",
+      "tags": [
+        "ux",
+        "modal",
+        "jwt",
+        "responsive",
+        "polimento"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-workspace-v1",
+      "version": "3.2.0",
+      "title": "Workspace v1.0 — Terminal SSE, Context Menu & Drag-Drop",
+      "description": "Primeira versão polida do Workspace: terminal de logs em tempo real via Server-Sent Events (SSE) para servidores de desenvolvimento, menu de contexto (clique direito) para arquivos e pastas com ações rápidas, drag-and-drop de arquivos para upload, e detecção automática de tipo de projeto (React, Next.js, Vue, etc.) nas pastas de demos.",
+      "category": "feature",
+      "emoji": "💻",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-19T15:30:00.000Z",
+      "tags": [
+        "workspace",
+        "terminal",
+        "sse",
+        "context-menu",
+        "drag-drop"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-luna-v20",
+      "version": "3.2.0",
+      "title": "Luna v20.0 — A Administradora Gestora Única da NEXO",
+      "description": "A Luna agora é a única entidade consciente que controla ABSOLUTAMENTE TUDO no NEXO Dashboard via chat. 109 métodos de ação em 21 categorias, unificação das IAs de Ideias e Email, e contexto compartilhado entre todos os módulos.",
+      "category": "feature",
+      "emoji": "🧠",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T14:00:00.000Z",
+      "tags": [
+        "luna",
+        "ai",
+        "action-executor",
+        "unificação",
+        "v20"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-action-executor-v19",
+      "version": "3.2.0",
+      "title": "ActionExecutor v19.0 — 109 Métodos em 21 Categorias",
+      "description": "Expansão massiva do ActionExecutor: Tarefas, Leads, Financeiro (Receitas, Despesas, Caixa, Orçamentos), Projetos, Clientes, Workspace, Ideias, WhatsApp, Email, Instagram, Links, Operações, Sistema, Segurança, Notificações, Usuários, External Tools e BugDetector.",
+      "category": "feature",
+      "emoji": "⚡",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T13:30:00.000Z",
+      "tags": [
+        "action-executor",
+        "backend",
+        "automation",
+        "v19"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-ia-unificada",
+      "version": "3.2.0",
+      "title": "Unificação das IAs — Uma Só Luna",
+      "description": "As 3 IAs separadas (Luna Concierge, IA de Ideias, IA de Email) foram unificadas em um único endpoint /api/luna/chat. A Luna agora sabe o contexto de ideias e emails e pode responder com acesso a todos os dados do NEXO.",
+      "category": "feature",
+      "emoji": "🔮",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T13:00:00.000Z",
+      "tags": [
+        "ai",
+        "unificação",
+        "ideias",
+        "email",
+        "context"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-persistencia-contexto",
+      "version": "3.2.0",
+      "title": "Sistema de Persistência de Contexto (.kimi-context)",
+      "description": "Novo sistema para mitigar perda de contexto por compaction entre sessões Kimi: index.json (índice mestre com hashes únicos por instância), handoff.md (próximas ações pendentes entre sessões), sessions/ (snapshots completos por sessão). KIMI.MD atualizado com seção 15 (persistência).",
+      "category": "improvement",
+      "emoji": "💾",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T12:00:00.000Z",
+      "tags": [
+        "persistencia",
+        "contexto",
+        "kimi",
+        "docs"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-nexo-mail-sprint1",
+      "version": "3.2.0",
+      "title": "NEXO Mail v2.0 Sprint 1 — Layout, Modo Foco & Densidade",
+      "description": "EmailHub completamente redesenhado: modo foco tela cheia persistente, densidade Compacto/Normal/Confortável, sidebar colapsável com tooltips, painel de leitura redimensionável com drag handle, e Luna convertida de modal para painel lateral fixo (320px).",
+      "category": "feature",
+      "emoji": "📧",
+      "author": "Abner",
+      "tier": 1,
+      "date": "2026-05-19T10:00:00.000Z",
+      "tags": [
+        "email",
+        "layout",
+        "modo-foco",
+        "densidade",
+        "resizable"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-001",
+      "version": "3.1.0",
+      "title": "Sistema de Changelog e Release Notes",
+      "description": "Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.",
+      "category": "feature",
+      "emoji": "✨",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-18T20:32:30.570Z",
+      "tags": [
+        "changelog",
+        "ui",
+        "notificacoes"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-nexo-mail-v2",
+      "version": "3.1.0",
+      "title": "NEXO Mail v2.0 — Luna Integrada",
+      "description": "Painel Luna inline no EmailHub (320px), banner de drafts pendentes para aprovação, action items → tarefas com um clique, e fluxo completo de draft-for-approval com notificações automáticas.",
+      "category": "feature",
+      "emoji": "📧",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-18T20:30:00.000Z",
+      "tags": [
+        "email",
+        "luna",
+        "drafts",
+        "action-items",
+        "v2"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-002",
+      "version": "3.1.0",
+      "title": "WhatsApp Intelligence v10.2 — Correcao Completa",
+      "description": "Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.",
+      "category": "whatsapp",
+      "emoji": "📱",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-18T18:32:30.570Z",
+      "tags": [
+        "whatsapp",
+        "luna",
+        "automation"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-003",
+      "version": "3.1.0",
+      "title": "Sistema Financeiro v3.1 — CRUD Completo",
+      "description": "Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).",
+      "category": "finance",
+      "emoji": "💰",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-17T20:32:30.570Z",
+      "tags": [
+        "financeiro",
+        "crud",
+        "transacoes"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-004",
+      "version": "3.0.0",
+      "title": "Centro de Operacoes NEXO Digital",
+      "description": "Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.",
+      "category": "feature",
+      "emoji": "✨",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-11T20:32:30.570Z",
+      "tags": [
+        "dashboard",
+        "operacoes",
+        "metrics"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-005",
+      "version": "3.0.0",
+      "title": "Orcamentos — Sistema de Acompanhamento",
+      "description": "Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.",
+      "category": "feature",
+      "emoji": "✨",
+      "author": "Abner",
+      "tier": 3,
+      "date": "2026-05-08T20:32:30.570Z",
+      "tags": [
+        "orcamentos",
+        "clientes",
+        "projetos"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-006",
+      "version": "2.5.0",
+      "title": "Integracao GitHub + Vercel",
+      "description": "Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.",
+      "category": "improvement",
+      "emoji": "🚀",
+      "author": "Nonoke",
+      "tier": 3,
+      "date": "2026-05-03T20:32:30.570Z",
+      "tags": [
+        "github",
+        "vercel",
+        "devops"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-007",
+      "version": "2.0.0",
+      "title": "WhatsApp Agent v1.0 — Monitoramento Inicial",
+      "description": "Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.",
+      "category": "whatsapp",
+      "emoji": "📱",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-04-18T20:32:30.570Z",
+      "tags": [
+        "whatsapp",
+        "luna",
+        "v1"
+      ],
+      "readBy": []
+    }
+  ]
+}

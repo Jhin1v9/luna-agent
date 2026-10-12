@@ -1,0 +1,29 @@
+{
+  "name": "luna-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Luna autonomous agent monorepo — kernel + dashboard",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "install:all": "corepack pnpm install",
+    "dev:kernel": "corepack pnpm --filter @luna/kernel dev",
+    "dev:dashboard": "corepack pnpm --filter @luna/dashboard dev",
+    "build": "corepack pnpm -r build",
+    "start": "corepack pnpm --filter @luna/dashboard start",
+    "test": "corepack pnpm -r test"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@luna/dashboard": "workspace:*",
+    "@luna/kernel": "workspace:*"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
