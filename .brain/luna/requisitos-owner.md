@@ -28,3 +28,24 @@
 
 **Status:** requisito ativo. Owner ainda não deu a definição exata da fala original —
 validar com ele e substituir a interpretação acima se necessário.
+
+## R002 — Nomes próprios SEMPRE capitalizados e corretos (owner, 13/10/2026, 00:09)
+
+> Owner: "SEMPRE NOME PROPRIO 1 LETRA MAIUSCULA E SEMPRE ESCRITA CORRETAMENTE
+> 'Vênus' 'Luna'"
+
+**Regra absoluta de escrita (todos os canais — WhatsApp, Telegram, painel, docs,
+código comentado, commits, synapses):**
+
+1. Todo nome próprio começa com letra MAIÚSCULA: Vênus, Luna, Nexo, Rottu, Enoque,
+   Abner, Jess, Dudu, Kimi.
+2. Escrita correta SEMPRE — com acentos e grafia exatas: "Vênus" (nunca "Venus",
+   "venus", "VÊNUS" fora de código constante), "Luna" (nunca "luna" em prosa).
+3. Válido em qualquer lugar: respostas ao time/cliente, UI do painel, memória,
+   relatórios. Em código/identificadores (nomes de processo, tabelas, variáveis)
+   vale o padrão técnico — mas qualquer texto humano segue a regra.
+
+**Motivo:** nomes são identidade — escrever errado soa descuido e quebra a persona
+profissional da Nexo. O owner chamou atenção às 00:09 após leitura das mensagens.
+
+**Status:** requisito ativo, vigor imediato.
