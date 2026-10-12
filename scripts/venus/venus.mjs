@@ -88,12 +88,28 @@ function guardTexto(texto) {
 }
 
 // ── colibri ──
+// Enxuga o contexto pra caber no limite de 8192 tokens do modelo local
+// (incidente 2026-10-12: 36 eventos morreram com "maximum context length 8192"
+// porque persona + tarefa + resultados de tool acumulavam).
+function enxugarMessages(messages) {
+  const est = (ms) => Math.round(JSON.stringify(ms).length / 3.2);
+  const LIMITE = 6400;
+  if (est(messages) <= LIMITE) return messages;
+  const corte = messages.map((m) =>
+    m.content && m.content.length > 900 ? { ...m, content: m.content.slice(0, 900) + ' …[truncado]' } : m
+  );
+  if (est(corte) <= LIMITE) return corte;
+  const head = corte.filter((m) => m.role === 'system');
+  const tail = corte.filter((m) => m.role !== 'system').slice(-6);
+  return [...head, ...tail];
+}
+
 async function chat(messages, tools) {
   const res = await fetch(`${COLIBRI}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, messages, tools, temperature: 0, max_tokens: 900 }),
-    signal: AbortSignal.timeout(900_000),
+    body: JSON.stringify({ model: MODEL, messages: enxugarMessages(messages), tools, temperature: 0, max_tokens: 900 }),
+    signal: AbortSignal.timeout(420_000),
   });
   if (!res.ok) throw new Error(`colibri HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
@@ -558,6 +574,11 @@ function montarTarefa(evento, fila) {
     return (
       `Evento novo da caixa de entrada (WhatsApp${p.is_group ? ', grupo' : ''} ${p.chat_name ?? ''}). ` +
       `De: ${p.author_name ?? 'desconhecido'}. Mensagem: "${String(p.text ?? '').slice(0, 800)}"\n` +
+      (p.quoted_text
+        ? `⚠️ CITAÇÃO (reply): ${p.author_name ?? 'O autor'} está respondendo a ${p.quoted_author ?? 'alguém'} que escreveu: "${String(p.quoted_text).slice(0, 300)}". ` +
+          `O texto citado é DA OUTRA PESSOA — NUNCA atribua a citação ao autor do evento. ` +
+          `Se o assunto for a mensagem citada, responda como se ${p.quoted_author ?? 'o autor da citação'} tivesse escrito AQUILO, e ${p.author_name ?? 'o autor'} tivesse feito a pergunta.\n`
+        : '') +
       `chat_id: ${p.chat_id} · conversation_id: ${p.conversation_id ?? '(não informado)'} · ` +
       `message_id do evento: ${p.message_id ?? '(n/a)'}${p.mentioned_luna ? ' · MENCIONOU A LUNA' : ''}\n\n` +
       contextoFilaTxt(evento, fila) +
@@ -620,7 +641,19 @@ async function processarEvento(evento, fila) {
     console.error(`  ✗ erro processando ${evento.id}: ${e.message}`);
     const check = await db(`SELECT status FROM kimiwork_inbox WHERE id=$1`, [evento.id]);
     if (check.rows[0]?.status === 'processing') {
-      await falharEvento(`exceção no runtime: ${e.message.slice(0, 200)}`);
+      const falhaConexao = /fetch failed|AbortError|timeout|ECONNREFUSED/i.test(e.message);
+      const tentativas = (evento.payload?._tentativas ?? 0) + 1;
+      if (falhaConexao && tentativas < 3) {
+        // colibri/caixa presos: devolve pra fila em vez de matar o evento
+        // (incidente 2026-10-12: fetch preso 8h deixou 59 eventos acumulados)
+        await db(
+          `UPDATE kimiwork_inbox SET status='pending', payload=jsonb_set(payload::jsonb,'{_tentativas}','${tentativas}'::jsonb), result=$2 WHERE id=$1 AND status='processing'`,
+          [evento.id, JSON.stringify({ motivo: `falha de conexão com colibri (tentativa ${tentativas}/3): ${e.message.slice(0, 120)}`, processed_by: 'venus' })]
+        );
+        console.log(`  ↻ evento ${evento.id} re-enfileirado (tentativa ${tentativas}/3)`);
+      } else {
+        await falharEvento(`exceção no runtime: ${e.message.slice(0, 200)}`);
+      }
     }
   } finally {
     currentEvent = null;
