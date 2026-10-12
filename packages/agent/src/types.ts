@@ -22,7 +22,8 @@ export type KimiAdapterMode =
   | 'kimi-web-local'
   | 'gemini'
   | 'pi'
-  | 'kimiwork';
+  | 'kimiwork'
+  | 'fcc';
 
 export interface KimiAdapterConfig {
   mode: KimiAdapterMode;

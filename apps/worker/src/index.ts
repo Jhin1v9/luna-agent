@@ -99,7 +99,15 @@ async function main(): Promise<void> {
               { mode: 'kimiwork' },
               { pool, timeoutMs: liveTimeoutMs, pollIntervalMs: config.KIMIWORK_LLM_POLL_MS },
             )
-          : new (await import('@luna/agent')).KimiCliAdapter(
+          : config.LIVE_BRAIN_PROVIDER === 'fcc'
+        ? // ADR-041 — live brain no gateway FCC local (API Anthropic-style,
+          // stateless, sem auth por default). Timeout do live (investigação).
+          new (await import('@luna/agent')).FccAdapter({
+            baseUrl: config.FCC_BASE_URL,
+            model: config.FCC_MODEL,
+            timeoutMs: liveTimeoutMs,
+          })
+        : new (await import('@luna/agent')).KimiCliAdapter(
               { mode: 'kimi-cli' },
               {
                 timeoutMs: liveTimeoutMs,

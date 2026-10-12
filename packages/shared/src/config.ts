@@ -20,8 +20,10 @@ const envSchema = z.object({
   // (sendTurn via WS ainda não mapeado — ADR-015); kimi-api = fast brain
   // oficial (§7.2, ADR-016); gemini = fast brain INTERINO para teste (ADR-018);
   // kimiwork = a Luna do Kimi Work como cérebro (ADR-040, decreto owner
-  // 2026-09-24) — turnos na fila kimiwork_llm_turns, resposta na varredura.
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork']).default('mock'),
+  // 2026-09-24) — turnos na fila kimiwork_llm_turns, resposta na varredura;
+  // roda = fast brain na roda de providers do painel (ADR-041, opt-in);
+  // fcc = live brain no gateway FCC local (ADR-041).
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork', 'fcc']).default('mock'),
   KIMIWORK_LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   KIMIWORK_LLM_POLL_MS: z.coerce.number().int().positive().default(2_500),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
@@ -63,7 +65,10 @@ const envSchema = z.object({
   // está sem quota; 'kimiwork' = a Luna do Kimi Work assume o live brain
   // inteiro (ADR-040, decreto owner 2026-09-24). Troca = só .env, zero
   // código (mesma interface estável).
-  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork', 'kimi-web-local']).default('kimi'),
+  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork', 'kimi-web-local', 'fcc']).default('kimi'),
+  // FCC (ADR-041) — gateway local Anthropic-style (rota LIVE).
+  FCC_BASE_URL: z.string().default('http://127.0.0.1:8082'),
+  FCC_MODEL: z.string().default('nvidia_nim/moonshotai/kimi-k3'),
   KIMIWEB_LOCAL_URL: z.string().default('http://127.0.0.1:58629'),
   KIMIWEB_LOCAL_TOKEN: z.string().default(''),
   KIMIWEB_SESSION_ID: z.string().default(''),

@@ -8,6 +8,7 @@ import { PiAdapter } from './pi.js';
 import { KimiWorkAdapter } from './kimiwork.js';
 import { FallbackAdapter } from './fallback.js';
 import { KimiWebLocalAdapter } from './kimi-web-local.js';
+import { FccAdapter } from './fcc.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
   switch (config.mode) {
@@ -39,6 +40,9 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
       // ADR-040 — Kimi Work como cérebro (decreto owner 2026-09-24): turnos
       // na fila kimiwork_llm_turns; a Luna do Kimi Work responde na varredura.
       return new KimiWorkAdapter(config);
+    case 'fcc':
+      // ADR-041 — live brain via FCC local (gateway Anthropic-style).
+      return new FccAdapter();
   }
 }
 
@@ -91,3 +95,5 @@ export {
 } from './openai-compat.js';
 export { ChainAdapter } from "./chain.js";
 export { KimiWebLocalAdapter } from "./kimi-web-local.js";
+export { FccAdapter } from "./fcc.js";
+export type { FccAdapterDeps } from "./fcc.js";
