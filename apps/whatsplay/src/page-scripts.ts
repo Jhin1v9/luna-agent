@@ -117,7 +117,24 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
   const SELF = /^(tú|você|voce|you|tu)$/i;
   return Promise.all(rows.map(async (row) => {
     await expandirRow(row);
-    const textEl = row.querySelector(sel.messageText);
+    // Bloco citado (reply) — igual ao READ_PANEL_MESSAGES_SCRIPT: os spans do
+    // quote são EXCLUÍDOS do texto da mensagem nova. Sem isso, responder
+    // citando entregava o texto da citada junto, atribuído ao autor da
+    // RESPOSTA (bug owner 12/10: "vc manda OLA, eu mando 'oi luna' marcando
+    // sua msg e vc fala q eu escrevi OLA").
+    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    const textEls = Array.from(row.querySelectorAll(sel.messageText))
+      .filter((el) => !quotedEl || !quotedEl.contains(el));
+    const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');
+    // Autor da mensagem CITADA: o atributo data-pre-plain-text do WA tem
+    // formato "[data] [hora] - Autor: ". É o dono do texto citado, NUNCA o
+    // autor da resposta — os dois são coisas diferentes (decreto owner 12/10).
+    let quotedAuthor = null;
+    if (quotedEl) {
+      const pre = quotedEl.getAttribute('data-pre-plain-text') || '';
+      const m = pre.match(/-\\s*([^:\\n]+):\\s*$/);
+      quotedAuthor = m ? m[1].trim() : null;
+    }
     let direction = row.querySelector('[data-testid="tail-in"]') ? 'inbound'
       : row.querySelector('[data-testid="tail-out"]') ? 'outbound' : null;
     let sender = '';
@@ -131,7 +148,7 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
     if (!direction) direction = 'inbound';
     const authorEl = row.querySelector('[data-testid="author"]');
     const author = authorEl ? (authorEl.textContent || '').trim() : direction === 'outbound' ? 'Tú' : null;
-    return { sender, author, direction, text: textEl ? (textEl.textContent || '').trim() : '', mid: row.getAttribute('data-id') || '' };
+    return { sender, author, direction, text, quoted: quotedEl ? (quotedEl.textContent || '').trim() : null, quotedAuthor, mid: row.getAttribute('data-id') || '' };
   }));
 }`;
 

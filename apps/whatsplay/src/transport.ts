@@ -26,6 +26,8 @@ export interface UnreadMessage {
   external_id: string;
   /** Texto da mensagem citada, se a nova msg for reply. */
   quoted_text?: string | null;
+  /** Autor da mensagem citada (NUNCA o autor da resposta — decreto owner 12/10). */
+  quoted_author?: string | null;
   quoted_from_luna?: boolean;
   /** 🖼️ Caminho local da imagem anexada (baixada do blob: da página), se houver. */
   image_path?: string | null;
@@ -47,6 +49,10 @@ export interface ConversationMessage {
   text: string;
   /** Quem falou (nome do membro no grupo; 'Tú'/null no outbound). */
   author?: string | null;
+  /** Texto da mensagem citada (reply), sem o autor. */
+  quoted?: string | null;
+  /** Autor da mensagem citada — extraído do data-pre-plain-text do WA. */
+  quotedAuthor?: string | null;
   /** data-id estável da mensagem no WA (discriminador do external_id §7.6). */
   mid?: string;
 }

@@ -286,6 +286,8 @@ export class IngestWatcher {
           external_id: `wa:${entry}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
+          quoted_text: (last as { quoted?: string | null }).quoted ?? null,
+          quoted_author: (last as { quotedAuthor?: string | null }).quotedAuthor ?? null,
           author_name: (last as { author?: string | null }).author ?? null,
           received_at: new Date().toISOString(),
         };
@@ -399,6 +401,8 @@ export class IngestWatcher {
       external_id: `wa:${badge.chat_id}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
       mentioned_luna: extractMention(last.text),
       quoted_from_luna: false,
+      quoted_text: (last as { quoted?: string | null }).quoted ?? null,
+      quoted_author: (last as { quotedAuthor?: string | null }).quotedAuthor ?? null,
       author_name: (last as { author?: string | null }).author ?? badge.chat_name,
       received_at: new Date().toISOString(),
     };

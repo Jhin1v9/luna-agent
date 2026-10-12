@@ -23,7 +23,7 @@ const envSchema = z.object({
   // 2026-09-24) — turnos na fila kimiwork_llm_turns, resposta na varredura;
   // roda = fast brain na roda de providers do painel (ADR-041, opt-in);
   // fcc = live brain no gateway FCC local (ADR-041).
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork', 'roda', 'fcc']).default('mock'),
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork', 'roda', 'fcc', 'pi']).default('mock'),
   KIMIWORK_LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   KIMIWORK_LLM_POLL_MS: z.coerce.number().int().positive().default(2_500),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
