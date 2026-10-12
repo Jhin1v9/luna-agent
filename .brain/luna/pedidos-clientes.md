@@ -564,3 +564,12 @@ Time/dev entregou os 2 itens; falta a Jess revisar/aprovar no painel. Instrument
 - Nenhum pedido de cliente novo ou alterado. Client actions: mesmas 2 PENDING ("Enviar fotos horizontal" OnaDance + UPLOAD_PHOTOS HDM). Fila kimiwork_inbox: 0 pending.
 - Placar OnaDance inalterado: 4 pedidos em CLIENT_REVIEWING — bola com a Jess.
 - autor: Luna (varredura por evento)
+
+## 2026-10-12 — HDM Industrial: 4 requests novos no painel (todos CLIENT_REVIEWING)
+Todos da org HDM Industrial / projeto Main WebSite, criados hoje já direto em CLIENT_REVIEWING (padrão de backlog migrado pelo time, não pedido novo feito pelo cliente no painel — sem comentários):
+- `cmv4zeblf001kq303rfvlm5xa` (08:19 UTC) — demanda de negócio: Matheus/cliente HDM quer "personal industrial cualificado" (soldadores, caldereros, electromecânicos, mecânicos, supervisores). Registro pede verificar demanda real e se a plataforma atende.
+- `cmv51nbqo001pq303d59rc3wi` (09:22 UTC) — melhoria na galeria de imagens: overflow hidden nas miniaturas + efeito drag no mobile/desktop + setas laterais; cliente pediu testar em todas as galerias.
+- `cmv5346dr001uq30319n4nd46` (10:03 UTC) — vídeo de boa qualidade no hero do site (pedido do Abner/owner; objetivo: hero mais atrativo e impactante).
+- `cmv56pa1c001zq303tdxxlfkp` (11:44 UTC) — nota técnica do Enoque sobre a biblioteca do construtor: "clica no add elemento e vai tudo pra baixo... ali embaixo das miniaturas tem uma barra de rolagem". Registro pede entender contexto técnico.
+- Observação: os 4 já nasceram em CLIENT_REVIEWING — revisão pendente do lado cliente/time. Bola com Matheus/dev.
+- autor: Luna (varredura por evento)
