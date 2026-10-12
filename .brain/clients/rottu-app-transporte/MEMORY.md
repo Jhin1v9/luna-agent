@@ -40,6 +40,7 @@
 - Licença: **AGPL-3.0** (self-host livre, mas modificações servidas via rede devem ser publicadas) ou licença comercial FCL (modificações proprietárias/white-label/SaaS fechado).
 - Fit com Rottu: é gestão de frota/despacho de operador (frotas próprias, last-mile) — NÃO é marketplace de cargas. O core do Rottu (matching oferta/demanda, precificação preditiva, swipe, dois perfis com regras diferentes, score) teria que ser construído do zero. Uso provável: peças de infra (rastreio, comprovante, roteirização) como referência ou backend auxiliar — decisão de licença é o gargalo (AGPL vs FCL).
 - Apps que já temos no VPS e o Enoque citou como "diferentes": `vps.nexo-digital.app/crm-delivery` e `/negocios/encomiendas/`.
+- **Parecer CTO (owner pediu 12/10 20:54):** veredito completo em `analise-fleetbase-cto.md` (mesma pasta). Resumo: NÃO usar como base (modelo divergente + AGPL + stack PHP fora da casa + core do marketplace é greenfield de qualquer forma); usar como referência. Peças prontas recomendadas: Valhalla/GraphHopper (rotas caminhão), MapLibre+tileserver (mapas), Traccar (GPS p/ rastreador físico), Mercado Pago/Stripe BR (Pix), Socket.IO (chat). Matching/precificação/score = construir.
 - Status: Enoque analisando o repo; nenhuma decisão tomada.
 
 ## Decisões e caminhos
