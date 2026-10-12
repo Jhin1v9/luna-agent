@@ -23,7 +23,8 @@ export type KimiAdapterMode =
   | 'gemini'
   | 'pi'
   | 'kimiwork'
-  | 'fcc';
+  | 'fcc'
+  | 'roda';
 
 export interface KimiAdapterConfig {
   mode: KimiAdapterMode;

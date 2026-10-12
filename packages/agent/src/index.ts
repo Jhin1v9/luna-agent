@@ -9,6 +9,7 @@ import { KimiWorkAdapter } from './kimiwork.js';
 import { FallbackAdapter } from './fallback.js';
 import { KimiWebLocalAdapter } from './kimi-web-local.js';
 import { FccAdapter } from './fcc.js';
+import { RodaAdapter } from './roda.js';
 
 export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
   switch (config.mode) {
@@ -43,6 +44,10 @@ export function createAdapter(config: KimiAdapterConfig): KimiLiveAdapter {
     case 'fcc':
       // ADR-041 — live brain via FCC local (gateway Anthropic-style).
       return new FccAdapter();
+    case 'roda':
+      // ADR-041 — fast brain na roda de providers (config/providers.json,
+      // editado pelo painel). Opt-in: KIMI_ADAPTER_MODE=roda.
+      return new RodaAdapter(config);
   }
 }
 
@@ -97,3 +102,4 @@ export { ChainAdapter } from "./chain.js";
 export { KimiWebLocalAdapter } from "./kimi-web-local.js";
 export { FccAdapter } from "./fcc.js";
 export type { FccAdapterDeps } from "./fcc.js";
+export { RodaAdapter, RodaConfigMissing } from "./roda.js";

@@ -245,9 +245,18 @@ importers:
 
   packages/agent:
     dependencies:
+      '@luna/logging':
+        specifier: workspace:*
+        version: link:../logging
       pg:
         specifier: ^8.13.0
         version: 8.23.0
+      pino:
+        specifier: ^9.5.0
+        version: 9.14.0
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^24.0.0

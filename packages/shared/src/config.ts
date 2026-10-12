@@ -23,7 +23,7 @@ const envSchema = z.object({
   // 2026-09-24) — turnos na fila kimiwork_llm_turns, resposta na varredura;
   // roda = fast brain na roda de providers do painel (ADR-041, opt-in);
   // fcc = live brain no gateway FCC local (ADR-041).
-  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork', 'fcc']).default('mock'),
+  KIMI_ADAPTER_MODE: z.enum(['mock', 'kimi-web', 'kimi-api', 'gemini', 'kimiwork', 'roda', 'fcc']).default('mock'),
   KIMIWORK_LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   KIMIWORK_LLM_POLL_MS: z.coerce.number().int().positive().default(2_500),
   KIMI_WEB_URL: z.string().url().default('http://127.0.0.1:58627'),
@@ -33,7 +33,7 @@ const envSchema = z.object({
   KIMI_API_MODEL: z.string().default('kimi-k2-0905-preview'),
   // LLM_* — contrato Model Router §9: trocar de provider = só trocar o .env.
   // Decreto do owner: modelo SEMPRE o mais barato; NUNCA 2.7, NUNCA K3 (ADR-019).
-  LLM_PROVIDER: z.enum(['kimi', 'gemini']).default('kimi'),
+  LLM_PROVIDER: z.enum(['kimi', 'gemini', 'roda']).default('kimi'),
   LLM_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().default('kimi-k2.6'),
