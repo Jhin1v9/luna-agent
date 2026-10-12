@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --luna-bg: #0a0a1a;
+  --luna-surface: #12121f;
+  --luna-elevated: #1a1a2e;
+  --luna-border: rgba(255, 255, 255, 0.06);
+  --luna-text: #e2e8f0;
+  --luna-text-secondary: #94a3b8;
+  --luna-primary: #e94560;
+  --luna-primary-hover: #ff6b6b;
+  --luna-gold: #ffd700;
+
+  /* Dynamic theme vars — updated by mode */
+  --luna-accent: #a855f7;
+  --luna-accent-glow: rgba(168,85,247,0.3);
+  --luna-accent-border: rgba(168,85,247,0.15);
+
+  --tool-writeFile: #3b82f6;
+  --tool-readFile: #22c55e;
+  --tool-executeShell: #a855f7;
+  --tool-searchWeb: #f97316;
+  --tool-gitStatus: #6b7280;
+  --tool-gitDiff: #6b7280;
+  --tool-gitLog: #6b7280;
+  --tool-gitCommit: #6b7280;
+  --tool-dashboard: #ec4899;
+  --tool-replaceInFile: #06b6d4;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+html {
+  background-color: #0a0a1a;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Prevent zoom on inputs in iOS Safari */
+input, textarea, select {
+  font-size: 16px;
+}
+
+/* Prevent double-tap zoom */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--luna-text);
+  background-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove ugly focus outline on all inputs */
+input:focus, textarea:focus, button:focus, select:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--luna-accent) !important;
+}
+
+/* Scrollbar — invisible but functional (premium feel) */
+::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  background: transparent;
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Selection */
+::selection {
+  background: var(--luna-accent-border);
+  color: var(--luna-text);
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--luna-accent);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Plan Mode Theme Overrides */
+body.plan-mode-active {
+  --luna-accent: #c9a227;
+  --luna-accent-glow: rgba(201,162,39,0.3);
+  --luna-accent-border: rgba(201,162,39,0.15);
+}
+
+body.plan-mode-active .chat-header {
+  background: linear-gradient(90deg, #0f0f1a 0%, #1a1a2e 100%);
+  border-bottom-color: rgba(201,162,39,0.2);
+}
+
+body.plan-mode-active .chat-input-container {
+  background: #0d0d1a;
+  border-top-color: rgba(201,162,39,0.2);
+}
+
+body.plan-mode-active .status-bar {
+  background: linear-gradient(90deg, #12121f 0%, #1a1a2e 50%, #12121f 100%);
+  border-top-color: rgba(201,162,39,0.3);
+}
+
+/* Animação de transição para plan mode */
+.chat-area, .chat-header, .chat-input-container, .status-bar {
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 40px rgba(255,215,0,0.1); }
+  50% { box-shadow: 0 0 60px rgba(255,215,0,0.2); }
+}
+
+/* Code blocks */
+pre {
+  font-family: 'JetBrains Mono', monospace;
+  background: #0d0d1a;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+:not(pre) > code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--luna-primary-hover);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(233, 69, 96, 0.1);
+  }
+}
+
+/* Markdown content styles */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: var(--luna-text);
+}
+
+.markdown-content h1 { font-size: 1.5rem; }
+.markdown-content h2 { font-size: 1.25rem; }
+.markdown-content h3 { font-size: 1.1rem; }
+
+.markdown-content p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid var(--luna-accent);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--luna-text-secondary);
+}
+
+.markdown-content a {
+  color: var(--luna-accent);
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--luna-border);
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content th {
+  background: var(--luna-surface);
+  font-weight: 600;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--luna-border);
+  margin: 1.5rem 0;
+}

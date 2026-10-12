@@ -1,0 +1,52 @@
+module.exports = {
+  apps: [
+    {
+      name: 'luna-server',
+      script: './backend/luna-server.js',
+      cwd: '{{NEXO_DASHBOARD_DIR}}',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      error_file: '{{HOME}}/.pm2/logs/luna-server-error.log',
+      out_file: '{{HOME}}/.pm2/logs/luna-server-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'nexo-dashboard',
+      script: './backend/server.js',
+      cwd: '{{NEXO_DASHBOARD_DIR}}',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      error_file: '{{HOME}}/.pm2/logs/nexo-dashboard-error.log',
+      out_file: '{{HOME}}/.pm2/logs/nexo-dashboard-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'telegram-bot',
+      script: './agents/telegram-luna-adapter.cjs',
+      cwd: '{{NEXO_DASHBOARD_DIR}}',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      error_file: '{{HOME}}/.pm2/logs/telegram-bot-error.log',
+      out_file: '{{HOME}}/.pm2/logs/telegram-bot-out.log',
+      merge_logs: true,
+    },
+  ],
+};

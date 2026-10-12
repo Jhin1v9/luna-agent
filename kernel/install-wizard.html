@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luna - Login no Kimi</title>
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: #1a1a2e;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 520px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { color: #e94560; margin-top: 0; }
+    a { color: #4ea8de; }
+    code {
+      background: #0f0f1a;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: JetBrains Mono, monospace;
+    }
+    ol { line-height: 1.8; }
+    .tip { color: #a0a0b0; font-size: 0.9em; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🌙 Quase lá!</h1>
+    <p>A Luna já está rodando. Agora você só precisa fazer login no Kimi no Chrome isolado.</p>
+
+    <ol>
+      <li>Aguarde o Chrome do Luna abrir (ele pode já estar em segundo plano).</li>
+      <li>Acesse a página de inspeção: <a href="http://localhost:9222/json" target="_blank"><code>http://localhost:9222/json</code></a></li>
+      <li>Clique no link da aba do <strong>Kimi</strong>.</li>
+      <li>Faça login manualmente no <strong>kimi.com</strong>.</li>
+      <li>Volte aqui e feche esta janela.</li>
+    </ol>
+
+    <p class="tip">
+      💡 Depois do login, acesse a Luna em <a href="http://localhost:3458" target="_blank"><code>http://localhost:3458</code></a>
+    </p>
+
+    <p class="tip">
+      ⚠️ Não use <kbd>Ctrl+Shift+R</kbd> na aba do Kimi — isso pode descartar a sessão de login.
+    </p>
+  </div>
+</body>
+</html>

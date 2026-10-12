@@ -1,0 +1,38 @@
+{
+  "name": "@luna/kernel",
+  "version": "1.0.0",
+  "description": "Luna Kernel v5.0 — AI Agent with Web Interface, Telegram Bot, and Kimi Bridge",
+  "main": "luna-soul.cjs",
+  "scripts": {
+    "start": "node ../../apps/dashboard/luna-server.js",
+    "server": "node ../../apps/dashboard/luna-server.js",
+    "telegram": "node telegram-luna-adapter.cjs",
+    "cli": "node luna-cli.cjs",
+    "build": "echo 'Kernel web build is handled by the luna-web workspace'",
+    "dev": "echo 'Kernel web dev is handled by the luna-web workspace'"
+  },
+  "keywords": [
+    "ai-agent",
+    "automation",
+    "telegram-bot",
+    "kimi-ai",
+    "playwright"
+  ],
+  "author": "NEXO DIGITAL S.L.",
+  "private": true,
+  "dependencies": {
+    "axios": "^1.16.0",
+    "glob": "^13.0.6",
+    "jsonrepair": "^3.14.1",
+    "shell-quote": "^1.8.4",
+    "turndown": "^7.2.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0"
+  }
+}

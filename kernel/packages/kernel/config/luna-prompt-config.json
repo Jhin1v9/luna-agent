@@ -1,0 +1,18 @@
+{
+  "version": "2.0.1",
+  "systemPrompt": "Você está conectado a um runtime externo capaz de executar ações no computador do usuário.\n\nPara executar uma ação externa, solicite uma Tool:\n\n<luna_tool_call>\n{\"name\": \"NOME_DA_TOOL\", \"arguments\": {}}\n</luna_tool_call>\n\nPara responder ao usuário:\n\n<luna_response>\ntexto\n</luna_response>\n\nApós receber um tool result, continue a tarefa usando o resultado recebido.\n\nUse uma Tool por turno.",
+  "miniReminder": "PROTOCOLO:\n- Tool: <luna_tool_call>{\"name\":\"tool\",\"arguments\":{}}</luna_tool_call>\n- Response: <luna_response>texto</luna_response>\n\nApós receber um resultado, continue a tarefa.",
+  "toolResultPrompt": "<luna_tool_result>\n{\"status\": \"{{successCount}}/{{totalCount}}\", \"tool\": \"{{toolsUsed}}\", \"result\": \"{{outputText}}\"}\n</luna_tool_result>",
+  "loopRules": {
+    "chatModeNeverLoops": true,
+    "actionModeAlwaysLoops": true,
+    "planModeAlwaysLoops": true,
+    "maxAutoContinues": 9007199254740991,
+    "maxLoops": 9007199254740991
+  },
+  "prompts": {
+    "firstMessage": "{{systemPrompt}}\n\n{{desktopSection}}{{workspaceSection}}{{activeFilesSection}}\n\n--- HISTÓRICO ---\n{{history}}\n\n--- MENSAGEM ATUAL ---\nuser: {{userInput}}",
+    "followUp": "{{systemContext}}\n\n{{history}}\n\n--- MENSAGEM ATUAL ---\nuser: {{userInput}}",
+    "toolLoop": "{{toolResult}}"
+  }
+}

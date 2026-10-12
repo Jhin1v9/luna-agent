@@ -1,0 +1,116 @@
+{
+  "name": "kimi",
+  "displayName": "Kimi Web",
+  "baseUrl": "https://www.kimi.ai",
+  "modeUrls": {
+    "instant": "https://www.kimi.ai/en?chat_enter_method=new_chat",
+    "thinking": "https://www.kimi.ai/en?chat_enter_method=new_chat"
+  },
+  "selectors": {
+    "input": [
+      ".chat-input-editor",
+      ".chat-editor [contenteditable='true']",
+      "[contenteditable='true']"
+    ],
+    "sendButton": [
+      ".send-button-container",
+      ".chat-editor-action .send-button-container",
+      ".chat-editor .send-button-container",
+      "[class*='send-button']",
+      "button[type='submit']"
+    ],
+    "stopButton": [
+      ".stop-button-container",
+      ".chat-editor-action .stop-button-container",
+      "[class*='stop-button']",
+      "button[class*='stop']",
+      "[aria-label*='stop' i]"
+    ],
+    "responseContainer": [
+      ".segment-content-box",
+      ".segment-assistant",
+      ".chat-content-item-assistant .segment-content-box",
+      ".markdown-container",
+      ".segment-content-box .markdown-container",
+      ".segment-assistant .markdown-container",
+      ".chat-content-item-assistant .markdown-container"
+    ],
+    "assistantMessage": [
+      ".chat-content-item.chat-content-item-assistant",
+      ".segment.segment-assistant"
+    ],
+    "messageList": [
+      ".message-list-container",
+      ".message-list",
+      ".chat-content-list",
+      ".chat-list"
+    ],
+    "loginIndicator": [
+      "form[action*='login']",
+      "form[action*='auth']",
+      "input[type='password']",
+      ".phone-login-action",
+      ".login-modal",
+      ".login-modal-mask",
+      ".login-page",
+      ".auth-modal"
+    ],
+    "appContent": [
+      ".chat-input-editor",
+      ".chat-editor",
+      ".message-list-container",
+      ".segment-assistant",
+      ".chat-content-item-assistant",
+      ".current-model"
+    ],
+    "thinking": [
+      ".toolcall-container.thinking-container",
+      ".thinking-container",
+      ".toolcall-container[class*='thinking']",
+      "[class*='thinking-container']",
+      "[class*='reasoning']"
+    ],
+    "thinkingText": [
+      ".toolcall-container.thinking-container .markdown-container",
+      ".toolcall-container.thinking-container .markdown",
+      ".thinking-container .markdown-container",
+      ".thinking-container .markdown"
+    ],
+    "actionButtons": [
+      ".segment-assistant-actions .icon-button",
+      ".segment-assistant-actions button",
+      ".chat-content-item-assistant .icon-button",
+      ".segment-assistant .icon-button"
+    ],
+    "mode": [
+      ".current-model .name",
+      ".current-model",
+      ".chat-editor-action .current-model",
+      ".model-name .name"
+    ],
+    "modeEffort": [
+      ".current-model .current-effort",
+      ".model-name .current-effort",
+      ".current-effort"
+    ]
+  },
+  "cdpPatterns": [
+    { "urlPattern": "*kimi*chat*", "requestStage": "Response" }
+  ],
+  "apiEndpoints": [
+    "/kimi.gateway.chat",
+    "/apiv2/kimi.chat",
+    "/kimi.chat.v1.ChatService"
+  ],
+  "features": {
+    "autoLogin": false,
+    "supportsStreaming": true,
+    "supportsThinking": true,
+    "loginMethod": "google_oauth",
+    "genericExtraction": false
+  },
+  "cookies": {
+    "masterCookies": "kimi-master-cookies.json",
+    "masterLocalStorage": "kimi-master-localstorage.json"
+  }
+}

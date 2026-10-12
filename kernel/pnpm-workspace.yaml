@@ -1,0 +1,15 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'packages/kernel/luna-web'
+allowBuilds:
+  '@google/genai': true
+  bcrypt: true
+  esbuild: true
+  keytar: true
+  protobufjs: true
+  sharp: true
+  sqlite3: true
+  tldjs: true
+  unrs-resolver: true
+  win-dpapi: false

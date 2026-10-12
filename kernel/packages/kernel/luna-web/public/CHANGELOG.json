@@ -1,0 +1,92 @@
+{
+  "releases": [
+    {
+      "version": "10.19",
+      "date": "28 de Junho de 2026",
+      "updates": [
+        {
+          "icon": "🌐",
+          "title": "Providers no Chat",
+          "items": [
+            "<strong>DeepSeek e Kimi</strong> agora aparecem no seletor de provider do header",
+            "<strong>Provider da sessão</strong> é salvo e sincronizado automaticamente ao trocar de conversa",
+            "<strong>Troca de provider em tempo real</strong> via dropdown, sem perder o contexto"
+          ]
+        },
+        {
+          "icon": "🧪",
+          "title": "Testes E2E",
+          "items": [
+            "<strong>Fluxo DeepSeek validado</strong> do login até a resposta do assistente",
+            "<strong>Usuário de teste</strong> adicionado para login automatizado nos testes"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "10.18",
+      "date": "12 de Junho de 2026",
+      "updates": [
+        {
+          "icon": "🎨",
+          "title": "Markdown Premium no Chat",
+          "items": [
+            "<strong>Tabelas estilizadas</strong> — borda glow, header gradiente, linhas zebradas e hover brilhante",
+            "<strong>Parser markdown robusto</strong> — migração do parser regex manual para <code>marked.js</code>",
+            "<strong>Listas, blockquotes e badges</strong> — identidade visual Luna em todo tipo de conteúdo"
+          ]
+        },
+        {
+          "icon": "📋",
+          "title": "Registry de Ferramentas",
+          "items": [
+            "<strong>Arquivo leve</strong> — <code>docs/luna-tools-registry.json</code> com 124 ferramentas no GitHub raw",
+            "<strong>Prompts atualizados</strong> — exemplos de JSON blocks e link do registry para consulta sem poluir o chat"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "10.17",
+      "date": "11 de Junho de 2026",
+      "updates": [
+        {
+          "icon": "🌙",
+          "title": "Auto-Compact Inteligente",
+          "items": [
+            "<strong>Threshold baseado em tokens</strong> — agora compacta em <code>220K tokens</code>, não mais em 100 eventos arbitrários",
+            "<strong>Estimativa via tamanho do arquivo</strong> — <code>fs.statSync</code> é instantâneo, não precisa ler milhares de eventos",
+            "<strong>Timeout de segurança</strong> — checkpoint tem limite de 30s, evita travamento indefinido"
+          ]
+        },
+        {
+          "icon": "✨",
+          "title": "Qualidade de Vida",
+          "items": [
+            "<strong>SSE com reconexão automática</strong> — <code>retry: 3000</code> + replay via <code>Last-Event-ID</code>",
+            "<strong>Plan mode isolado</strong> — eventos de plano não ativam o estado de plan mode do chat",
+            "<strong>IDs únicos para plan mode</strong> — evita deduplicação de eventos SSE"
+          ]
+        },
+        {
+          "icon": "🚀",
+          "title": "Dashboard & API",
+          "items": [
+            "<strong>dashboardApi nunca mais quebra</strong> — sempre retorna <code>{success, data, error}</code>",
+            "<strong>Ferramentas duplicadas removidas</strong> — 9x <code>dashboardUpdateTask</code> eliminados",
+            "<strong>Router de comandos</strong> — <code>/financeiro</code>, <code>/tarefas</code>, <code>/leads</code> funcionam nativamente"
+          ]
+        },
+        {
+          "icon": "🎨",
+          "title": "Visual",
+          "items": [
+            "<strong>Animação de fases da lua</strong> — 8 fases com estrelas twinkling durante compactação",
+            "<strong>Card simplificado</strong> — só lua + título, sem poluição visual",
+            "<strong>Novo modal de changelog</strong> — novidades da Luna com estilo celestial ✨"
+          ]
+        }
+      ]
+    }
+  ]
+}
