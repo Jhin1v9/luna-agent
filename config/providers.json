@@ -1,0 +1,172 @@
+{
+  "fastBrain": "pollinations",
+  "liveBrain": "fcc-local",
+  "providers": [
+    {
+      "id": "groq",
+      "label": "Groq (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiKeyEnv": "GROQ_API_KEY",
+      "model": "llama-3.3-70b-versatile",
+      "models": [
+        "llama-3.3-70b-versatile"
+      ],
+      "enabled": false,
+      "priority": 13,
+      "builtin": true
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "model": "gemini-3.6-flash",
+      "models": [
+        "gemini-3.6-flash"
+      ],
+      "enabled": true,
+      "priority": 2,
+      "builtin": true
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter DeepSeek (conversacional · grátis)",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "deepseek/deepseek-chat-v3-0324:free",
+      "models": [
+        "deepseek/deepseek-chat-v3-0324:free"
+      ],
+      "enabled": false,
+      "priority": 15,
+      "builtin": true
+    },
+    {
+      "id": "xai",
+      "label": "xAI Grok 4.5 (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://api.x.ai/v1",
+      "apiKeyEnv": "XAI_API_KEY",
+      "model": "grok-4.5",
+      "models": [
+        "grok-4.5",
+        "grok-3",
+        "grok-3-mini"
+      ],
+      "enabled": false,
+      "priority": 14,
+      "builtin": true
+    },
+    {
+      "id": "fcc-local",
+      "label": "FCC (local · rota LIVE)",
+      "transport": "fcc-local",
+      "baseUrl": "http://127.0.0.1:8082",
+      "apiKeyEnv": null,
+      "model": "auto",
+      "models": [],
+      "enabled": true,
+      "priority": 6,
+      "builtin": true
+    },
+    {
+      "id": "kimi-coding",
+      "label": "Kimi for Coding (kernel)",
+      "transport": "openai",
+      "baseUrl": "https://api.kimi.com/coding/v1",
+      "apiKeyEnv": "KIMI_API_KEY",
+      "model": "kimi-for-coding",
+      "models": [
+        "kimi-for-coding",
+        "k3",
+        "k3-256k",
+        "kimi-k2.6"
+      ],
+      "enabled": true,
+      "priority": 3,
+      "builtin": true
+    },
+    {
+      "id": "nvidia-nim",
+      "label": "NVIDIA NIM kimi-k3 (kernel)",
+      "transport": "openai",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "apiKeyEnv": "NVIDIA_API_KEY",
+      "model": "moonshotai/kimi-k3",
+      "models": [
+        "moonshotai/kimi-k3",
+        "deepseek-ai/deepseek-v4.1-flash",
+        "z-ai/glm-5.3",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "enabled": false,
+      "priority": 7,
+      "builtin": true
+    },
+    {
+      "id": "colibri-local",
+      "label": "Colibri (local)",
+      "transport": "openai",
+      "baseUrl": "http://127.0.0.1:8000/v1",
+      "apiKeyEnv": null,
+      "model": "qwen3-coder-30b-a3b-colibri",
+      "models": [
+        "qwen3-coder-30b-a3b-colibri"
+      ],
+      "enabled": false,
+      "priority": 99,
+      "builtin": true
+    },
+    {
+      "id": "open-webui",
+      "label": "Open WebUI (local)",
+      "transport": "openai",
+      "baseUrl": "http://127.0.0.1:3000/api/v1",
+      "apiKeyEnv": "OPENWEBUI_API_KEY",
+      "model": "openai-fast",
+      "models": [
+        "openai-fast",
+        "openai",
+        "mistral",
+        "llama"
+      ],
+      "enabled": true,
+      "priority": 4,
+      "builtin": false
+    },
+    {
+      "id": "github-models",
+      "label": "GitHub Models (grátis)",
+      "transport": "openai",
+      "baseUrl": "https://models.github.ai/inference",
+      "apiKeyEnv": "GITHUB_API_KEY",
+      "model": "openai/gpt-4o",
+      "models": [
+        "openai/gpt-4o",
+        "openai/gpt-4o-mini",
+        "meta/Llama-3.3-70B-Instruct"
+      ],
+      "enabled": true,
+      "priority": 5,
+      "builtin": false
+    },
+    {
+      "id": "luna-kernel",
+      "label": "Luna Kernel (local, coding)",
+      "transport": "openai",
+      "baseUrl": "http://127.0.0.1:3458/v1",
+      "apiKeyEnv": null,
+      "model": "kimi-for-coding",
+      "models": [
+        "kimi-for-coding",
+        "k3"
+      ],
+      "enabled": false,
+      "priority": 98,
+      "builtin": false
+    }
+  ]
+}
