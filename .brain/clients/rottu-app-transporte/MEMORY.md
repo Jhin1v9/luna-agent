@@ -34,6 +34,14 @@
 - Nonoke = time Nexo (dono)
 - Pai (Fai) = time
 
+## Candidato a base: Fleetbase (12/10/2026)
+- Origem: Enoque mandou no productions (20:41 local) um reels do Thulio Bittencourt sobre o **Fleetbase** (`github.com/fleetbase/fleetbase`) — "sistema de entrega de código aberto que você implanta no cliente em vez de alugar". Abner: "metade do trabalho feito?" e pediu pra Luna salvar a info. Enoque vai baixar o repo e analisar segurança.
+- O que é: LSOS (logistics/supply-chain OS) modular, open-source, ~3k+ estrelas. Stack: PHP/Laravel (API) + Ember (console) + MySQL/Redis/SocketCluster; deploy via Docker Compose; app de motorista "Navigator" (iOS/Android, white-label); API REST + webhooks + sistema de extensões. Foco: despacho, gestão de frota, rastreio em tempo real, comprovante de entrega, otimização de rota, order board.
+- Licença: **AGPL-3.0** (self-host livre, mas modificações servidas via rede devem ser publicadas) ou licença comercial FCL (modificações proprietárias/white-label/SaaS fechado).
+- Fit com Rottu: é gestão de frota/despacho de operador (frotas próprias, last-mile) — NÃO é marketplace de cargas. O core do Rottu (matching oferta/demanda, precificação preditiva, swipe, dois perfis com regras diferentes, score) teria que ser construído do zero. Uso provável: peças de infra (rastreio, comprovante, roteirização) como referência ou backend auxiliar — decisão de licença é o gargalo (AGPL vs FCL).
+- Apps que já temos no VPS e o Enoque citou como "diferentes": `vps.nexo-digital.app/crm-delivery` e `/negocios/encomiendas/`.
+- Status: Enoque analisando o repo; nenhuma decisão tomada.
+
 ## Decisões e caminhos
 - 11/10: Elias perguntou FRETOO ou ROTTU; Luna deu palpite (FRETOO mais descritivo) mas decisão era do cliente.
 - 12/10: Eduardo apresentou o design pronto com ROTTU → nome FECHADO. Enoque e Abner aprovaram ("material de qualidade").
