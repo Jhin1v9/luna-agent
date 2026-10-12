@@ -69,3 +69,11 @@ Disparo às 14:09Z com motivo painel_auth (poll falhou; último OK 13:09Z, gap 6
 
 ## 2026-10-08 (painel_auth #3 do dia) — retry de 3x20s aplicado no predicado
 Terceiro painel_auth transitivo (05:08, 14:09, 23:11Z — sempre gap ~60.1 min, painel sempre respondeu normal nas leituras do agente). Padrão de falha pontual de rede/timeout do desktop a cada ~1h. Ação (dentro da autonomia, semântica do decreto preservada): `_panel_signature` agora faz **3 tentativas com 20s de intervalo** — falha < ~40s é filtrada; queda real do painel falha nas 3 e dispara normalmente. Sintaxe validada. Cookie verificado vivo (leitura 200 nesta rodada). Próximos painel_auth devem ser apenas quedas reais.
+
+## 2026-10-12 — Atividade do dev (Jhin1v9) desde 09/10
+- `bddf4e2` — **monorepo: luna-kernel via subtree em `kernel/`**, preset luna-kernel no painel, pnpm workspace exclui kernel (merge de subtree `0fc89ea`).
+- `83be366` — painel v2: menu SPA, animações, refresh cirúrgico; ecosystem.config.cjs com os 8 processos.
+- `e66183c` — venus: MAX_ROUNDS 6→10 + regra 11 (responder é prioridade máxima).
+- Fora de kernel/: +1.292/-509 linhas — providers do painel (`apps/painel/lib/providers.ts`, 467 linhas) e `config/providers.json` (172).
+- Sem testes/typecheck rodados nesta varredura (só diagnóstico de diff). Risco a observar: subtree do kernel excluído do pnpm workspace — instalação/build do painel não deve ser afetada, mas vale `pnpm typecheck` na próxima sessão de dev.
+- autor: Luna (varredura por evento)
