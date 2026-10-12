@@ -15,6 +15,7 @@ import {
   Moon, BrainCircuit, ShieldCheck, Send, Activity, Server, Inbox as InboxIcon,
   ArrowLeftRight, Sparkles, CheckCircle2, XCircle, RefreshCw, RotateCcw, ChevronDown,
   ArrowUpRight, Loader2, LayoutDashboard, MessageSquare, Terminal, Settings2,
+  Plus, Trash2, KeyRound, Zap,
 } from "lucide-react";
 
 type Modo = { KIMI_ADAPTER_MODE: string; LIVE_BRAIN_PROVIDER: string; VENUS_AUTONOMO: string };
@@ -29,9 +30,35 @@ type VenusInfo = { status: string; running: boolean; processed_by_venus: number;
 type VenusErros = { incidencias: { id: string; kind: string; received_at: string; motivo: string | null; por: string | null }[]; log: string[] };
 type Ordem = { id: string; ordem: string; contexto: string | null; status: string; result: string | null; created_at: string; executed_at: string | null };
 type Comando = { perguntas: Turno[]; ordens: Ordem[] };
+type ProviderEntry = {
+  id: string; label: string; transport: 'openai' | 'anthropic' | 'fcc-local';
+  baseUrl: string; apiKeyEnv: string | null; model: string; models: string[];
+  enabled: boolean; priority: number; builtin: boolean;
+  keyStatus?: { configured: boolean; preview: string | null };
+};
+type ProvidersConfig = { fastBrain: string; liveBrain: string; providers: ProviderEntry[] };
+type PDraft = { enabled: boolean; model: string; priority: number };
+type TestResult = { ok: boolean; detail: string; latencyMs: number };
 
 const ADAPTER_MODES = ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'];
 const PROVIDERS = ['kimi', 'kimiwork'];
+const KEY_ENVS = ['KIMI_API_KEY', 'KIMI_API_KEY_2', 'NVIDIA_API_KEY', 'NVIDIA_API_KEY_2', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'XAI_API_KEY', 'DEEPSEEK_API_KEY'];
+const ADD_PRESETS = [
+  { id: 'nvidia-nim', label: 'NVIDIA NIM' },
+  { id: 'groq', label: 'Groq' },
+  { id: 'gemini', label: 'Gemini (Google)' },
+  { id: 'openrouter', label: 'OpenRouter' },
+  { id: 'xai', label: 'xAI (Grok 4.5)' },
+  { id: 'deepseek', label: 'DeepSeek' },
+  { id: 'kimi-api', label: 'Kimi API (platform)' },
+  { id: 'colibri-local', label: 'Colibri (local)' },
+  { id: 'fcc-local', label: 'FCC (local)' },
+  { id: 'custom', label: 'Custom… (preencher campos)' },
+];
+function slugifyLabel(label: string): string {
+  const s = label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  return s || 'custom';
+}
 const MAX_CHARS = 900;
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -103,6 +130,15 @@ function SenderChip({ sender }: { sender: string }) {
   if (sender === 'agent:venus') return <span className="badge badge-info">agent:venus</span>;
   return <span className="badge">contact</span>;
 }
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button role="switch" aria-checked={on} onClick={onClick}
+      className={`relative h-[22px] w-[42px] shrink-0 rounded-full border transition-colors ${on ? 'border-luna/60 bg-luna/25' : 'border-line bg-bg'}`}>
+      <motion.span layout className={`absolute top-[2px] size-4 rounded-full ${on ? 'right-[2px] bg-luna' : 'left-[2px] bg-dim'}`}
+        transition={{ type: 'spring', stiffness: 500, damping: 32 }} />
+    </button>
+  );
+}
 
 // páginas do menu
 const PAGES = [
@@ -112,7 +148,7 @@ const PAGES = [
   { id: 'inbox', label: 'Inbox', icon: InboxIcon },
   { id: 'venus', label: 'Vênus', icon: Sparkles },
   { id: 'servicos', label: 'Serviços', icon: Server },
-  { id: 'config', label: 'Cérebro / Modo', icon: Settings2 },
+  { id: 'config', label: '⚙️ Configurações', icon: Settings2 },
 ] as const;
 type PageId = (typeof PAGES)[number]['id'];
 
@@ -149,6 +185,18 @@ export default function Painel() {
   const [draftAdapter, setDraftAdapter] = useState('kimi-api');
   const [draftProvider, setDraftProvider] = useState('kimi');
   const [draftVenus, setDraftVenus] = useState(true);
+  const [pconf, setPconf] = useState<ProvidersConfig | null>(null);
+  const [pDrafts, setPDrafts] = useState<Record<string, PDraft>>({});
+  const [pFast, setPFast] = useState('');
+  const [pLive, setPLive] = useState('');
+  const [fccModels, setFccModels] = useState<string[]>([]);
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [keySaving, setKeySaving] = useState<Record<string, boolean>>({});
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
+  const [testRes, setTestRes] = useState<Record<string, TestResult>>({});
+  const [savingCfg, setSavingCfg] = useState(false);
+  const [addSel, setAddSel] = useState('');
+  const [custom, setCustom] = useState({ label: '', transport: 'openai' as ProviderEntry['transport'], baseUrl: '', apiKeyEnv: '', model: '', models: '' });
   const [applying, setApplying] = useState(false);
   const [invoking, setInvoking] = useState(false);
   const [tarefa, setTarefa] = useState('');
@@ -176,13 +224,27 @@ export default function Painel() {
   const loadAtividade = useCallback(async () => {
     try { setAtividade(await getJSON<Msg[]>('/api/atividade')); } catch { /* noop */ }
   }, []);
+  const loadProviders = useCallback(async () => {
+    const c = await getJSON<ProvidersConfig>('/api/config');
+    setPconf(c);
+    setPFast(c.fastBrain);
+    setPLive(c.liveBrain);
+    const d: Record<string, PDraft> = {};
+    for (const p of c.providers) d[p.id] = { enabled: p.enabled, model: p.model, priority: p.priority };
+    setPDrafts(d);
+  }, []);
+  const loadFccModels = useCallback(async () => {
+    try { const r = await getJSON<{ fcc: string[] }>('/api/config/models'); setFccModels(r.fcc); } catch { /* FCC fora — lista vazia */ }
+  }, []);
 
   useEffect(() => {
     loadModo().catch(() => toast.error('falha ao ler modo atual'));
     getJSON<Chat[]>('/api/chats').then((c) => { setChats(c); setChatSel(c[0]?.chat_id || 'productions'); }).catch(() => {});
     loadAtividade();
     loadAuto();
-  }, [loadModo, loadAtividade, loadAuto]);
+    loadProviders().catch(() => toast.error('falha ao ler providers'));
+    loadFccModels();
+  }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels]);
 
   // auto-refresh 10s com countdown visível + refresh ao voltar pra aba
   useEffect(() => {
@@ -228,6 +290,93 @@ export default function Painel() {
       }
       await loadModo();
     } finally { setApplying(false); }
+  }
+
+  // ── providers (config/providers.json): ações ──
+  const pDirty = pconf ? pconf.providers.some((p) => {
+    const d = pDrafts[p.id];
+    return !d || d.enabled !== p.enabled || d.model !== p.model || d.priority !== p.priority;
+  }) || pFast !== pconf.fastBrain || pLive !== pconf.liveBrain : false;
+
+  async function salvarProviders() {
+    if (!pconf) return;
+    setSavingCfg(true);
+    try {
+      const config = {
+        fastBrain: pFast, liveBrain: pLive,
+        providers: pconf.providers.map((p) => {
+          const { keyStatus: _omit, ...rest } = p; // keyStatus é gerado no GET — nunca volta pro json
+          const d = pDrafts[p.id] ?? { enabled: p.enabled, model: p.model, priority: p.priority };
+          return { ...rest, enabled: d.enabled, model: d.model, priority: d.priority };
+        }),
+      };
+      await postJSON('/api/config', { action: 'save', config });
+      toast.success('config/providers.json gravado (atômico)');
+      await loadProviders();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingCfg(false); }
+  }
+
+  async function salvarKey(p: ProviderEntry) {
+    const v = (keyInputs[p.id] || '').trim();
+    if (!p.apiKeyEnv) return;
+    if (!v) { toast.error('key vazia'); return; }
+    setKeySaving((s) => ({ ...s, [p.id]: true }));
+    try {
+      await postJSON('/api/config', { action: 'set-key', env: p.apiKeyEnv, value: v });
+      toast.success(`${p.apiKeyEnv} gravada no .env`);
+      setKeyInputs((s) => ({ ...s, [p.id]: '' }));
+      await loadProviders();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setKeySaving((s) => ({ ...s, [p.id]: false })); }
+  }
+
+  async function testarProvider(p: ProviderEntry) {
+    setTesting((s) => ({ ...s, [p.id]: true }));
+    try {
+      const r = await postJSON<TestResult>('/api/config/test', { providerId: p.id });
+      setTestRes((s) => ({ ...s, [p.id]: r }));
+    } catch (e: any) {
+      setTestRes((s) => ({ ...s, [p.id]: { ok: false, detail: e.message, latencyMs: 0 } }));
+    } finally { setTesting((s) => ({ ...s, [p.id]: false })); }
+  }
+
+  async function removerProvider(p: ProviderEntry) {
+    if (!confirm(`Remover o provider "${p.label}" (${p.id})?`)) return;
+    try {
+      await postJSON('/api/config', { action: 'remove-provider', id: p.id });
+      toast.success(`${p.label} removido`);
+      await loadProviders();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function adicionarPreset(presetId: string) {
+    try {
+      const r = await postJSON<{ id: string }>('/api/config', { action: 'add-provider', presetId });
+      toast.success(`provider ${r.id} adicionado`);
+      setAddSel('');
+      await loadProviders();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function adicionarCustom() {
+    const entry = {
+      id: slugifyLabel(custom.label),
+      label: custom.label.trim(),
+      transport: custom.transport,
+      baseUrl: custom.baseUrl.trim(),
+      apiKeyEnv: custom.apiKeyEnv || null,
+      model: custom.model.trim(),
+      models: custom.models.split(',').map((m) => m.trim()).filter(Boolean),
+      enabled: true, priority: 99, builtin: false,
+    };
+    try {
+      const r = await postJSON<{ id: string }>('/api/config', { action: 'add-provider', custom: entry });
+      toast.success(`provider ${r.id} adicionado`);
+      setAddSel('');
+      setCustom({ label: '', transport: 'openai', baseUrl: '', apiKeyEnv: '', model: '', models: '' });
+      await loadProviders();
+    } catch (e: any) { toast.error(e.message); }
   }
 
   const chatIdEfetivo = () => chatManual.trim() || chatSel;
@@ -277,6 +426,17 @@ export default function Painel() {
     try {
       const r = await postJSON<{ turno_id: string }>(`/api/inbox/${ev.id}/escalar`, {});
       toast.success('escalado para a Luna', { description: `turno ${r.turno_id}` });
+      loadAuto();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function zerarFila() {
+    const n = inbox?.filter((e) => e.status === 'pending' || e.status === 'processing').length ?? 0;
+    if (n === 0) { toast.error('fila já está vazia'); return; }
+    if (!confirm(`Zerar a fila do Vênus? ${n} evento(s) pending/processing serão CANCELADOS (não serão respondidos).`)) return;
+    try {
+      const r = await postJSON<{ cancelados: number }>('/api/inbox/cancelar-fila', {});
+      toast.success(`fila zerada — ${r.cancelados} evento(s) cancelado(s)`);
       loadAuto();
     } catch (e: any) { toast.error(e.message); }
   }
@@ -622,7 +782,12 @@ export default function Painel() {
   const PageInbox = (
     <div key="inbox" className="space-y-4" {...pageAnim}>
       <Card index={0}>
-        <Title icon={InboxIcon}>Inbox ao vivo — kimiwork_inbox</Title>
+        <div className="flex items-start justify-between gap-3">
+          <Title icon={InboxIcon}>Inbox ao vivo — kimiwork_inbox</Title>
+          <button className="btn btn-sm" onClick={zerarFila} title="Cancela todos os eventos pending/processing — destrava o Vênus quando a fila acumula">
+            <Trash2 size={11} />Zerar fila
+          </button>
+        </div>
         {tabs([
           { id: 'pending', label: 'pending', count: inbox?.filter((e) => e.status === 'pending').length },
           { id: 'processing', label: 'processing', count: inbox?.filter((e) => e.status === 'processing').length },
@@ -745,49 +910,226 @@ export default function Painel() {
     </div>
   );
 
-  const PageConfig = (
-    <div key="config" className="grid gap-4 xl:grid-cols-2" {...pageAnim}>
-      <Card index={0}>
-        <Title icon={BrainCircuit}>Cérebro / Modo — escrita atômica no .env</Title>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">KIMI_ADAPTER_MODE</label>
-            <select className="input" value={draftAdapter} onChange={(e) => setDraftAdapter(e.target.value)}>
-              {ADAPTER_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+  // ── configurações: cards de cérebro + lista de providers ──
+  const renderBrainCard = (kind: 'fast' | 'live') => {
+    const val = kind === 'fast' ? pFast : pLive;
+    const set = kind === 'fast' ? setPFast : setPLive;
+    const sel = pconf?.providers.find((p) => p.id === val);
+    const selEnabled = sel ? (pDrafts[sel.id]?.enabled ?? sel.enabled) : false;
+    return (
+      <Card index={kind === 'fast' ? 0 : 1}>
+        <Title icon={BrainCircuit}>{kind === 'fast' ? '🧠 Cérebro FAST' : '🧠 Cérebro LIVE'}</Title>
+        <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">
+          Provider {kind === 'fast' ? 'FAST (classificar comentários, responder clientes, rotinas de texto)' : 'LIVE (conversas ao vivo)'}
+        </label>
+        <select className="input" value={val} onChange={(e) => set(e.target.value)} disabled={!pconf}>
+          {val && !pconf?.providers.some((p) => p.id === val) && (
+            <option value={val}>{val} (id sem provider correspondente)</option>
+          )}
+          {!val && <option value="">— selecione —</option>}
+          {(pconf?.providers ?? []).map((p) => (
+            <option key={p.id} value={p.id}>{p.label}{p.enabled ? '' : ' (desativado)'}</option>
+          ))}
+        </select>
+        {sel && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-dim">
+            <span className={`badge ${sel.transport === 'fcc-local' ? 'badge-luna' : 'badge-info'}`}>{sel.transport}</span>
+            <span className="mono">{sel.model || 'sem modelo'}</span>
+            <span className="mono truncate">{sel.baseUrl}</span>
           </div>
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">LIVE_BRAIN_PROVIDER</label>
-            <select className="input" value={draftProvider} onChange={(e) => setDraftProvider(e.target.value)}>
-              {PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
+        )}
+        {sel && !selEnabled && (
+          <div className="mt-2 rounded-lg border border-warn/50 bg-warn/5 p-2 text-[12px] text-warn">
+            Este provider está desativado — na prática o cérebro cai para o próximo da corrente.
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-line bg-bg/60 px-3 py-2">
-            <span className="text-[12px] text-dim">VENUS_AUTONOMO</span>
-            <button role="switch" aria-checked={draftVenus} onClick={() => setDraftVenus(!draftVenus)}
-              className={`relative h-[22px] w-[42px] rounded-full border transition-colors ${draftVenus ? 'border-luna/60 bg-luna/25' : 'border-line bg-bg'}`}>
-              <motion.span layout className={`absolute top-[2px] size-4 rounded-full ${draftVenus ? 'right-[2px] bg-luna' : 'left-[2px] bg-dim'}`}
-                transition={{ type: 'spring', stiffness: 500, damping: 32 }} />
+        )}
+      </Card>
+    );
+  };
+
+  const renderProvider = (p: ProviderEntry, i: number) => {
+    const d = pDrafts[p.id] ?? { enabled: p.enabled, model: p.model, priority: p.priority };
+    const res = testRes[p.id];
+    const baseOpts = p.transport === 'fcc-local' ? (fccModels.length ? fccModels : p.models) : p.models;
+    const modelOpts = baseOpts.includes(d.model) ? baseOpts : [d.model, ...baseOpts].filter(Boolean);
+    const patch = (ch: Partial<PDraft>) => setPDrafts((s) => ({ ...s, [p.id]: { ...d, ...ch } }));
+    return (
+      <motion.div key={p.id} {...cardAnim(i)}
+        className={`rounded-xl border px-3 py-2.5 transition-colors ${d.enabled ? 'border-line/70 bg-bg/50' : 'border-line/40 bg-bg/30'}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Toggle on={d.enabled} onClick={() => patch({ enabled: !d.enabled })} />
+          <span className={`text-[13px] font-medium ${d.enabled ? '' : 'text-dim'}`}>{p.label}</span>
+          <span className={`badge ${p.transport === 'fcc-local' ? 'badge-luna' : 'badge-info'}`}>{p.transport}</span>
+          <span className={`badge ${p.builtin ? '' : 'badge-warn'}`}>{p.builtin ? 'embutido' : 'custom'}</span>
+          <div className="ml-auto flex items-center gap-2">
+            <label className="text-[10px] uppercase tracking-wider text-dim">prioridade</label>
+            <input type="number" className="input w-20 px-2 py-1 text-center" value={d.priority}
+              onChange={(e) => patch({ priority: Number(e.target.value) || 0 })} />
+            {!p.builtin && (
+              <button className="btn btn-sm btn-danger px-2" onClick={() => removerProvider(p)} title={`Remover ${p.label}`}>
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="mono mt-1 truncate text-[11px] text-dim">
+          {p.baseUrl}{p.apiKeyEnv ? ` · key: ${p.apiKeyEnv}` : ' · sem key (local)'}
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-dim">Modelo</label>
+            {modelOpts.length ? (
+              <select className="input mono" value={d.model} onChange={(e) => patch({ model: e.target.value })}>
+                {modelOpts.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : (
+              <input className="input mono" placeholder="id do modelo" value={d.model} onChange={(e) => patch({ model: e.target.value })} />
+            )}
+          </div>
+          <div className="pb-0.5">
+            {p.apiKeyEnv ? (
+              p.keyStatus?.configured
+                ? <span className="badge badge-ok"><span className="size-1.5 rounded-full bg-ok" />configurada {p.keyStatus.preview}</span>
+                : <span className="badge badge-fail"><span className="size-1.5 rounded-full bg-fail" />key ausente</span>
+            ) : (
+              <span className="badge badge-info">sem key (local)</span>
+            )}
+          </div>
+        </div>
+        {p.apiKeyEnv && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input type="password" className="input mono min-w-[200px] flex-1" placeholder={`nova ${p.apiKeyEnv} (nunca exibida)`}
+              value={keyInputs[p.id] || ''} onChange={(e) => setKeyInputs((s) => ({ ...s, [p.id]: e.target.value }))} />
+            <button className="btn btn-sm shrink-0" onClick={() => salvarKey(p)} disabled={keySaving[p.id] || !(keyInputs[p.id] || '').trim()}>
+              {keySaving[p.id] ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}Salvar key
             </button>
           </div>
-          <button className="btn btn-primary w-full" onClick={aplicarModo} disabled={applying}>
-            {applying ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Aplicar no .env
+        )}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button className="btn btn-sm" onClick={() => testarProvider(p)} disabled={testing[p.id]}>
+            {testing[p.id] ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}Testar
           </button>
-          {modo && (
-            <div className="mono space-y-1 rounded-lg border border-line bg-bg/60 p-3">
-              <div className="flex justify-between"><span className="text-dim">atual</span><span className="text-luna">{modo.KIMI_ADAPTER_MODE}</span></div>
-              <div className="flex justify-between"><span className="text-dim">provider</span><span className="text-luna">{modo.LIVE_BRAIN_PROVIDER}</span></div>
-              <div className="flex justify-between"><span className="text-dim">vênus autônomo</span><span className="text-luna">{modo.VENUS_AUTONOMO}</span></div>
-            </div>
+          {res && (
+            <>
+              <span className={`badge ${res.ok ? 'badge-ok' : 'badge-fail'}`}>{res.ok ? 'ok' : 'erro'} · {res.latencyMs}ms</span>
+              <span className={`min-w-0 flex-1 truncate text-[11px] ${res.ok ? 'text-ok' : 'text-fail'}`} title={res.detail}>{res.detail}</span>
+            </>
           )}
         </div>
+      </motion.div>
+    );
+  };
+
+  const PageConfig = (
+    <div key="config" className="space-y-4" {...pageAnim}>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {renderBrainCard('fast')}
+        {renderBrainCard('live')}
+      </div>
+
+      <Card index={2}>
+        <Title icon={Server} extra={
+          <div className="flex items-center gap-2">
+            {pDirty && <span className="badge badge-warn">alterações pendentes</span>}
+            <button className="btn btn-sm btn-primary" onClick={salvarProviders} disabled={!pDirty || savingCfg || !pconf}>
+              {savingCfg ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}Salvar
+            </button>
+          </div>
+        }>
+          Providers de LLM — roda infinita
+        </Title>
+        <div className="mb-3 rounded-lg border border-line/60 bg-bg/50 p-2.5 text-[12px] leading-snug text-dim">
+          <span className="text-luna">Ordem da rotação:</span> a corrente segue a prioridade — acabou a quota de um provider,
+          passa para o próximo habilitado, <span className="text-fg">em ciclo</span>. Os desativados ficam de fora da rotação.
+          Coding pesado fica no luna-kernel (providers marcados &quot;kernel&quot; ficam desligados aqui por padrão).
+        </div>
+        {!pconf ? <Skeleton rows={4} /> : (
+          <div className="space-y-2">
+            {[...pconf.providers]
+              .sort((a, b) => (pDrafts[a.id]?.priority ?? a.priority) - (pDrafts[b.id]?.priority ?? b.priority))
+              .map((p, i) => renderProvider(p, i))}
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
+          <Plus size={14} className="text-dim" />
+          <span className="text-[12px] text-dim">Adicionar provider:</span>
+          <select className="input w-60" value={addSel}
+            onChange={(e) => { const v = e.target.value; setAddSel(v); if (v && v !== 'custom') adicionarPreset(v); }}>
+            <option value="">— escolher preset —</option>
+            {ADD_PRESETS.filter((pr) => pr.id === 'custom' || !pconf?.providers.some((p) => p.id === pr.id)).map((pr) => (
+              <option key={pr.id} value={pr.id}>{pr.label}</option>
+            ))}
+          </select>
+          <span className="text-[10px] text-dim">presets entram habilitados · prioridade 99 · removíveis</span>
+        </div>
+        <AnimatePresence>
+          {addSel === 'custom' && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }} className="overflow-hidden">
+              <div className="mt-3 grid gap-2 rounded-xl border border-line/70 bg-bg/50 p-3 md:grid-cols-3">
+                <input className="input" placeholder="Nome (ex.: Meu Provider)" value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} />
+                <select className="input" value={custom.transport} onChange={(e) => setCustom({ ...custom, transport: e.target.value as ProviderEntry['transport'] })}>
+                  <option value="openai">openai</option>
+                  <option value="anthropic">anthropic</option>
+                  <option value="fcc-local">fcc-local</option>
+                </select>
+                <input className="input mono" placeholder="baseUrl — https://…" value={custom.baseUrl} onChange={(e) => setCustom({ ...custom, baseUrl: e.target.value })} />
+                <select className="input" value={custom.apiKeyEnv} onChange={(e) => setCustom({ ...custom, apiKeyEnv: e.target.value })}>
+                  <option value="">sem key (local)</option>
+                  {KEY_ENVS.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+                <input className="input mono" placeholder="modelo default" value={custom.model} onChange={(e) => setCustom({ ...custom, model: e.target.value })} />
+                <input className="input mono" placeholder="modelos p/ dropdown (vírgula)" value={custom.models} onChange={(e) => setCustom({ ...custom, models: e.target.value })} />
+                <button className="btn btn-primary md:col-span-3" onClick={adicionarCustom}
+                  disabled={!custom.label.trim() || !/^https?:\/\//.test(custom.baseUrl.trim())}>
+                  <Plus size={13} />Adicionar provider
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="hint mt-3">Keys ficam no .env — o json guarda só o NOME da env, nunca o valor. Gravação atômica tmp+rename.</div>
       </Card>
-      <Card index={1}>
-        <Title icon={Terminal}>Status das integrações</Title>
-        {renderChecks()}
-        <div className="hint mt-3">As chaves sensíveis são verificadas por presença — valores nunca expostos no painel.</div>
-      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card index={3}>
+          <Title icon={Settings2}>Modo operacional — escrita atômica no .env</Title>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">KIMI_ADAPTER_MODE</label>
+              <select className="input" value={draftAdapter} onChange={(e) => setDraftAdapter(e.target.value)}>
+                {ADAPTER_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">LIVE_BRAIN_PROVIDER</label>
+              <select className="input" value={draftProvider} onChange={(e) => setDraftProvider(e.target.value)}>
+                {PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-line bg-bg/60 px-3 py-2">
+              <span className="text-[12px] text-dim">VENUS_AUTONOMO</span>
+              <Toggle on={draftVenus} onClick={() => setDraftVenus(!draftVenus)} />
+            </div>
+            <button className="btn btn-primary w-full" onClick={aplicarModo} disabled={applying}>
+              {applying ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Aplicar no .env
+            </button>
+            {modo && (
+              <div className="mono space-y-1 rounded-lg border border-line bg-bg/60 p-3">
+                <div className="flex justify-between"><span className="text-dim">atual</span><span className="text-luna">{modo.KIMI_ADAPTER_MODE}</span></div>
+                <div className="flex justify-between"><span className="text-dim">provider</span><span className="text-luna">{modo.LIVE_BRAIN_PROVIDER}</span></div>
+                <div className="flex justify-between"><span className="text-dim">vênus autônomo</span><span className="text-luna">{modo.VENUS_AUTONOMO}</span></div>
+              </div>
+            )}
+          </div>
+        </Card>
+        <Card index={4}>
+          <Title icon={Terminal}>Status das integrações</Title>
+          {renderChecks()}
+          <div className="hint mt-3">As chaves sensíveis são verificadas por presença — valores nunca expostos no painel.</div>
+        </Card>
+      </div>
     </div>
   );
 

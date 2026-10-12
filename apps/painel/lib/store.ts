@@ -58,7 +58,7 @@ const VENUS_LOG = path.join(os.homedir(), '.pm2', 'logs', 'venus-varredura-out.l
 
 export const ENV_ALLOWLIST: Record<string, string[]> = {
   KIMI_ADAPTER_MODE: ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'],
-  LIVE_BRAIN_PROVIDER: ['kimi', 'kimiwork'],
+  LIVE_BRAIN_PROVIDER: ['kimi', 'pi', 'kimiwork', 'kimi-web-local'],
   VENUS_AUTONOMO: ['true', 'false'],
 };
 
@@ -67,7 +67,7 @@ const BEAT_INTERVAL_S: Record<string, number> = {
 };
 const STALE_S = 90;
 
-function envAll(): Record<string, string> {
+export function envAll(): Record<string, string> {
   const out: Record<string, string> = {};
   if (!fs.existsSync(REPO_ENV)) return out;
   for (const line of fs.readFileSync(REPO_ENV, 'utf8').split(/\r?\n/)) {
@@ -275,6 +275,19 @@ export async function reprocessarInbox(id: string): Promise<{ ok: boolean; error
   const exists = await db<{ status: string }>(`SELECT status FROM kimiwork_inbox WHERE id=$1`, [id]);
   if (!exists[0]) return { ok: false, error: 'evento nao encontrado' };
   return { ok: false, error: `so e permitido reprocessar done/error (atual: ${exists[0].status})` };
+}
+
+// Zerar fila (owner 12/10): pendencias antigas acumuladas travam o Vênus.
+// Cancela tudo que está pending/processing — os eventos ficam em 'cancelled'
+// (fora do claim dele) e podem ser reprocessados manualmente um a um se precisar.
+export async function cancelarFilaInbox(): Promise<{ ok: boolean; cancelados: number }> {
+  const rows = await db<{ id: string }>(
+    `UPDATE kimiwork_inbox SET status='cancelled', processed_at=now(),
+       result=COALESCE(result::text,'{}')::jsonb || '{"motivo":"fila cancelada pelo painel (owner)"}'::jsonb
+     WHERE status IN ('pending','processing') AND kind IN ('whatsapp.message','telegram.message')
+     RETURNING id`,
+  );
+  return { ok: true, cancelados: rows.length };
 }
 
 // ---------------------------------------------------------------------------
