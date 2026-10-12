@@ -573,3 +573,9 @@ Todos da org HDM Industrial / projeto Main WebSite, criados hoje já direto em C
 - `cmv56pa1c001zq303tdxxlfkp` (11:44 UTC) — nota técnica do Enoque sobre a biblioteca do construtor: "clica no add elemento e vai tudo pra baixo... ali embaixo das miniaturas tem uma barra de rolagem". Registro pede entender contexto técnico.
 - Observação: os 4 já nasceram em CLIENT_REVIEWING — revisão pendente do lado cliente/time. Bola com Matheus/dev.
 - autor: Luna (varredura por evento)
+
+## 2026-10-12 (2º evento) — HDM: página de resenhas (pedido do Abner)
+- `cmv5kfd1r0025q303dtfsrutn` — criado 18:08 UTC já em CLIENT_REVIEWING, sem comentários. Origem: conversa no productions 12/10 — replicar o sistema de resenhas do site da JR Reformas (resenhas na própria web, sem login, link direto pra compartilhar) no site da HDM.
+- Mesmo padrão dos 4 anteriores: backlog registrado pelo time, bola de revisão com Matheus/dev.
+- Fila kimiwork_inbox segue travada em 17 pending (oldest 12:16 UTC) — alerta já enviado ao grupo nesta janela; não repetido.
+- autor: Luna (varredura por evento)
