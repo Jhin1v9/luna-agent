@@ -22,6 +22,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { createBridge } = require('./bridge-factory.cjs');
 const { execSync, spawn } = require('child_process');
 
 const { SessionManager } = require('./session-manager.cjs');
@@ -732,7 +733,26 @@ function parseKimiResponse(text) {
 function parseTagResponse(text) {
   if (!text) return null;
 
-  const trimmed = text.trim();
+  
+  let trimmed = text.trim();
+
+  // Strategy G (Fusao API): modelos seguindo o formato XML dos docs
+  // (<luna_tool_call>{"name","arguments"}</luna_tool_call>) sao convertidos
+  // para o protocolo real [[action]] antes da deteccao.
+  {
+    const xmlRe = /<luna_tool_call>\s*([\s\S]*?)<\/luna_tool_call>/g;
+    let xmlM; let converted = 0;
+    while ((xmlM = xmlRe.exec(trimmed)) !== null) {
+      try {
+        const obj = JSON.parse(xmlM[1].trim());
+        if (obj && obj.name) {
+          trimmed += String.fromCharCode(10) + '[[action]]' + JSON.stringify({ tool: obj.name, params: obj.arguments || {} }) + '[[/action]]';
+          converted++;
+        }
+      } catch { /* JSON invalido dentro do XML — ignora */ }
+    }
+    if (converted > 0) console.log('[parseTagResponse] Strategy G: ' + converted + ' <luna_tool_call> convertido(s) para [[action]]');
+  }
 
   // Strategy F: Backward compatibility — if text looks like old JSON, try parseKimiResponse first
   if (trimmed.startsWith('{')) {
@@ -1939,7 +1959,7 @@ class LunaSoul extends EventEmitter {
   /** Initialize Kimi Bridge connection */
   async init(options = {}) {
     if (!this.kimiBridge) {
-      this.kimiBridge = new KimiBridge();
+      this.kimiBridge = createBridge();
     }
     await this.kimiBridge.connect(options.userId || 'luna-default');
     this.emit('ready');

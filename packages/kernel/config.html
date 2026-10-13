@@ -890,5 +890,73 @@
     // Init
     loadConfig();
   </script>
+
+<!-- ===================== LUNA WEB (Fusão API) ===================== -->
+<div class="card" style="margin:20px;padding:16px;border:1px solid #4a9eff55;border-radius:10px;">
+  <h2 style="margin:0 0 4px;">🌙 LUNA WEB — transporte do cérebro</h2>
+  <p style="opacity:.7;font-size:13px;margin:0 0 12px;">Como a Luna pensa: API grátis (roda da luna agent) ou Playwright/CDP no Kimi Web. Mudanças aplicam no próximo restart do servidor.</p>
+  <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+    <input type="checkbox" id="lwUseAgent" style="width:18px;height:18px;">
+    <b>Usar mesma config da luna agent</b> <span style="opacity:.6;font-size:12px;">(roda do painel :3101 — recomendado)</span>
+  </label>
+  <div id="lwRodaInfo" style="font-size:12px;opacity:.75;margin-bottom:10px;">carregando…</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <label>Transporte:
+      <select id="lwTransport" style="margin-left:6px;">
+        <option value="auto">auto (API primeiro, CDP de fallback)</option>
+        <option value="api">api (só APIs — sem Chrome)</option>
+        <option value="cdp">cdp (MODO PLAYWRIGHT — Kimi Web no Chrome)</option>
+      </select>
+    </label>
+    <span id="lwStatus" style="font-size:12px;"></span>
+  </div>
+  <details id="lwManualBox" style="margin-top:10px;">
+    <summary>Config manual (quando o checkbox está desmarcado)</summary>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <label>baseUrl <input id="lwBaseUrl" placeholder="https://api.exemplo.com/v1" style="width:280px;"></label>
+      <label>modelo <input id="lwModel" placeholder="modelo" style="width:160px;"></label>
+      <label>apiKey <input id="lwApiKey" type="password" placeholder="sk-…" style="width:200px;"></label>
+    </div>
+  </details>
+  <button onclick="lwSave()" style="margin-top:12px;padding:8px 18px;border-radius:8px;border:none;background:#4a9eff;color:#000;font-weight:600;cursor:pointer;">Salvar config LUNA WEB</button>
+</div>
+<script>
+async function lwLoad() {
+  try {
+    const r = await fetch('/api/luna-web/providers'); const j = await r.json();
+    document.getElementById('lwTransport').value = j.transport || 'auto';
+    document.getElementById('lwUseAgent').checked = j.useAgentConfig !== false;
+    document.getElementById('lwBaseUrl').value = (j.manual && j.manual.baseUrl) || '';
+    document.getElementById('lwModel').value = (j.manual && j.manual.model) || '';
+    const roda = (j.roda || []).filter(p => p.enabled);
+    const ativo = roda.slice().sort((a,b)=>(a.priority||99)-(b.priority||99))[0];
+    document.getElementById('lwRodaInfo').innerHTML = j.agentsConfigFound
+      ? '🔄 Roda da agent encontrada — próximo da fila: <b>' + (ativo ? ativo.label + ' (' + ativo.model + ')' : 'nenhum habilitado') + '</b> · ' + roda.length + ' provider(s) ligados'
+      : '⚠️ config/providers.json da luna agent NÃO encontrado perto do kernel — usando fallback do .env local';
+    lwToggle();
+  } catch (e) { document.getElementById('lwRodaInfo').textContent = 'erro ao carregar: ' + e.message; }
+}
+function lwToggle() {
+  const on = document.getElementById('lwUseAgent').checked;
+  document.getElementById('lwManualBox').style.opacity = on ? .45 : 1;
+}
+async function lwSave() {
+  const env = {
+    LUNA_TRANSPORT: document.getElementById('lwTransport').value,
+    LUNA_WEB_USE_AGENT_CONFIG: document.getElementById('lwUseAgent').checked ? 'true' : 'false',
+  };
+  if (!document.getElementById('lwUseAgent').checked) {
+    if (document.getElementById('lwBaseUrl').value) env.LUNA_API_BASE_URL = document.getElementById('lwBaseUrl').value;
+    if (document.getElementById('lwModel').value) env.LUNA_API_MODEL = document.getElementById('lwModel').value;
+    const k = document.getElementById('lwApiKey').value;
+    if (k) env.LUNA_API_KEY = k;
+  }
+  const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env }) });
+  const j = await r.json();
+  document.getElementById('lwStatus').textContent = j.ok ? '✅ salvo — restart o servidor pra aplicar' : '❌ ' + (j.error || 'erro');
+}
+document.getElementById('lwUseAgent').addEventListener('change', lwToggle);
+lwLoad();
+</script>
 </body>
 </html>
