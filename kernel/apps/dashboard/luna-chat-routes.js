@@ -592,7 +592,9 @@ router.post('/api/chat', async (req, res) => {
           turnActionCount++;
           if (!['listTools', 'toolInfo'].includes(ev.tool)) turnHadRealAction = true;
         }
-        if (ev.type === 'done') turnFinalText = content || '';
+        // texto final pode vir de done OU de assistant/response_delta (done as vezes vem vazio)
+        if ((ev.type === 'assistant' || ev.type === 'response_delta') && content) turnFinalText = content;
+        if (ev.type === 'done' && content) turnFinalText = content;
 
         // W6-T8: close the stream once the final done is persisted — any
         // straggler events after this are dropped by the gate above.
