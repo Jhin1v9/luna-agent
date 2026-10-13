@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
+import { fileURLToPath } from 'node:url';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordActivity, recordAudit, publishEvent, enqueueJob, type Sql } from '@luna/database';
@@ -57,7 +58,7 @@ let pricesCache: PricesFile | null = null;
 function loadPrices(): PricesFile {
   if (pricesCache) return pricesCache;
   pricesCache = JSON.parse(
-    readFileSync('C:/Users/Abner/Documents/Luna cto/luna-agent/config/prices.json', 'utf8'),
+    readFileSync(fileURLToPath(new URL('../../../../config/prices.json', import.meta.url)), 'utf8'),
   ) as PricesFile;
   return pricesCache;
 }

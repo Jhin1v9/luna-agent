@@ -158,6 +158,7 @@ export class IngestWatcher {
     this.ingest = deps.ingestFn ?? createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log }).ingestOne;
     this.ingestAllowlist = parseAllowlist(deps.ingestAllowlist?.join(','));
     this.enforceIngest = deps.enforceIngestAllowlist ?? false;
+    // 2026-10-14 diagnostico: gate do sweep explicito no boot
   }
 
   private async collect(): Promise<ChatBadge[]> {
@@ -255,7 +256,18 @@ export class IngestWatcher {
       // o browser busca pelo número — sweep suporta; nome segue igual.
       try {
         const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
-        const last = msgs[msgs.length - 1];
+        // 2026-10-14 (bug ao vivo): olhar SO a ultima mensagem do painel
+        // engolia pedido respondido — quando a Luna responde, o painel termina
+        // com outbound DELA e o sweep pulava o cliente pra sempre (mensagem do
+        // Abner ficou horas sem resposta por causa do 'pronto Abner' outbound
+        // por cima). Agora: candidata = ultima mensagem DEPOIS da ultima
+        // resposta da Luna (outbound sem mencao).
+        let lastOutIdx = -1;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].direction === 'outbound' && !extractMention(msgs[i].text)) { lastOutIdx = i; break; }
+        }
+        const pendente = msgs.slice(lastOutIdx + 1);
+        const last = pendente[pendente.length - 1];
         if (!last) continue;
         const key = `${last.direction}:${last.text}`;
         const prev = this.lastSeenMsg.get(entry);
@@ -283,7 +295,10 @@ export class IngestWatcher {
           // para textos-prefixo ("@luna teste diga 1" vs "...diga 123" =
           // mesmo hash, mensagem engolida como "duplicada"; ao vivo
           // 2026-09-22) e o hash de texto puro engolia reenvio idêntico.
-          external_id: `wa:${entry}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
+          // (2026-10-14) sem o prefixo do entry: 'Abner' e
+          // '34685093192@s.whatsapp.net' abrem o MESMO chat — com entry no id,
+          // a mesma msg ingeria 2x (resposta duplicada).
+          external_id: `wa:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
           quoted_text: (last as { quoted?: string | null }).quoted ?? null,
@@ -301,8 +316,9 @@ export class IngestWatcher {
             );
           },
         );
-      } catch {
-        // chat não abriu agora (virtualizado?), tenta no próximo ciclo
+      } catch (err) {
+        // 2026-10-14: era silencioso — inbound morria aqui sem rastro.
+        this.deps.log.warn({ entry, err: String(err).slice(0, 200) }, 'watcher(sweep): leitura falhou — tenta no próximo ciclo');
       }
     }
   }

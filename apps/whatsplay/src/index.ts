@@ -1,5 +1,8 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getPool, closePool, checkConnection, writeHeartbeat } from '@luna/database';
 import { createAdapter } from '@luna/agent';
 import { WhatsAppWebTransport } from './browser.js';
@@ -33,9 +36,13 @@ const repairAdapter = createAdapter({
   apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
 });
 
+// 2026-10-14: caminhos eram absolutos do PC — quebravam na VPS (e exigiam
+// manter 2 arquivos). Agora: perfil do Chrome em <home>/.luna (mesma regra
+// no PC e na VPS) e evidenceDir relativo ao repo (este arquivo está em
+// apps/whatsplay/src/ → repo root = ../../../). Env continua ganhando.
 const userDataDir =
-  config.WHATSAPP_USER_DATA_DIR || 'C:/Users/Abner/.luna/chrome-whatsapp';
-const evidenceDir = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain/luna/incidents';
+  config.WHATSAPP_USER_DATA_DIR || join(homedir(), '.luna/chrome-whatsapp');
+const evidenceDir = fileURLToPath(new URL('../../../.brain/luna/incidents', import.meta.url));
 
 let shuttingDown = false;
 let lastInboundAt: Date | null = null;
@@ -171,6 +178,7 @@ async function main(): Promise<void> {
   // (sweep detectava e a ingest falhava em silêncio) até restart. A cada 45s
   // confere; se caiu, reload + re-anexa o observer de mutação.
   const healthTimer = setInterval(() => {
+    if (process.env.WHATSAPP_HEALTH_DISABLED === 'true') return; // modo configuração: QR estável pra scan
     transport.isPageHealthy().then((ok) => {
       if (!ok) {
         log.warn('health: página fora do estado saudável — recuperando');

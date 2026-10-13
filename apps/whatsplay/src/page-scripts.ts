@@ -84,7 +84,16 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
     // EXCLUÍDOS do texto da mensagem nova. Antes o textContent puxava o
     // preview da citação junto: quem respondia a msg da Luna com um emoji
     // entregava o "chat inteiro" pra ela (bug reportado pelo owner 26/09).
-    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    // 2026-10-14 (WA atualizou o DOM): data-pre-plain-text agora existe no
+    // wrapper de COPIA de TODA mensagem ("[hora, data] Autor: "), nao so
+    // em citacoes — o filtro antigo (e o 1o fix por msg-meta, que falhava
+    // quando o meta ficava fora do wrapper) excluia o proprio texto da
+    // mensagem (sweep cego, inbound morto). Regra correta, validada no DOM
+    // vivo: o wrapper da mensagem e o pre-plain EXTERNO; o bloco citado,
+    // quando existe, fica ANINHADO dentro dele. So e citacao o pre-plain
+    // que tem OUTRO pre-plain como ancestral no row.
+    const allPre = Array.from(row.querySelectorAll('[data-pre-plain-text]'));
+    const quotedEl = allPre.find((q) => allPre.some((o) => o !== q && o.contains(q))) || null;
     const textEls = Array.from(row.querySelectorAll(sel.messageText))
       .filter((el) => !quotedEl || !quotedEl.contains(el));
     const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');
@@ -122,7 +131,16 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
     // citando entregava o texto da citada junto, atribuído ao autor da
     // RESPOSTA (bug owner 12/10: "vc manda OLA, eu mando 'oi luna' marcando
     // sua msg e vc fala q eu escrevi OLA").
-    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    // 2026-10-14 (WA atualizou o DOM): data-pre-plain-text agora existe no
+    // wrapper de COPIA de TODA mensagem ("[hora, data] Autor: "), nao so
+    // em citacoes — o filtro antigo (e o 1o fix por msg-meta, que falhava
+    // quando o meta ficava fora do wrapper) excluia o proprio texto da
+    // mensagem (sweep cego, inbound morto). Regra correta, validada no DOM
+    // vivo: o wrapper da mensagem e o pre-plain EXTERNO; o bloco citado,
+    // quando existe, fica ANINHADO dentro dele. So e citacao o pre-plain
+    // que tem OUTRO pre-plain como ancestral no row.
+    const allPre = Array.from(row.querySelectorAll('[data-pre-plain-text]'));
+    const quotedEl = allPre.find((q) => allPre.some((o) => o !== q && o.contains(q))) || null;
     const textEls = Array.from(row.querySelectorAll(sel.messageText))
       .filter((el) => !quotedEl || !quotedEl.contains(el));
     const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');

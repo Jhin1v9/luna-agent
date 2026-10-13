@@ -179,3 +179,238 @@ retorna "operação não suportada", backend morre segurando ~25GB de RAM (32GB 
 **Mitigado enquanto isso:** apps dependentes de Postgres PARADOS no pm2 (sem crash-loop); kernel :3458, painel :3101 (páginas ok), FCC :8082, kimiweb :58629 no ar.
 
 **Feito e pushado:** kernel f2f5a2b, agent 06f2008 (itens 2-8 da lista, exceto keys que dependem do Abner).
+
+---
+
+## Sessão 2026-10-13 tarde (Kimi Work, turno longo do owner)
+
+**Feito e validado:**
+- **WhatsApp VPS pareado** — whatsplay no VPS online com Chrome real VISÍVEL (Wayland nativo
+  via `--ozone-platform=wayland` + `XDG_RUNTIME_DIR/WAYLAND_DISPLAY`; patch condicional em
+  `apps/whatsplay/src/browser.ts`, ativa só com `WHATSAPP_OZONE_PLATFORM=wayland`). Pairing
+  por QR (o pairing code foi rejeitado pelo servidor do WhatsApp). Lê chats reais
+  (Production, OnaDance, Abner). ⚠️ Falta teste de ENVIO: o banco está vazio de inbound —
+  o Abner precisa mandar "oi" pro +34 614 05 35 88 pra nascer conversation_id.
+- **Persona da Luna no luna-agent do VPS** — `.kimi-code/agents/luna.md` existia mas NUNCA era
+  lido; `apps/orchestrator/src/agent/context.ts` só usava PERSONA_SUMMARY. Adicionada
+  `loadLunaPersona()` (sobe do cwd até achar o .kimi-code, cache por mtime) injetada no
+  renderConversationPrompt. Typecheck limpo, orchestrator restartado.
+- **Fix `/luna` branco no VPS** — index.html referenciava `/assets/*` absoluto mas a página
+  é servida em `/luna/` (Caddy strip). Fix: `base: './'` no
+  `luna-kernel/packages/kernel/luna-web/vite.config.js` + rebuild + dist tar/scp/tar pro VPS.
+  Validado 200. ⚠️ Página branca no navegador do owner = Ctrl+F5 (cache do bundle antigo).
+- **Luna Tools v6.0 — backend real** — `luna-kernel/apps/dashboard/routes/luna-tools.js`
+  apontava pra um "Dashboard PRO" da :3456 que NUNCA existiu (todos os cards do ToolsPanel
+  ficavam "—"). Reescrito pra consumir o backend verdadeiro do painel Nexo
+  (container `nexo_dashboard_backend`, :3500 no VPS, exposto pelo Caddy em
+  `https://vps.nexo-digital.app/dashboard/api/*`):
+  - Auth: `Authorization: Bearer <INTERNAL_API_TOKEN>` (o token do container, funciona nas
+    4 rotas: leads, tasks, finance/summary, voting/sessions; o DASHBOARD_API_KEY só serve leads).
+  - Envs novas em `apps/dashboard/.env` (PC e VPS): `LUNA_DASHBOARD_URL`
+    (PC: `https://vps.nexo-digital.app/dashboard`; VPS: `http://127.0.0.1:3500`) e
+    `LUNA_DASHBOARD_TOKEN`.
+  - ⚠️ A :3500 é bind 127.0.0.1 no VPS — o PC só alcança pela URL pública do Caddy.
+  - Validado PC e VPS: `/api/tools/stats` devolve dados reais (3 leads, 20 tarefas,
+    saldo -36,18 €). Cards do ToolsPanel populam.
+  - POST /api/tools/leads|tasks repassam pro backend real (formato igual ao que o proxy do
+    workspace-cliente usava); não testado POST pra não criar lixo no banco.
+- **ChatHeader do luna-web** — bug de overlap ("Thinking" sobre "Kimi Web" em ~690px):
+  `.header-left`/`header-right` com flex-shrink estourando. Corrigido flex/min-width/overflow
+  + media queries reescritas (1024/768/640/480). Build novo deployado no VPS
+  (`tar -czf dist` → scp → extrair em `~/luna-kernel/packages/kernel/luna-web/dist`).
+  Screenshot valida: header limpo, sem sobreposição.
+- **Envs separadas (convenção)** — `.env` local do luna-agent = PC, NUNCA transfere.
+  `.env.vps` (raiz do luna-agent) = FONTE DE VERDADE do VPS (baixado de lá hoje).
+  Deploy: `bash scripts/deploy-env-vps.sh` (scp .env.vps → vps:~/luna-agent/.env + instrução
+  de restart). Mesma lógica vale pro kernel: `luna-kernel/apps/dashboard/.env` existe em
+  cada máquina com valores próprios (não versionar, não misturar).
+
+**Pendente desta sessão:**
+- Gravar as mudanças no brain (`POST /brain/api/learning/outcomes`, Bearer BRAIN_API_TOKEN).
+- Teste E2E de envio de WhatsApp pelo VPS (depende do Abner mandar "oi" primeiro).
+- A roda de APIs do VPS (`LUNA_RODA_CONFIG=~/luna-kernel/roda/providers.json`) e as 12 keys
+  novas continuam dependendo de contas criadas pelo Abner.
+
+## Sessão 2026-10-13 noite — VPS estável (watchdog + whatsplay)
+
+- **Login /luna/ no VPS FUNCIONA** — testado no browser interno (rede: ./api/auth/login →
+  tools/stats → providers → system/agent, logado:true). Owner precisa dar **Ctrl+F5**
+  (navegador segura o bundle antigo com fetches absolutos). Fix anterior: todos os fetches
+  do luna-web viraram relativos (`./api/...`) em 8 arquivos (42 via sed + 2 Edits no
+  api.js: EventSource stream e visible/invisible). Credenciais VPS (users.json do
+  luna-server): `abner` e `abner@nexo-digital.app`, senha `.7741@`, role Admin — lido a
+  cada login, sem restart.
+- **Watchdog crash loop fix** — `.env` do VPS tinha `KIMI_ADAPTER_MODE=pi` (resto de
+  sessão do Kimi Code no PC): o PiAdapter spawna o binário `pi` → `spawn pi ENOENT` →
+  30 restarts → errored. Trocado pra `kimi-api` (bate com LLM_BASE_URL=api.kimi.com/coding/v1,
+  key validada com chat/completions real). `self-test: tudo ok`.
+- **Paths Windows hardcoded no watchdog** — `apps/watchdog/src/index.ts` e `selftest.ts`
+  usavam `C:/Users/Abner/...` fixo. Agora `LUNA_AGENT_ROOT` (env) com default do PC.
+  No VPS: `LUNA_AGENT_ROOT=/home/nexo/luna-agent` no .env. ATENÇÃO: `loadDotEnv` NÃO
+  sobrescreve var já existente em process.env — e o **daemon pm2 carrega envs velhos**
+  (resurrect dump). Por isso o restart com env inline foi o que destravou:
+  `LUNA_AGENT_ROOT=/home/nexo/luna-agent pm2 restart luna-watchdog --update-env`.
+  Sempre que uma env do .env "não pegar", suspeitar do env congelado do daemon pm2.
+- **`LUNA_PM2_MANAGED=1`** adicionado ao .env do VPS — sem isso o watchdog tentava
+  `spawn cmd.exe` pra reiniciar serviços DOWN no Linux.
+- **backup-profile.sh portado pra Linux** — branch `robocopy` (PC) vs `tar -czf` com as
+  mesmas exclusões + sanity `Default/` (VPS). Testado: 88 MB tar.gz da sessão Chrome.
+  backup-db.sh já funcionava.
+- **openChat serializado + reuso de painel** — `browser.ts`: `openChatChain` (chain de
+  promessas) + `lastOpenedOpenChat`. Chamadas concorrentes (reconcile + getUnread +
+  outbound) repetiam o fluxo inteiro: o 2º call dava Escape (fechava o painel que o 1º
+  abriu), recarregava via deeplink e caía no fallback de busca com ~20s de timeouts
+  (evidência 19:36). Early-check: painel já aberto com dígitos do jid no header (ou aberto
+  por nós <60s) → reutiliza. Typecheck OK, deployado, whatsplay restartado.
+- **Estado WhatsApp**: whatsplay nativo online (captura por mutação de DOM, chrome-voice
+  no boot, NOTIFYs luna_outbound/voice_call_requests/whatsapp_actions ativos), Chrome
+  do VPS vivo, mas `messages` channel=whatsapp continua **0** — o reconcile só processa
+  chats com badge de não-lido e as mensagens antigas foram consumidas sem ingestão.
+  **Teste de fogo depende de mensagem NOVA do Abner** (grupo ou privado pro +34 614 05 35 88).
+  Se voltar "sem texto inbound", inspecionar `readConversation` (browser.ts ~408/435:
+  extração após deeplink — a página recarrega no goto e o messagePanel pode demorar).
+
+**Pendente:**
+- Teste de fogo com msg nova do Abner (badge → ingest → evento → resposta da Luna).
+- Gravar outcomes no brain (POST /brain/api/learning/outcomes, Bearer BRAIN_API_TOKEN).
+- Enviar "pronto Abner" no WhatsApp dele (endpoint :3101/api/mensagem) quando a fase 1 fechar.
+- 12 keys de APIs gratuitas (roda) — dependem de contas do Abner.
+
+## Sessão 2026-10-13 noite — Providers/roda no VPS (a "magia")
+
+- **Roda acesa no VPS** — as 4 keys (GEMINI/KIMI/GITHUB/NVIDIA) foram transferidas do
+  `.env` do luna-agent do PC pro `~/luna-kernel/apps/dashboard/.env` do VPS (luna-server
+  dá dotenv nesse arquivo; providers resolvem `apiKeyEnv` de process.env). Catálogo
+  `/api/luna-web/providers` mostra 5/5 `hasKey:true` no PC e no VPS.
+- **Fix bridge-factory.cjs** — `readAgentProvidersConfig()` só aceitava path contendo
+  "luna-agent" (anti-decoy) e o path do providers.json do VPS é `~/luna-kernel/roda/`
+  → catálogo vinha `roda:[]`. Agora `LUNA_RODA_CONFIG` (já setado no .env do dashboard)
+  é candidato EXPLÍCITO e escapa do guard. PC = fonte da verdade, deployado ao VPS.
+- **Timeout ApiBridge 10min → 3min** (`api-bridge.cjs`) — endpoint morto segurava a
+  "roda infinita" o turno inteiro antes de girar (evidência: E2E travava 90s+).
+- **NVIDIA NIM DESABILITADO na roda** — a key lista modelos (GET /v1/models 200, 80
+  modelos, kimi-k3/deepseek-v4.1-flash presentes) mas TODO chat/completions TRAVA
+  (testado do PC e do VPS, >90-120s sem resposta). Conta sem cota/provisioning ativo.
+  Reabilitar quando o Abner ativar em build.nvidia.com → trocar `enabled` no
+  `~/luna-kernel/roda/providers.json`.
+- **Roda validada E2E**: POST :3458/v1/chat/completions respondeu em 4,3s (gira do
+  gemini 429 pro próximo saudável sozinho). Saúde medida do VPS: kimi-coding 200/1,9s,
+  github gpt-4o 200/0,5s, pollinations 200/1,1s, gemini 429 (cota, gira), nvidia OFF.
+- **FCC instalado no VPS** — uv 0.13 + `uv tool install free-claude-code`, roda sob pm2
+  `luna-fcc` na :8082 (admin /admin). SEGREDOS: pm2 precisa `--interpreter
+  ~/.local/share/uv/tools/free-claude-code/bin/python` (senão executa o .py como JS) e
+  a env é `NVIDIA_NIM_API_KEY` (NÃO `NVIDIA_API_KEY`). Como o upstream NVIDIA está morto,
+  o FCC responde 503 — fica de placeholder até a key da NVIDIA funcionar.
+- **PENDENTE**: suporte a transport `anthropic` no bridge-factory pra plugar o
+  fcc-local (`http://127.0.0.1:8082`, só fala `/v1/messages`) na roda. Depende do
+  NVIDIA (ou de outro provider configurado no FCC admin) voltar a funcionar.
+
+## Sessão 2026-10-13 noite (2) — Tools/brain/prompt da Luna Web
+
+- **FIX CRÍTICO api-bridge.cjs** — `temperature: 0` fixo quebrava o kimi-for-coding
+  ("invalid temperature: only 1 is allowed") → HTTP 400 em TODO turno → roda girava
+  pra providers piores → resposta morria vazia. Agora só envia temperature se
+  `LUNA_API_TEMPERATURE` estiver explícita. Roda reordenada: kimi-coding(1) →
+  pollinations(2) → gemini(3) → github(4, SSE dele devolve corpo "OK" vazio —
+  fica por último) → nvidia-nim(5, OFF).
+- **Brain tools novas no kernel** — `brainSearch`/`brainRead`/`brainSaveOutcome` em
+  `luna-tools.cjs` (HTTP pro container nexo-brain :4321, envs `BRAIN_INTERNAL_URL`
+  + `BRAIN_API_TOKEN` no .env do dashboard, PC e VPS), cases no executor do
+  `luna-soul.cjs`, categoria 🧠 Brain no `tool-catalog.cjs`. Antes o modelo NÃO
+  TINHA como acessar o brain no VPS (brain-loader só lia dir local inexistente).
+  Endpoints reais: GET /api/search?q=, GET /api/nodes/:id, POST /api/learning/outcomes.
+- **System prompt reescrito** (`config/luna-prompt-config.json`, PC+VPS): identidade
+  (Luna 🌙, CTO virtual da Nexo Digital, parceira do Abner), REGRA DE OURO (responder
+  OU usar uma tool, nunca chutar — "deixa eu verificar"), seções BRAIN e WHATSAPP com
+  exemplos reais, e {{TOOL_INDEX}}. Validado E2E: a Luna chamou brainSearch sozinha e
+  respondeu quem é o Abner com base nas notas (19s, tool ok).
+- **FIX outbound grupo** (whatsplay `outbound.ts`) — grupo @g.us chegava como jid e a
+  busca do WA digitava os DÍGITOS do id ("No se encontró ningún chat", screenshot do
+  owner). Agora: jid de grupo → entrega pelo NOME do grupo (contact_name); privado
+  segue por número/jid (deeplink). Allowlist/send-safety continuam no jid.
+- **PENDENTE pro Kimi Code** (ver HANDOFF-kimi-code.md): teste ponta-a-ponta de
+  dashboardSendWhatsApp pela Luna Web, suporte anthropic no bridge pra FCC, painel
+  mostrar provider/modelo ativo, providers gratuitos extras (groq/openrouter/mistral
+  precisam de conta do Abner).
+
+## 2026-10-13 — noite (3): matrix de providers + fixes de tools (VPS produção)
+
+### Matrix de testes (15 providers × 4 turnos, via https://vps.nexo-digital.app/luna/api — caminho humano)
+Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
+- 🥇 kimi-coding: melhor disciplina de tools (chama a tool certa, formato ok)
+- 🥈 openrouter-nemotron-super: bom tools + persona forte
+- 🥉 openrouter-nemotron-ultra: bom mas se perdeu no T4 (resposta vazia)
+- gemma-31b/26b, dots, nano-omni, lightning, laguna-s/xs, lfm, north-code: 429 "free-models-per-day" — a matrix ES-GOTOU a cota diária de cada um (reset diário; limites sobem com 10+ créditos na conta OpenRouter)
+- pollinations: instável (respostas vazias) — fallback apenas
+- gemini: quota morta (429) — precisa key nova
+- github-models: SSE responde vazio — candidato a desligar
+
+### Fixes aplicados (PC → scp → VPS, tudo node --check + restart luna-web)
+1. DASHBOARD_API_URL: era https://vps.nexo-digital.app:3501/api (PORTA MORTA) → http://127.0.0.1:3500/api + DASHBOARD_INTERNAL_API_TOKEN nas envs (VPS+PC kernel+PC agent). Tasks agora funcionam (CRUD validado).
+2. Tools WhatsApp reescritas em luna-tools.cjs: scan/history/status agora fazem SQL DIRETO na tabela messages (DATABASE_URL=postgres://luna:luna@localhost:5433/luna adicionado ao dashboard .env VPS+PC). APIs legadas /whatsapp-agent/* e /whatsapp/history NÃO EXISTEM mais.
+3. dashboardSendWhatsApp: painel :3101 primeiro; se recusar (conversation_id inexistente) → fallback direto SQL (get-or-create org 'Nexo Digital' → client 'whatsapp-direto' → conversation → INSERT messages queued + pg_notify('luna_outbound')). Validado: mensagem entra na fila.
+4. tool-catalog.cjs: categoria '📋 Dashboard — Tarefas & Solicitações' adicionada (dashboardCreateTask/List/Update/Complete/Delete + CreateLead) — estavam implementadas mas invisíveis pros modelos. Validado E2E: modelo criou tarefa sozinho.
+
+### BLOQUEIO ATUAL — precisa do owner
+- Envio real de WhatsApp: mensagem entra na fila (send_state=queued→failed) mas o whatsplay NÃO CONSEGUE abrir o chat no browser (openChat falha: pane-side nunca aparece, "Enter não abriu o resultado"). WA Web UI da sessão do VPS precisa ser olhada AO VIVO via RustDesk (pode ter caído/sessão expirada). Logs: ~/.pm2/logs/luna-whatsplay-out.log
+- Inbound (teste de fogo): messages continua 0 — watcher ativo + allowlist ok (Abner e grupos no escopo), mas nenhuma msg nova chegou desde 20:11. Owner deve mandar msg NOVA pro +34 614 05 35 88 e olhar o log em tempo real.
+- painel Nexo solicitações (:13510 /nexo/api/admin/requests) deu 403 sem auth — pra criar solicitação REAL no workspace precisa do token/cookie do painel (não investigado a fundo; dashboardCreateTask cobre o caso "tarefa").
+
+### Addendum 23:2x — visor de provider + agenda de contatos (tudo deployado no VPS)
+- Visor: RodaApiBridge.health (fails/limited/ok por provider) + GET /api/roda/status + widget injetado em packages/kernel/luna-web/dist/index.html (pill no topo-direita, nome curto + bolinha 🟢🟠🔴, hover mostra a roda; poll 8s). Bridge agora joga erro amigável quando a roda esgota ("Todos os providers falharam...") em vez de dump cru de 429.
+- Agenda de contatos: painel next ganhou /api/contacts (GET/POST/DELETE, data/contacts.json) + UI na aba Mensageiro (select, add Nome+Número, remover, clicar preenche o chat_id). "Abner 34685093192" já semeado.
+- dashboardSendWhatsApp: resolve nome→chat_id via /api/contacts antes de enviar (erro amigável se não achar). Validado: fn({phone:'Abner'}) → "enviado para 34685093192 (fila local)".
+- NOTA: page.tsx do painel foi patchada DIRETO no VPS (backup page.tsx.bak-20261013) — replicar pro PC depois se o repo local divergir.
+
+### Addendum 23:47 — BRAIN funcionando de verdade (root cause achado e fixado) + persona + skill do brain
+- **Root cause do brain stale:** o container `nexo-brain` usa imagem de 08/out — TODO o repo fica congelado no build; só `clients/learning/memory/projects/security` eram mounts. O server lê o índice de `/app/atlas/public/data.js` (da imagem, velho) e as fichas de `/app/luna/*` (também velhas). Por isso a Jess voltava "escola de dança" mesmo com o fonte certo no host.
+- **Fix:** `docker-compose.yml` do brain ganhou mounts read-only dos dirs de conteúdo vivos (`luna`, `reports`, `knowledge`, `personas`, `personalities`, `changelog`, `runbooks`, `automation`) + bind do `atlas/public/data.js` gerado no host (backup: docker-compose.yml.bak-20261013). `docker compose up -d` recriou o container. Agora: editar arquivo em `/opt/nexo-brain/luna/...` → `node atlas/generate.mjs` (node24) na raiz → search fresca IMEDIATA (loadAtlas lê do disco por request, sem cache). Validado: "Jess" → "marca de roupa de pole dance artesanal" ✅
+- **Ficha canônica do Abner criada:** `/opt/nexo-brain/luna/contatos-pessoais/abner/FICHA.md` (owner/fundador Nexo Digital, WA pessoal +34 685 09 31 92, WA da Luna +34 614 05 35 88, abner@nexo-digital.app, aprova tudo, madrugador, PT). Search "Abner" → score 100 ✅
+- **Skill do brain:** `~/.luna/skills/brain/SKILL.md` (PC fonte + VPS /home/nexo/.luna/skills/brain/). Frontmatter name/description/triggers; ensina: brainSearch com termos CURTOS (1-3 palavras, frase longa volta vazio), brainRead pelo id retornado, brainSaveOutcome. Entra no skillIndex do system prompt de first message (validado com loadSkillIndex no VPS). É a 1ª skill do sistema.
+- **Persona:** `~/.luna/personas/default.md` (PC+VPS) — antes o dir estava VAZIO e loadPersona('default') voltava null → Luna seca/sem personalidade. Agora: CTO virtual da Nexo, tom profissional-caloroso-direto, regras de ouro (brain antes de perguntar, tool antes de confirmar, erro vira brainSaveOutcome).
+- page.tsx do painel replicada VPS→PC (com CRLF), diff validado idêntico.
+- Sempre lembrar: pm2 restart luna-web --update-env; VPS ssh = /usr/bin/ssh vps (usuário nexo); node24 no PATH via $HOME/node24/bin.
+
+### Addendum 00:00 — GitHub Copilot na roda + busca do brain tokenizada + E2E APROVADO
+- **github-models CORRIGIDO:** a URL `models.github.ai/inference` responde "OK" em text/plain (quebrava o SSE do api-bridge → "respondeu vazio"). A URL real da API é `https://api.githubcopilot.com/chat/completions` (modelos sem prefixo: `gpt-4o`, `gpt-4o-mini`), autentica com GITHUB_API_KEY (gho_...). Atualizado em: VPS /home/nexo/luna-kernel/roda/providers.json (backup .bak-ghfix), VPS + PC /config/providers.json do painel. Priority 13 (frente do pollinations).
+- **Kimi coding esgotado:** a key KIMI_API_KEY tem janela de 5h — voltou 429 "access_terminated". Reseta sozinha. OpenRouter free: cotas diárias esgotadas pela matrix; resetam diariamente.
+- **Busca do brain tokenizada (root cause de "Jess OnaDance" voltar vazio):** scoreAtlas exigia a frase inteira como substring — ids tipo `jess-onadance` (hífen) não casavam com query com espaço. Fix em /opt/nexo-brain/atlas/lib/atlas-data.mjs (backup .bak-20261013): pontua por token + bônus se todos baterem. **O lib/ agora é mount vivo no container** (`/opt/nexo-brain/atlas/lib:/app/atlas/lib:ro` no compose) — fix de código do brain não precisa mais de rebuild de imagem.
+- **toolResultPrompt reforçado** (config/luna-prompt-config.json, PC→VPS): manda o modelo ENTREGAR a resposta ao usuário após o resultado da tool — gpt-4o estava respondendo "entendido, vamos prosseguir" sem responder.
+- **TESTE DE FOGO APROVADO via https://vps.nexo-digital.app/luna/api/chat (provider: github-models/gpt-4o):**
+  - "Quem é a Jess da OnaDance?" → brainSearch {"query":"Jess OnaDance"} → brainRead → resposta com as 3 solicitações reais da ficha (slider→vídeo hero, Trustpilot, "Avísame cuando vuelva") ✅
+  - "Qual o whatsapp do Abner?" → brainSearch → **"+34 685 093 192"** com link wa.me ✅
+  - Skill do brain + persona + lembrete "💡 suas tools" tudo ativo no loop.
+- **Membrane CLI instalado** (path: /c/Program Files/nodejs) pra envio de WhatsApp via Kimi Work — PENDENTE autorização do owner no navegador (URL de consent impressa no chat). Depois: `membrane login complete <code>`, conectar connector whatsapp, e aí eu consigo mandar msg direto (fallback independente do whatsplay do VPS).
+
+### Addendum 00:15 — persona canônica unificada + Membrane conectado
+- **toolResultPrompt reescrito com a persona** (não mais "responda em linguagem natural" genérico): a instrução pós-tool agora manda responder COMO Luna (CTO virtual, tom vivo/direto/colega de time, fecha pedindo feedback com cliente). Validado: "Qual o whatsapp do Abner?" → "Achei o que você pediu! O número comercial do Abner é +34 685 093 192... número que ele decretou pra Nexo, já aplicado na landing de Sabadell" ✅ (voz da Luna, dado do brain).
+- **Persona canônica:** ~/.luna/personas/default.md (PC+VPS) AGORA É o `.kimi-code/agents/luna.md` da luna-agent (fonte de verdade, decreto 27/09) — o que eu tinha escrito antes era uma versão paralela; substituído.
+- **Membrane:** login feito (CLI em /c/Program Files/nodejs). Connection ID whatsapp: `6aceabcb6fd54e2694f374f4` — pendente parear pelo owner na URL https://api.getmembrane.com/screens/connections/219835b5-dec5-4592-ac4a-eba1c00ab719/6aceabcb6fd54e2694f374f4 (escanear QR com o app WhatsApp). Depois: `membrane connection get 6aceabcb6fd54e2694f374f4 --wait`, achar a action send-text-message e enviar. Isso dá um canal de envio WhatsApp independente do whatsplay do VPS.
+
+### Addendum 00:20 — WhatsApp OUTBOUND curado (Kimi Code) + sincronizado
+- Root cause: WA Web atualizou o DOM (role="row" + data-testid list-item-N, header "Chats" na busca, insertText morreu) + conversas do fallback SQL com contact_id NULL matavam o deliverOne (sem contato/alvo) + clearSearchField no-op.
+- Fix (Kimi Code, patchado no VPS): outbound.ts lê cv.metadata->>'chat_id' como fallback de alvo; browser.ts usa fill() no lugar de insertText, limpa todos os candidatos de busca, locador :has([data-testid="cell-frame-title"]) pulando o header.
+- **PROVA:** 2 mensagens reenfileiradas → ambas `sent` no banco ("reteste pipeline ok ??" 21:11 e "teste resolução por nome 🌙" 21:23) — owner recebeu no WhatsApp.
+- Arquivos puxados VPS→PC (fonte da verdade), typecheck do whatsplay limpo.
+- PENDENTE: teste de fogo INBOUND (owner manda msg nova pro +34 614 05 35 88 → cair em messages → Luna responder).
+- Ruído residual: sweep perde corrida pro deeplink logo após health-reloads (1807 restarts acumulados — instabilidade crônica da página WA Web, olhar futuro).
+- Roda VPS reordenada: gemini(1) → 11× openrouter free → github-copilot(13) → pollinations(14) → kimi-coding(15, evitado). Keys grátis novas entram na roda amanhã.
+
+### Addendum 00:25 — Membrane descartado, WhatsApp 100% whatsplay
+- Membrane whatsapp connector exige credenciais da Meta (Access Token + Phone Number ID da WhatsApp Business API) — owner decidiu: **ficamos no whatsplay** (decisão final).
+- "pronto Abner" ENVIADO e **sent** via pipeline oficial: INSERT messages (conversation 8f6a9817, metadata.chat_id=34685093192) + pg_notify('luna_outbound') → whatsplay entregou.
+- Membrane CLI fica instalado (login feito) pra outras integrações futuras, mas WhatsApp não passa mais por ele.
+- PENDENTE (único): teste de fogo INBOUND — owner manda msg nova pro +34 614 05 35 88.
+
+### Addendum 00:30 (madrugada 14/10) — INBOUND FUNCIONANDO PONTA-A-PONTA ✅
+- **Teste de fogo APROVADO:** a "certeza?" do owner (0:18) foi lida pelo sweep, ingerida (messages + evento), respondida e **entregue no WhatsApp** ("Oi Abner! Estou aqui e pronta para ajudar…") às 23:17:53 UTC.
+- **Root cause do sweep cego (3 camadas, todas corrigidas no VPS e syncadas pro PC):**
+  1. `page-scripts.ts` (READ_CONVERSATION + READ_PANEL): o WA Web novo põe `data-pre-plain-text` no wrapper de cópia de TODA mensagem ("[hora, data] Autor: "), não só em citações — o filtro antigo excluía o próprio texto (texto voltava vazio → `filter(m.text)` zerava tudo). **Fix:** citação = pre-plain-text ANINHADO (com ancestral pre-plain no row); wrapper da mensagem é o externo. Validado no DOM vivo.
+  2. `browser.ts` readConversation: msg-containers renderizam primeiro como SHELLS vazios (tail-in/out presentes, `.selectable-text` chega via hydration depois). Espera fixa de 500ms lia shells. **Fix:** `waitForSelector('[data-testid="msg-container"] .selectable-text', 8s)` no lugar do timeout fixo.
+  3. `watcher.ts` (já documentado no addendum anterior): candidata = última mensagem DEPOIS da última outbound da Luna.
+- **Causa raiz do silêncio do orchestrator (dead letter):** `loadRouterConfig` tinha default `C:/Users/Abner/.../routes.json` hardcoded → ENOENT no VPS → 6 eventos whatsapp.message.received morreram na DLQ. **Portabilizado** (todos via `import.meta.url`, funciona PC+VPS sem config): `router/config.ts` (routes.json), `agent/handler.ts` (prices.json), `router/tools-brain.ts` + `packages/brain/src/index.ts` (.brain), `whatsplay/src/index.ts` (chrome profile → `<home>/.luna/chrome-whatsapp`, evidenceDir relativo ao repo).
+- **Cadeia FAST salva por env (sem código):** kimi elo1 esgotou (janela 5h), kimi-2 esgotou (mensal!), gemini free 429 (20/dia). `GEMINI_BASE_URL=https://api.githubcopilot.com` + `GEMINI_API_KEY=$GITHUB_API_KEY` + `GEMINI_MODEL=gpt-4o-mini` no .env do orchestrator (elo 3 = Copilot). Prova ao vivo: "fallback: kimi-api→gemini-api" → resposta entregue. Voltar pro gemini = reverter as 3 linhas.
+- **Roda do kernel reordenada** (providers.json, backup .bak-ordem-20261014): github-models(1) → pollinations(2) → gemini(3) → kimi-coding(4) → 11× openrouter free → nvidia-nim. Status das chaves: OR free reseta 08:00 UTC (50/dia por key); gemini 20/dia; nvidia timeout.
+- **Diagnósticos removidos** (logs gates/entrada varrida/resultado bruto/diagnostico DOM + campos te/q/sel). Logs pm2 do whatsplay acumulam histórico — os marcadores antigos no arquivo são do período de debug.
+- **Typecheck verde PC + VPS:** whatsplay, orchestrator, brain.
+- **PENDENTE pro owner:** mandar msg nova pro +34 614 05 35 88 pra validar o ciclo completo com o estado limpo (grupos da allowlist também geram eventos — "🏆Production" e "HDM" estão na lista; ver se o volume de eventos de grupo não incomoda).

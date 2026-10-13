@@ -75,6 +75,15 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   private page: Page | null = null;
   private lastHeartbeatAt = new Date();
   private lastSeenMessageKey = new Map<string, string>();
+  /**
+   * Serialização de openChat: reconcile + getUnread + outbound podem disparar
+   * openChat CONCORRENTEMENTE — o 2º call dava Escape (fechava o painel que o
+   * 1º acabou de abrir), recarregava via deeplink e caía no fallback de busca
+   * com ~20s de timeouts (evidência VPS 2026-10-13 19:36). A cadeia faz um
+   * call esperar o outro; lastOpenedOpenChat evita reabrir o que já está aberto.
+   */
+  private openChatChain: Promise<unknown> = Promise.resolve();
+  private lastOpenedOpenChat: { key: string; at: number } | null = null;
 
   constructor(private readonly config: BrowserConfig) {}
 
@@ -173,6 +182,16 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         '--disable-session-crashed-bubble',
         '--hide-crash-restore-bubble',
         '--disable-restore-session-state',
+        // 2026-10-13 (VPS Wayland sem foco): Chrome tratava a janela como
+        // occluded/background e parava de renderizar a lista de resultados da
+        // busca (openChat esgotava clique no 1º resultado, ingest morria).
+        // Estas flags mantêm renderer e timers vivos sem foco de janela.
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-background-timer-throttling',
+        // 2026-10-13: patch ozone (visível no Wayland do VPS) — estava só no
+        // VPS; unificado aqui na fonte de verdade.
+        ...(process.env.WHATSAPP_OZONE_PLATFORM ? [`--ozone-platform=${process.env.WHATSAPP_OZONE_PLATFORM}`] : []),
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${this.config.userDataDir}`,
         // 2026-09-24 (decreto owner): NUNCA passar WA_URL aqui — se já
@@ -396,6 +415,25 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       // NUNCA ler o painel sem conferir o chat: openChat verifica o título.
       // Falhou → retorna vazio (o sweep tenta de novo no próximo ciclo).
       if (!(await this.openChat(chatId))) return [];
+      // 2026-10-14 (bug ao vivo): após navegação/deeplink o painel demora
+      // ~5s pra renderizar (#main só aparece depois). Ler na hora voltava 0
+      // mensagens e o sweep ficava cego (lidas:0 em toda entrada, inbound
+      // morto). Espera o container de mensagens antes de avaliar.
+      // O container existe antes das mensagens renderizarem (lista
+      // virtualizada) — o sinal pronto é a 1ª msg-container (sonda ao vivo
+      // 2026-10-14: 3s=0, 5s=30 containers).
+      await page
+        .waitForSelector('[data-testid="msg-container"]', { timeout: 12_000 })
+        .catch(() => { /* lê o que tiver mesmo assim */ });
+      // 2026-10-14 (bug ao vivo, diag te=0): o WA renderiza os msg-container
+      // como SHELLS vazios primeiro (tail-in/out já presentes, texto e
+      // .selectable-text chegam DEPOIS via hydration). Esperar só 500ms lia
+      // rows estruturais com zero texto (sweep cego). Espera real: o 1º
+      // texto dentro de um container (painel só de mídia estoura o timeout e
+      // segue — comportamento antigo, sem texto mesmo).
+      await page
+        .waitForSelector('[data-testid="msg-container"] .selectable-text', { timeout: 8_000 })
+        .catch(() => { /* painel sem texto — lê o que tiver */ });
       const messages = (await evalWithArg(page, READ_CONVERSATION_SCRIPT, {
         sel: SELECTORS,
         lim: limit,
@@ -551,6 +589,67 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
     return typeof v === 'string' ? v : null;
   }
 
+  /** Limpa o campo de busca DE VERDADE. 2026-10-13 (VPS, evidência
+   *  openchat-busca-t3 18:53): Ctrl+A+Backspace falhava quando o foco se
+   *  perdia entre o click e a limpeza — a busca do ciclo anterior ficava e o
+   *  insertText do próximo openChat CONCATENAVA ("EnoqueProyecto Nexo..."),
+   *  zerando os resultados do sweep inteiro. O campo é <input> controlado pelo
+   *  React: setar o valor via setter NATIVO do prototype + evento input faz o
+   *  React sincronizar de verdade, sem depender de foco/teclado. Retorna true
+   *  se achou o campo e ele ficou vazio. */
+  private async clearSearchField(page: Page): Promise<boolean> {
+    const ok = await evalWithArg(
+      page,
+      `(_) => {
+        const visible = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const s = getComputedStyle(e);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const sels = [
+          '#side [data-testid="chat-list-search-container"] input',
+          '#side input[aria-label*="Buscar" i]',
+          '#side input[aria-label*="Search" i]',
+          '#side input[aria-label*="Pesquisar" i]',
+          '#side [data-testid="chat-list-search"]',
+          '#side [role="textbox"]',
+          '#side div[contenteditable="true"]',
+          '#side input[type="text"]',
+          '#side input:not([type="hidden"])',
+        ];
+        let touched = false;
+        for (const sel of sels) {
+          for (const el of document.querySelectorAll(sel)) {
+            if (!visible(el)) continue;
+            touched = true;
+            el.focus();
+            if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+              // 2026-10-13 (bug ao vivo 23:17): build nova do WA Web usa
+              // contenteditable na busca — o setter nativo de <input> era
+              // no-op e o check de el.value (undefined) passava vacuo, deixando
+              // a busca residual ("120363...@g.us") pra sempre e zerando o
+              // #pane-side — todo openChat seguinte esgotava o clique.
+              el.textContent = '';
+              el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+            } else {
+              const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+              const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+              if (setter) setter.call(el, '');
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        }
+        return touched;
+      }`,
+      null,
+    ).catch(() => false);
+    await page.waitForTimeout(300);
+    return ok === true;
+  }
+
   /** Nº de caracteres de texto no campo de composição VISÍVEL (-1 = não achado). */
   private async composeBoxTextLen(page: Page, selector: string): Promise<number> {
     // Só conta elemento VISÍVEL: o WA Web mantém clones ocultos do campo no
@@ -681,26 +780,59 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
    * painel conferido (normalização bidi); se não abrir de verdade → falha
    * explícita, nunca ação no chat errado.
    */
-  private async openChat(nameOrId: string): Promise<boolean> {
+  /** openChat serializado (chain) + registro do último chat aberto com sucesso. */
+  private openChat(nameOrId: string): Promise<boolean> {
+    const run = this.openChatChain.then(() => this.openChatInner(nameOrId));
+    this.openChatChain = run.catch(() => false);
+    return run.then((ok) => {
+      if (ok) this.lastOpenedOpenChat = { key: nameOrId, at: Date.now() };
+      return ok;
+    });
+  }
+
+  private async openChatInner(nameOrId: string): Promise<boolean> {
     const page = this.requirePage();
+    // Chat certo já aberto? Reutiliza em vez de fechar/reabrir (ver campo
+    // openChatChain). Pra jid só aceita com dígitos do número no header ou
+    // se FOMOS NÓS quem abrimos esse mesmo jid <60s atrás — evita aceitar
+    // painel de outro contato salvo que estava aberto.
+    const isJidEarly = nameOrId.includes('@');
+    const earlyTitle = await this.currentOpenChatTitle();
+    if (earlyTitle !== null) {
+      const recentSame =
+        this.lastOpenedOpenChat?.key === nameOrId &&
+        Date.now() - this.lastOpenedOpenChat.at < 60_000;
+      let earlyOk = !isJidEarly && recentSame;
+      if (isJidEarly && !earlyOk) {
+        const want = nameOrId.split('@')[0].replace(/[^0-9]/g, '');
+        if (want.length >= 8) {
+          const hdr = await evalWithArg(
+            page,
+            `(_) => {
+              const h = document.querySelector('[data-testid="conversation-info-header"]');
+              return h ? (h.textContent || '').replace(/[^0-9]/g, '') : '';
+            }`,
+            null,
+          ).catch(() => '');
+          earlyOk = typeof hdr === 'string' && hdr.includes(want);
+        }
+      }
+      if (earlyOk) {
+        this.config.log?.info({ jid: nameOrId }, 'openChat: chat já aberto — reutilizando painel');
+        return true;
+      }
+    }
     // jid/número (decreto: identificar o contato PELO NÚMERO): a busca é o
     // caminho — título do chat não casa com número, e número é único.
     // Normaliza estado: busca residual de ciclo anterior deixa a lista filtrada
     // e quebra o clique na row (bug ao vivo 2026-09-22 — evidência repair-*).
+    // 2026-10-13: clearSearchField (setter nativo) substitui o selectAll por
+    // execCommand, que não limpava input controlado pelo React — era o que
+    // deixava "Enoque" na caixa e concatenava com o próximo termo.
+    await this.clearSearchField(page);
     await evalWithArg(
       page,
       `(_) => {
-        const box = document.querySelector('#side [data-testid="chat-list-search"]') ||
-                    document.querySelector('#side input[aria-label*="Buscar" i]') ||
-                    document.querySelector('#side input[aria-label*="Search" i]') ||
-                    document.querySelector('#side input[aria-label*="Pesquisar" i]') ||
-                    document.querySelector('#side [role="textbox"]') ||
-                    document.querySelector('#side div[contenteditable="true"]');
-        if (box && (box.value !== undefined ? box.value : (box.textContent || '')).trim()) {
-          box.focus();
-          document.execCommand('selectAll');
-          document.execCommand('delete');
-        }
         const x = document.querySelector('#side [data-testid="search-back"], #side button[aria-label*="cerrar" i], #side button[aria-label*="close" i]');
         if (x) x.click();
       }`,
@@ -754,6 +886,30 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       return core(title) === core(nameOrId);
     };
 
+    // 2026-10-13 (VPS, evidência 19:17): para jid de CONTATO (não grupo),
+    // deeplink /send?phone= abre o chat DIRETO — a busca por número + Enter +
+    // clique no 1º resultado quebraram no WA Web atual (resultados renderizam
+    // fora de #pane-side e o clique esgota). Se o deeplink não abrir (número
+    // sem WhatsApp / tela de erro), cai no fluxo da busca embaixo. Grupos
+    // (@g.us) não têm deeplink — seguem direto pra busca.
+    if (isJid && !nameOrId.includes('@g.us')) {
+      const digits = searchKey.replace(/\D/g, '');
+      if (digits.length >= 8) {
+        await page
+          .goto(`https://web.whatsapp.com/send?phone=${digits}`, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+          .catch(() => {});
+        await page.waitForTimeout(3_500);
+        if (await matches()) {
+          this.config.log?.info({ jid: nameOrId }, 'openChat: chat aberto via deeplink /send');
+          return true;
+        }
+        // volta pra URL base e deixa o fluxo da busca tentar
+        await page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+        await page.waitForTimeout(2_500);
+        await this.ensureMainChatList();
+      }
+    }
+
     // 1) clique na row visível (caminho rápido; jid vai direto pra busca)
     if (!isJid) {
       const row = page
@@ -783,9 +939,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       // espalhada como rascunhos '31' no Tú e 'ai' no grupo).
       const noPanel = async (): Promise<boolean> => (await this.currentOpenChatTitle()) === null;
       await search.click({ timeout: 3_000 }).catch(() => {});
-      await page.keyboard.press('Control+a').catch(() => {});
-      await page.keyboard.press('Backspace').catch(() => {});
-      await page.waitForTimeout(300);
+      // 2026-10-13: limpeza nuclear (setter nativo — ver clearSearchField).
+      // Ctrl+A+Backspace deixava resíduo e o próximo openChat concatenava.
+      await this.clearSearchField(page);
       // WA 2026: o campo de busca é um <input> CONTROLADO pelo React — teclas
       // individuais (keyboard.type) disparam re-render no meio da digitação e
       // o campo RESETA, truncando o termo (bug ao vivo 2026-09-23 22:19: "ele
@@ -800,10 +956,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
           await page.waitForTimeout(400);
           await search.click({ timeout: 1_500 }).catch(() => {});
         }
-        await page.keyboard.press('Control+a').catch(() => {});
-        await page.keyboard.press('Backspace').catch(() => {});
-        await page.waitForTimeout(250);
-        await page.keyboard.insertText(searchKey);
+        await this.clearSearchField(page);
+        // 2026-10-13 (bug ao vivo 23:25): no build novo do WA Web o insertText
+        // NÃO grava no input de busca (click foca, tecla cai no nada — val
+        // voltava ''). fill() grava de verdade (protocolo CDP, foco próprio).
+        await search.fill(searchKey).catch(() => {});
         await page.waitForTimeout(600);
         typed = await this.searchFieldValue(page);
         if (typed === searchKey) break;
@@ -814,8 +971,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       }
       if (typed !== null && typed !== searchKey) {
         this.config.log?.warn({ esperado: searchKey, obtido: typed }, 'busca truncada pelo WA — limpando pra retry');
-        await page.keyboard.press('Control+a').catch(() => {});
-        await page.keyboard.press('Backspace').catch(() => {});
+        await this.clearSearchField(page);
         await page.keyboard.press('Escape').catch(() => {});
         return false;
       }
@@ -831,17 +987,13 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.keyboard.press('Enter').catch(() => {});
         await page.waitForTimeout(1_800);
         if (await matches()) {
-          await search.click({ timeout: 1_000 }).catch(() => {});
-          await page.keyboard.press('Control+a').catch(() => {});
-          await page.keyboard.press('Backspace').catch(() => {});
+          await this.clearSearchField(page);
           await page.keyboard.press('Escape').catch(() => {});
           return true;
         }
         this.config.log?.warn({}, 'openChat jid: Enter não abriu o resultado — tentando clique na row visível');
         if (await this.clickJidSearchResult(page, matches)) {
-          await search.click({ timeout: 1_000 }).catch(() => {});
-          await page.keyboard.press('Control+a').catch(() => {});
-          await page.keyboard.press('Backspace').catch(() => {});
+          await this.clearSearchField(page);
           await page.keyboard.press('Escape').catch(() => {});
           return true;
         }
@@ -855,6 +1007,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         .locator(
           `#pane-side [data-testid="cell-frame-container"]:has([title="${key}"]), ` +
           `#pane-side [role="row"]:has([title="${key}"]), ` +
+          `#pane-side [data-testid^="list-item-"]:has([title="${key}"]), ` +
           `#pane-side [role="listitem"] [title*="${partial}"]`,
         )
         .first();
@@ -873,13 +1026,9 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.keyboard.press('Enter').catch(() => {});
         await page.waitForTimeout(2_000);
       }
-      // limpa a busca DE VERDADE (teclado: selectAll+delete) — Escape sozinho
-      // deixava o termo no campo e poluía o ciclo seguinte (bug ao vivo
-      // 2026-09-22).
-      await search.click({ timeout: 1_000 }).catch(() => {});
-      await page.keyboard.press('Control+a').catch(() => {});
-      await page.keyboard.press('Backspace').catch(() => {});
-      await page.waitForTimeout(200);
+      // limpa a busca DE VERDADE (setter nativo — 2026-10-13; teclado deixava
+      // resíduo e poluía o ciclo seguinte, bug 2026-09-22 + evidência 18:53)
+      await this.clearSearchField(page);
       await page.keyboard.press('Escape').catch(() => {});
       if (await matches()) return true;
     }
@@ -1265,7 +1414,11 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   private async clickJidSearchResult(page: Page, matches: () => Promise<boolean>): Promise<boolean> {
     const waits = [1_500, 3_000, 5_000];
     for (let attempt = 0; attempt < waits.length; attempt++) {
-      const item = page.locator('#pane-side [role="listitem"]:visible, #pane-side [role="row"]:visible, #side [role="listitem"]:visible').first();
+      // 2026-10-13 (bug ao vivo): build novo do WA Web insere uma row-cabeçalho
+      // de seção ("Chats"/"Grupos en común") ANTES do resultado — o 1º role=row
+      // visível era o header e o clique caía no vazio. Só row com título de chat
+      // (cell-frame-title) é candidata.
+      const item = page.locator('#pane-side [role="listitem"]:has([data-testid="cell-frame-title"]):visible, #pane-side [role="row"]:has([data-testid="cell-frame-title"]):visible, #side [role="listitem"]:has([data-testid="cell-frame-title"]):visible, #pane-side [data-testid^="list-item-"]:has([data-testid="cell-frame-title"]):visible').first();
       try {
         await item.waitFor({ state: 'visible', timeout: waits[attempt]! });
         await item.click({ timeout: 3_000 });

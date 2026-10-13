@@ -38,6 +38,7 @@ interface OutboundMessageRow {
   conversation_id: string;
   address: string | null;
   contact_name: string | null;
+  conversation_chat_id: string | null;
   correlation_id: string | null;
   /** 🆕 CITAÇÃO (mention.respond v2): trecho da mensagem a citar — quando
    *  presente, a entrega usa replyToMessage (citação visual) em vez de
@@ -197,6 +198,7 @@ export function createOutboundListener(deps: OutboundDeps) {
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
       `SELECT m.id, m.body, m.conversation_id, ct.address, ct.name AS contact_name,
+              cv.metadata->>'chat_id' AS conversation_chat_id,
               m.metadata->>'correlation_id' AS correlation_id,
               m.metadata->>'reply_to_query' AS reply_to_query
        FROM messages m
@@ -207,11 +209,27 @@ export function createOutboundListener(deps: OutboundDeps) {
     );
     if (!res.rowCount) return; // já entregue ou não existe
     const row = res.rows[0]!;
-    const target = row.address ?? row.contact_name;
+    // 2026-10-13 (bug ao vivo): conversas criadas pelo fallback do painel
+    // (org→client→conversation) chegam SEM contact_id — mas o metadata.chat_id
+    // tem o jid/dígitos do destino. Sem esse fallback TODA resposta morria em
+    // 'sem contato/alvo de entrega' antes mesmo de abrir o chat.
+    const chatIdFallback = row.conversation_chat_id
+      ? /^\d{8,}$/.test(row.conversation_chat_id)
+        ? `${row.conversation_chat_id}@s.whatsapp.net`
+        : row.conversation_chat_id
+      : null;
+    const target = row.address ?? row.contact_name ?? chatIdFallback;
     if (!target) {
       await mark(messageId, 'failed', 'sem contato/alvo de entrega');
       return;
     }
+    // 2026-10-13 (bug ao vivo, screenshot do owner): GRUPO chegava aqui como jid
+    // (@g.us) e o openChat pesquisava os DÍGITOS do id na busca do WA — que não
+    // acha grupo nenhum ("No se encontró ningún chat"). Busca de grupo é por
+    // NOME (igual humano faz). Contatos privados seguem pelo número/jid
+    // (deeplink /send resolve direto). Allowlist/send-safety continuam no jid.
+    const isGroupJid = /@g\.us$/.test(row.address ?? '');
+    const sendTarget = isGroupJid ? (row.contact_name ?? target) : target;
     // SEND-SAFETY antes de tudo: vínculo pergunta→resposta íntegro.
     try {
       await sendSafetyCheck(messageId, row.conversation_id);
@@ -269,12 +287,12 @@ export function createOutboundListener(deps: OutboundDeps) {
         // (mention.respond v2). Falha explícita dentro de replyToMessage —
         // nunca degrada pra envio sem citação.
         if (row.reply_to_query && transport.replyToMessage) {
-          deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60) }, 'entrega com CITAÇÃO (reply_to_query)');
-          return withSendLock(() => transport.replyToMessage!(target, row.reply_to_query!, texto));
+          deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60), alvo: sendTarget }, 'entrega com CITAÇÃO (reply_to_query)');
+          return withSendLock(() => transport.replyToMessage!(sendTarget, row.reply_to_query!, texto));
         }
         return withSendLock(() =>
           transport.sendMessage(
-            target,
+            sendTarget,
             texto,
             opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
           ),
