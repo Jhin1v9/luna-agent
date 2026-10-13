@@ -2134,3 +2134,91 @@ router.post('/api/luna/compact', async (req, res) => {
 });
 
 module.exports = { router, setupAuth, getLunaSoul, getWebSession, addMessageToSession };
+
+// ============================================================
+// OpenAI-compatible endpoint (Fusão API — Fase 1)
+// POST /v1/chat/completions → roda o soul completo (API → parse [[action]] →
+// ToolGuard → tools no PC) e devolve JSON no formato OpenAI. Sessão efêmera.
+// ============================================================
+router.post('/v1/chat/completions', async (req, res) => {
+  const startedAt = Date.now();
+  try {
+    const { messages, model, max_tokens } = req.body || {};
+    const lastUser = [...(messages || [])].reverse().find((m) => m.role === 'user');
+    if (!lastUser) return res.status(400).json({ error: { message: 'messages[] sem role user', type: 'invalid_request' } });
+
+    const text = typeof lastUser.content === 'string'
+      ? lastUser.content
+      : (lastUser.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+    if (!text || !text.trim()) return res.status(400).json({ error: { message: 'content vazio', type: 'invalid_request' } });
+
+    const session = createWebSession(text.slice(0, 40), 'instant', 'default');
+    const luna = await getLunaSoul();
+
+    let responseText = '';
+    const toolLog = [];
+    const TIME_LIMIT_MS = Math.min(Math.max(Number(max_tokens) || 0, 0), 1) * 0 + 9 * 60 * 1000;
+
+    const stream = luna.processMessageStream(text, {
+      sessionId: session.id,
+      userId: 'web-' + session.id,
+      mode: 'instant',
+      persona: 'default',
+      provider: 'kimi',
+    });
+
+    for await (const ev of stream) {
+      if (ev.type === 'response_delta') responseText += ev.text || '';
+      else if (ev.type === 'action_end' && ev.result) {
+        toolLog.push({ tool: ev.tool || ev.name || 'tool', ok: ev.result.success !== false, detail: String(ev.result.result || '').slice(0, 160) });
+      } else if (ev.type === 'done') {
+        if (!responseText && ev.result?.response) responseText = ev.result.response;
+        break;
+      }
+      if (Date.now() - startedAt > TIME_LIMIT_MS) break;
+    }
+
+    const payload = {
+      id: 'chatcmpl-luna-' + Date.now(),
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: model || 'luna-kernel',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: responseText || '(sem resposta textual — veja tool_calls no log da sessão)',
+          ...(toolLog.length ? { tool_calls: toolLog } : {}),
+        },
+        finish_reason: 'stop',
+      }],
+      usage: { total_tokens: 0 },
+      luna: { sessionId: session.id, toolsExecuted: toolLog.length, tools: toolLog, latencyMs: Date.now() - startedAt },
+    };
+    res.json(payload);
+  } catch (e) {
+    res.status(500).json({ error: { message: String(e.message || e).slice(0, 300), type: 'luna_kernel_error' } });
+  }
+});
+
+// Catálogo da roda para a tela LUNA WEB (lê o config/providers.json do agent)
+router.get('/api/luna-web/providers', (req, res) => {
+  try {
+    const { readAgentProvidersConfig } = require(path.join(LUNA_DIR, 'bridge-factory.cjs'));
+    const found = readAgentProvidersConfig();
+    const roda = found
+      ? (found.config.providers || []).map((p) => ({ id: p.id, label: p.label, model: p.model, enabled: !!p.enabled, priority: p.priority, hasKey: p.apiKeyEnv ? !!process.env[p.apiKeyEnv] : true }))
+      : [];
+    res.json({
+      ok: true,
+      transport: process.env.LUNA_TRANSPORT || 'auto',
+      useAgentConfig: (process.env.LUNA_WEB_USE_AGENT_CONFIG ?? 'true') === 'true',
+      manual: { baseUrl: process.env.LUNA_API_BASE_URL || '', model: process.env.LUNA_API_MODEL || '', hasKey: !!process.env.LUNA_API_KEY },
+      kernelEnvFallback: { baseUrl: process.env.KIMI_BASE_URL || '', model: process.env.KIMI_MODEL || '', hasKey: !!process.env.KIMI_API_KEY },
+      agentsConfigFound: !!found,
+      roda,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
