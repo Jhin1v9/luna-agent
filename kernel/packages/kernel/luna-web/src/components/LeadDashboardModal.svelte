@@ -46,7 +46,7 @@
   async function loadData() {
     loading = true;
     try {
-      const res = await fetch('/api/tools/leads');
+      const res = await fetch('api/tools/leads');
       const data = await res.json();
       if (data.ok) {
         leads = data.leads;
@@ -63,7 +63,7 @@
     if (!formName.trim()) return;
     formLoading = true;
     try {
-      const res = await fetch('/api/tools/leads', {
+      const res = await fetch('api/tools/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -57,7 +57,7 @@ export class SSEManager {
     this.fallbackTimer = setInterval(async () => {
       if (this.isIntentionallyClosed || this.gracefulClose || this.eventSource) return;
       try {
-        const res = await fetch(`/api/chat/session/${encodeURIComponent(sessionId)}/messages`, {
+        const res = await fetch(`api/chat/session/${encodeURIComponent(sessionId)}/messages`, {
           headers: authHeaders(false)
         });
         const data = await res.json();
@@ -121,7 +121,7 @@ export class SSEManager {
     this._stopFallbackPolling();
 
     const token = getToken();
-    const url = `/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}${token ? '&token=' + encodeURIComponent(token) : ''}`;
+    const url = `api/chat/stream?sessionId=${encodeURIComponent(sessionId)}${token ? '&token=' + encodeURIComponent(token) : ''}`;
     this.eventSource = new EventSource(url);
 
     this.eventSource.onmessage = (e) => {
@@ -224,7 +224,7 @@ export async function sendMessage(message, sessionId, mode = 'instant', files = 
   let lastError;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('api/chat', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(body)
@@ -248,7 +248,7 @@ export async function sendMessage(message, sessionId, mode = 'instant', files = 
 
 export async function cancelStream(sessionId) {
   isStreaming.set(false);
-  await fetch('/api/chat/cancel', {
+  await fetch('api/chat/cancel', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId })
@@ -262,7 +262,7 @@ export async function cancelStream(sessionId) {
 export async function ackEvents(sessionId, eventIds) {
   if (!sessionId || !Array.isArray(eventIds) || eventIds.length === 0) return;
   try {
-    await fetch('/api/chat/ack', {
+    await fetch('api/chat/ack', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ sessionId, eventIds })
@@ -275,7 +275,7 @@ export async function ackEvents(sessionId, eventIds) {
 // v10.16: Manual context compaction — triggered by user via /compactar command or button
 // (W10-T2: auto-compact on context limit goes through the soul directly, not this API)
 export async function compactSession(sessionId, userId = 'luna-default', onEvent) {
-  const res = await fetch('/api/luna/compact', {
+  const res = await fetch('api/luna/compact', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId, userId })
@@ -314,7 +314,7 @@ export async function compactSession(sessionId, userId = 'luna-default', onEvent
 
 export async function fetchSessions() {
   try {
-    const res = await fetch('/api/chat/sessions', { headers: authHeaders(false) });
+    const res = await fetch('api/chat/sessions', { headers: authHeaders(false) });
     return res.json();
   } catch {
     return { ok: true, sessions: [] };
@@ -325,7 +325,7 @@ export async function sessionAction(action, sessionId, title, provider) {
   const body = { action, sessionId };
   if (title !== undefined) body.title = title;
   if (provider !== undefined) body.provider = provider;
-  const res = await fetch('/api/chat/session', {
+  const res = await fetch('api/chat/session', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body)
@@ -334,7 +334,7 @@ export async function sessionAction(action, sessionId, title, provider) {
 }
 
 export async function exportSessions(sessionIds, format = 'json') {
-  const res = await fetch('/api/chat/export', {
+  const res = await fetch('api/chat/export', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionIds, format })
@@ -367,7 +367,7 @@ export function startHeartbeat(userId = 'web-default', intervalMs = 30000) {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(async () => {
     try {
-      await fetch('/api/system/heartbeat', {
+      await fetch('api/system/heartbeat', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ userId })
@@ -387,7 +387,7 @@ export function stopHeartbeat() {
 
 export async function turnOffAgent(userId = 'web-default') {
   stopHeartbeat();
-  const res = await fetch('/api/system/turnoff', {
+  const res = await fetch('api/system/turnoff', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ userId })
@@ -397,7 +397,7 @@ export async function turnOffAgent(userId = 'web-default') {
 
 export async function fetchSessionMessages(sessionId) {
   try {
-    const res = await fetch(`/api/chat/session/${encodeURIComponent(sessionId)}/messages`, {
+    const res = await fetch(`api/chat/session/${encodeURIComponent(sessionId)}/messages`, {
       headers: authHeaders(false)
     });
     return res.json();
@@ -408,7 +408,7 @@ export async function fetchSessionMessages(sessionId) {
 
 export async function fetchConfig() {
   try {
-    const res = await fetch('/api/config', { headers: authHeaders(false) });
+    const res = await fetch('api/config', { headers: authHeaders(false) });
     return res.json();
   } catch {
     return {};
@@ -416,7 +416,7 @@ export async function fetchConfig() {
 }
 
 export async function saveConfig(config) {
-  const res = await fetch('/api/config', {
+  const res = await fetch('api/config', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(config)
@@ -425,7 +425,7 @@ export async function saveConfig(config) {
 }
 
 export async function login(username, password) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch('api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
@@ -441,7 +441,7 @@ export async function fetchMe() {
   const token = localStorage.getItem('luna_token');
   if (!token) return null;
   try {
-    const res = await fetch('/api/auth/me', {
+    const res = await fetch('api/auth/me', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (res.status === 401) {
@@ -481,7 +481,7 @@ window.fetch = async function(...args) {
 
 export async function startPlanMode(message, sessionId) {
   console.log('[startPlanMode] fetch /api/plan', { message: message.slice(0, 80), sessionId });
-  const res = await fetch('/api/plan', {
+  const res = await fetch('api/plan', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ message, sessionId })
@@ -491,7 +491,7 @@ export async function startPlanMode(message, sessionId) {
 }
 
 export async function approvePlan(sessionId) {
-  const res = await fetch('/api/plan/approve', {
+  const res = await fetch('api/plan/approve', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId })
@@ -500,7 +500,7 @@ export async function approvePlan(sessionId) {
 }
 
 export async function rejectPlan(sessionId) {
-  const res = await fetch('/api/plan/reject', {
+  const res = await fetch('api/plan/reject', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId })
@@ -509,7 +509,7 @@ export async function rejectPlan(sessionId) {
 }
 
 export async function submitRevision(sessionId, revisedPlan) {
-  const res = await fetch('/api/plan/revise', {
+  const res = await fetch('api/plan/revise', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId, revisedPlan })
@@ -522,28 +522,28 @@ export async function submitRevision(sessionId, revisedPlan) {
 // ============================================================
 
 export async function systemRestart() {
-  const res = await fetch('/api/system/restart', { method: 'POST', headers: authHeaders(false) });
+  const res = await fetch('api/system/restart', { method: 'POST', headers: authHeaders(false) });
   return res.json();
 }
 
 export async function systemStop() {
-  const res = await fetch('/api/system/stop', { method: 'POST', headers: authHeaders(false) });
+  const res = await fetch('api/system/stop', { method: 'POST', headers: authHeaders(false) });
   return res.json();
 }
 
 export async function systemStart() {
-  const res = await fetch('/api/system/start', { method: 'POST', headers: authHeaders(false) });
+  const res = await fetch('api/system/start', { method: 'POST', headers: authHeaders(false) });
   return res.json();
 }
 
 export async function systemStatus() {
-  const res = await fetch('/api/system/status', { headers: authHeaders(false) });
+  const res = await fetch('api/system/status', { headers: authHeaders(false) });
   return res.json();
 }
 
 // v10.2: Agent status polling
 export async function agentStatus() {
-  const res = await fetch('/api/system/agent', { headers: authHeaders(false) });
+  const res = await fetch('api/system/agent', { headers: authHeaders(false) });
   return res.json();
 }
 
@@ -555,7 +555,7 @@ export async function setVisibleMode(visible) {
 
 export async function fetchPersonas() {
   try {
-    const res = await fetch('/api/personas', { headers: authHeaders(false) });
+    const res = await fetch('api/personas', { headers: authHeaders(false) });
     return res.json();
   } catch {
     return { ok: false, personas: [] };
@@ -564,7 +564,7 @@ export async function fetchPersonas() {
 
 export async function fetchProviders() {
   try {
-    const res = await fetch('/api/providers', { headers: authHeaders(false) });
+    const res = await fetch('api/providers', { headers: authHeaders(false) });
     return res.json();
   } catch {
     return { ok: false, providers: [] };
@@ -572,7 +572,7 @@ export async function fetchProviders() {
 }
 
 export async function setSessionProvider(sessionId, provider) {
-  const res = await fetch('/api/chat/session', {
+  const res = await fetch('api/chat/session', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ action: 'setProvider', sessionId, provider })
@@ -581,7 +581,7 @@ export async function setSessionProvider(sessionId, provider) {
 }
 
 export async function setSessionPersona(sessionId, persona) {
-  const res = await fetch('/api/chat/session', {
+  const res = await fetch('api/chat/session', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ action: 'setPersona', sessionId, persona })
@@ -590,13 +590,13 @@ export async function setSessionPersona(sessionId, persona) {
 }
 
 export async function systemHealth() {
-  const res = await fetch('/api/system/health', { headers: authHeaders(false) });
+  const res = await fetch('api/system/health', { headers: authHeaders(false) });
   return res.json();
 }
 
 // v10.30: targeted self-heal — restart only the diagnosed-broken services
 export async function selfhealServices(services) {
-  const res = await fetch('/api/system/selfheal', {
+  const res = await fetch('api/system/selfheal', {
     method: 'POST',
     headers: authHeaders(true),
     body: JSON.stringify({ services })
@@ -605,12 +605,12 @@ export async function selfhealServices(services) {
 }
 
 export async function systemLogs(lines = 50) {
-  const res = await fetch(`/api/system/logs?lines=${lines}`, { headers: authHeaders(false) });
+  const res = await fetch(`api/system/logs?lines=${lines}`, { headers: authHeaders(false) });
   return res.json();
 }
 
 export async function testConnection(type, token) {
-  const res = await fetch('/api/system/test-connection', {
+  const res = await fetch('api/system/test-connection', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ type, token }),
@@ -619,7 +619,7 @@ export async function testConnection(type, token) {
 }
 
 export async function executeLunaTool(tool, params = {}) {
-  const res = await fetch('/api/luna/execute', {
+  const res = await fetch('api/luna/execute', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ tool, params }),
@@ -629,7 +629,7 @@ export async function executeLunaTool(tool, params = {}) {
 
 // v3.3: resolve a pending destructive-operation confirmation (Confirm/Cancel)
 export async function confirmToolAction(sessionId, confirmationId, action = 'confirm') {
-  const res = await fetch('/api/luna/confirm', {
+  const res = await fetch('api/luna/confirm', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ sessionId, confirmationId, action }),
@@ -642,7 +642,7 @@ export async function confirmToolAction(sessionId, confirmationId, action = 'con
 }
 
 export async function downloadSelfHost() {
-  const res = await fetch('/api/selfhost/download', { method: 'POST', headers: authHeaders(false) });
+  const res = await fetch('api/selfhost/download', { method: 'POST', headers: authHeaders(false) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
     throw new Error(err.error || 'Erro ao baixar pacote');
