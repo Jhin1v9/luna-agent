@@ -282,7 +282,16 @@ export class IngestWatcher {
         const msg: UnreadMessage = {
           chat_id: entry,
           chat_name: entry,
-          is_group: (await this.deps.transport.currentChatIsGroup?.().catch(() => false)) ?? false,
+          // 2026-10-14 (bug ao vivo): currentChatIsGroup lia o header com o
+          // painel JÁ fechado pelo readConversation (finally closeCurrentChat)
+          // → false SEMPRE; além disso o testid antigo morreu no DOM novo.
+          // Detecção estrutural pelo que acabou de ser lido: em GRUPO todo
+          // membro vem com label de autor (elemento [data-testid="author"]);
+          // no privado inbound não tem author e outbound sai como 'Tú' (sem
+          // elemento). Falso negativo só se as últimas 3 fossem 100% da Luna.
+          is_group: msgs.some(
+            (m) => m.author != null && m.author !== 'Tú' && m.author !== 'Você' && m.author !== 'You',
+          ),
           // transcrição com AUTOR (quem falou o quê) — prompt rico pra Luna
           text:
             msgs
@@ -409,7 +418,10 @@ export class IngestWatcher {
     const msg: UnreadMessage = {
       chat_id: badge.chat_id,
       chat_name: badge.chat_name,
-      is_group: badge.is_group,
+      is_group: badge.is_group || inbound.some(
+        (m) => (m as { author?: string | null }).author != null &&
+          !/^(tú|você|voce|you|tu)$/i.test(String((m as { author?: string | null }).author)),
+      ),
       text: inbound
         .slice(-3)
         .map((m) => `${(m as { author?: string | null }).author ?? m.sender ?? 'contato'}: ${m.text}`)

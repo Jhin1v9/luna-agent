@@ -136,6 +136,7 @@ export function createIngest(deps: IngestDeps) {
         text: msg.text,
         author_name: msg.author_name ?? msg.chat_name,
         is_group: msg.is_group,
+        mentioned_luna: msg.mentioned_luna === true,
         deliver: true,
         chat_id: msg.chat_id,
         quoted_text: msg.quoted_text ?? null,

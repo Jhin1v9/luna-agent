@@ -43,6 +43,10 @@ interface HandlerPayload {
   author_name?: string | null;
   /** true se a mensagem veio de grupo (detecção de humano na escalção). */
   is_group?: boolean;
+  /** true = o texto menciona a Luna (calculado no whatsplay, watcher sweep). */
+  mentioned_luna?: boolean;
+  /** Autor da mensagem citada (reply) — citar a Luna conta como menção. */
+  quoted_author?: string | null;
   /** true = mensagem de canal real (WhatsPlay entrega); false = simulação. */
   deliver?: boolean;
 }
@@ -284,6 +288,33 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         });
         return;
       }
+    }
+
+    // 2026-10-14 (bug ao vivo): GRUPO só recebe resposta com menção ou
+    // citação da Luna — o mentioned_luna já vinha calculado do whatsplay
+    // (watcher sweep), mas ninguém conferia aqui, e o FAST responderia toda
+    // mensagem das allowlists de grupo (spam certo nas integrações).
+    // Privado continua "sempre responde" (decreto owner 03/10).
+    if (
+      event.event_type === 'whatsapp.message.received' &&
+      payload.is_group === true &&
+      payload.mentioned_luna !== true &&
+      !/luna/i.test(String(payload.quoted_author ?? ''))
+    ) {
+      log.info(
+        { event_id: event.event_id, author: payload.author_name },
+        'grupo sem menção à Luna — sem resposta automática (§5 grupo)',
+      );
+      await recordAudit(db, {
+        actor: 'orchestrator',
+        action: 'agent.reply.group_no_mention_skipped',
+        tool: 'message_handler',
+        client_id: event.client_id,
+        correlation_id: event.correlation_id,
+        result: 'success',
+        metadata: { event_id: event.event_id, author: payload.author_name },
+      });
+      return;
     }
 
     const runStartedAt = new Date();
