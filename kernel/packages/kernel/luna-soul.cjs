@@ -5104,6 +5104,15 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
     // Detect if it's a file tool or desktop tool
     const FILE_TOOLS = Object.keys(lunaTools);
     const DESKTOP_TOOLS = ['shell', 'click', 'doubleClick', 'rightClick', 'type', 'keypress', 'hotkey', 'scroll', 'screenshot', 'ocr', 'open_app', 'wait'];
+    // Wave 6: normaliza nome inventado pelo modelo (fuzzy) antes de qualquer rota
+    if (typeof tool === 'string' && tool && !lunaTools[tool]) {
+      const fuzzy = this._resolveToolNameFuzzy(tool);
+      if (fuzzy && typeof lunaTools[fuzzy] === 'function') {
+        console.log(`[LunaSoul] tool '${tool}' auto-corrigida -> '${fuzzy}'`);
+        tool = fuzzy;
+      }
+    }
+
     const isFileTool = FILE_TOOLS.includes(tool);
     const isDesktopTool = DESKTOP_TOOLS.includes(tool);
 
@@ -5378,7 +5387,13 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
               case 'dashboardVoteInSession': return lunaTools.dashboardVoteInSession(p);
               case 'dashboardDeleteVotingSession': return lunaTools.dashboardDeleteVotingSession(p);
               case 'dashboardCommandRouter': return this._execDashboardCommandRouter(p);
-              default: return { success: false, error: `Ferramenta desconhecida: ${tool}` };
+              default: {
+                // Wave 6-fix: export sem case explícito (ex: listTools/toolInfo) executa genericamente
+                if (typeof lunaTools[tool] === 'function') {
+                  return lunaTools[tool](p);
+                }
+                return { success: false, error: `Ferramenta desconhecida: ${tool}. Ferramentas disponiveis: ${this._listAvailableToolNames().join(', ')}` };
+              }
             }
           };
           // v9.4-fix: Real execution timer — source of truth for tool duration
