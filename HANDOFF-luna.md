@@ -414,3 +414,9 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
 - **Diagnósticos removidos** (logs gates/entrada varrida/resultado bruto/diagnostico DOM + campos te/q/sel). Logs pm2 do whatsplay acumulam histórico — os marcadores antigos no arquivo são do período de debug.
 - **Typecheck verde PC + VPS:** whatsplay, orchestrator, brain.
 - **PENDENTE pro owner:** mandar msg nova pro +34 614 05 35 88 pra validar o ciclo completo com o estado limpo (grupos da allowlist também geram eventos — "🏆Production" e "HDM" estão na lista; ver se o volume de eventos de grupo não incomoda).
+- **Addendum 00:45 — gate de grupo (menção/citação) corrigido em 2 camadas:**
+  - `shouldRespond` (ingest) JÁ existia (grupo sem menção = silêncio), mas `is_group` do sweep era SEMPRE false: `currentChatIsGroup()` lia o header com o painel já fechado pelo `readConversation` (finally `closeCurrentChat`) + testid antigo morto no DOM novo → grupo passava como privado. Fix: detecção estrutural pelos autores das mensagens lidas (grupo = todo membro tem label `[data-testid="author"]`; privado outbound sai como 'Tú' sem elemento).
+  - Evento `whatsapp.message.received` NÃO carregava `mentioned_luna` (só a kimiwork inbox carregava) — adicionado ao payload do evento.
+  - Handler ganhou gate em profundidade: whatsapp + is_group + sem menção + sem citação da Luna → skip com audit `agent.reply.group_no_mention_skipped`.
+  - **Incidente honesto:** antes do fix, 1 handoff-answer da FAST ("Deixa eu verificar isso direitinho — já te falo aqui mesmo", router_output HANDOFF_LIVE) foi entregue no grupo 🏆Production (evento "Ja ja faço o Bizum!"). Próximas mensagens de grupo sem menção ficam em silêncio.
+- Validação pendente com estado limpo: owner manda (1) msg nova no privado do +34 614 05 35 88 → resposta; (2) msg num grupo da allowlist SEM menção → silêncio; (3) msg no grupo MENCIONANDO a Luna → resposta.
