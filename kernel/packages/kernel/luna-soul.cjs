@@ -2797,6 +2797,9 @@ class LunaSoul extends EventEmitter {
 
     // Auto-continue loop: Kimi decides → Luna executes → result goes back to Kimi → Kimi responds
     let loopInput = messageInput;
+    // Wave 12 (anti-loop): rastreia repetição consecutiva da MESMA tool no turno
+    let prevToolName = null;
+    let prevToolRepeat = 0;
     let checkAlreadySent = false; // v12.0-fix: single reformat retry (the old string-compare broke once the message carried the raw excerpt)
     let truncatedToolRetries = 0; // v13.0 (LB1): bounded re-emission requests for truncated tool JSON
 
@@ -3611,6 +3614,17 @@ class LunaSoul extends EventEmitter {
         const successCount = domActionResults.filter(d => d.result?.success).length;
         const totalCount = domActionResults.length || (result.tool ? 1 : 0);
         const statusEmoji = successCount === totalCount ? '✅' : '⚠️';
+
+        // Wave 12 (anti-loop): mesmo tool consecutivo = aviso duro no feedback
+        {
+          const tName = String(toolsUsed || '');
+          if (tName && tName === prevToolName) prevToolRepeat++; else { prevToolName = tName; prevToolRepeat = 0; }
+          if (prevToolRepeat >= 1) {
+            outputText += `
+
+🚨 ANTI-LOOP: você JÁ executou '${tName}' ${prevToolRepeat + 1}x seguidas. NÃO chame a mesma tool novamente. Leia o resultado acima e PROSSIGA com a tarefa original do usuário: chame a PRÓXIMA tool DIFERENTE necessária, ou finalize com [[response]]. Se está sem saber o próximo passo, chame toolInfo com o nome da tool que pretende usar.`;
+          }
+        }
 
         // v13.0 (owner directive 2026-08-13): NO char cap on tool results —
         // the model receives the FULL output. Luna ilimitada.
