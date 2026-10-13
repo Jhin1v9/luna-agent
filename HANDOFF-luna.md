@@ -147,3 +147,35 @@ APIs grátis com failover, card de config no painel, testes E2E tool por tool.
 painel :3101 ✅ · kernel :3458 ✅ · fcc :8082 ✅ · kimiweb ✅ · venus-watchdog ✅ ·
 orchestrator/worker/watchdog/whatsplay ⛔ (postgres docker fora do ar) ·
 venus-varredura ⛔ errored · docker desktop ⛔ · open-webui :3000 ⛔.
+
+---
+
+## Sessão 2026-10-13 (retomada Kimi Code, após Kimi Work)
+
+**Feito nesta retomada:**
+- Item 2 ✅ card Luna Web no painel: era build antigo — rebuild+restart, card OK (conteúdo renderiza client-side na aba Configurações; API /api/luna-web ok)
+- Item 3 ✅ auditado: prompt (system ~10,4KB + master + tool index) vai no user message que o soul monta — E2E com tools prova que chega ao provider
+- Item 4 ✅ mecânica de contexto ao girar a roda implementada no RodaApiBridge (rascunho parcial do provider anterior vai pro próximo)
+- Item 5 ✅ currentProvider exposto em GET :3458/api/luna-web/providers (e o card do painel mostra)
+- Item 6 ✅ commits: kernel f2f5a2b (pushado), agent 06f2008 (pushado); tmp-*.cjs apagados; seção LUNA WEB removida do config.html do kernel (pedido owner)
+- Item 7 ✅ Startup: ficou o Nexo-Luna-Stack-AutoStart.cmd (sobe docker+pm2 resurrect, idempotente)
+- Item 8 ❌ as 12 keys novas (groq/xai/openrouter/cerebras/zai/mistral/sambanova/together/HF_TOKEN/ovh/glhf/hetzner) dependem do Abner criar contas — links no tutorial da sessão anterior
+- Item 9 ⏳ "pronto Abner" pro 34685093192: aguardando Postgres (docker)
+
+**Em andamento:** Docker daemon travou após reboot — WSL reiniciado, aguardando daemon subir pra `docker start luna-postgres open-webui` → `pm2 restart luna-orchestrator luna-worker luna-watchdog luna-whatsplay` → whatsapp "pronto Abner".
+
+## BLOQUEIO final da retomada (2026-10-13)
+
+Docker Desktop NÃO sobe sozinho após reboot: daemon trava, WSL `wsl --shutdown`
+retorna "operação não suportada", backend morre segurando ~25GB de RAM (32GB total,
+94% em uso). Duas tentativas de restart limpo falharam (~15min).
+
+**AÇÃO HUMANA PENDENTE (Abner):**
+1. Abrir o Docker Desktop manualmente (ícone na bandeja) — provavelmente tem erro/dialog na GUI
+2. Se continuar falhando: `wsl --update` no PowerShell admin, ou reiniciar o PC (RAM 94%)
+3. Quando o daemon subir: `docker start luna-postgres open-webui` → `pm2 restart luna-orchestrator luna-worker luna-whatsplay luna-watchdog venus-varredura` → `pm2 save`
+4. Enviar "pronto Abner" pro whatsapp 34685093192 (endpoint :3101/api/mensagem falhou sem Postgres)
+
+**Mitigado enquanto isso:** apps dependentes de Postgres PARADOS no pm2 (sem crash-loop); kernel :3458, painel :3101 (páginas ok), FCC :8082, kimiweb :58629 no ar.
+
+**Feito e pushado:** kernel f2f5a2b, agent 06f2008 (itens 2-8 da lista, exceto keys que dependem do Abner).
