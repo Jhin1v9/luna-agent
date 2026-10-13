@@ -526,6 +526,7 @@ router.post('/api/chat', async (req, res) => {
 
     // Wave 12 (nudge): conta ações do turno pra detectar 'texto puro em pedido de ação'
     let turnActionCount = 0;
+    let turnHadRealAction = false; // listTools/toolInfo não contam — são informativas
     let turnFinalText = '';
 
     for await (const ev of stream) {
@@ -587,7 +588,10 @@ router.post('/api/chat', async (req, res) => {
           timestamp: new Date().toISOString(),
         }, { persist: ev.type !== 'action_progress' }); // Wave 4 review follow-up: chunks ride the next event's persistence
 
-        if (ev.type === 'action_end') turnActionCount++;
+        if (ev.type === 'action_end') {
+          turnActionCount++;
+          if (!['listTools', 'toolInfo'].includes(ev.tool)) turnHadRealAction = true;
+        }
         if (ev.type === 'done') turnFinalText = content || '';
 
         // W6-T8: close the stream once the final done is persisted — any
@@ -600,7 +604,7 @@ router.post('/api/chat', async (req, res) => {
     // Modelos fracos da roda ignoram a regra 8 do master prompt — o servidor
     // reinjeta UM lembrete duro e re-pergunta, em vez de aceitar o teatro.
     const ACTION_INTENT_RE = /(envia|enviar|manda|mandar|mensagem|cria|criar|escreve|escrever|ler|leia|lista|listar|mostra|mostrar|checa|checar|busca|buscar|atualiza|atualizar|apaga|apagar|remove|remover|executa|executar|roda|rodar|gera|gerar|poema|whatsapp)/i;
-    if (!myStreamMeta.cancelled && turnActionCount === 0 && turnFinalText &&
+    if (!myStreamMeta.cancelled && !turnHadRealAction && turnFinalText &&
         !turnFinalText.includes('[[') && ACTION_INTENT_RE.test(message)) {
       console.log(`[WEB-NUDGE] turno sem ações para pedido de ação — reinjetando lembrete (sessão ${session.id})`);
       session._streamClosed = false; // W6-T8: reabre o stream pro turno de nudge
