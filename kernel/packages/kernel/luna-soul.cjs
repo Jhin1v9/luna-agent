@@ -5051,7 +5051,7 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
 
   /** ACTION mode — execute a tool */
   async _handleAction(parsed, sessionId, options, emitProgress = null, eventBus = null, toolInstanceId = null) {
-    const tool = parsed.tool || parsed.action?.type;
+    let tool = parsed.tool || parsed.action?.type; // Wave 12: let (fuzzy no topo pode renomear)
     const params = parsed.params || parsed.action?.params || {};
     const reasoning = parsed.reasoning || '';
     let result;

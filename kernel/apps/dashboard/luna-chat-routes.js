@@ -589,8 +589,9 @@ router.post('/api/chat', async (req, res) => {
         }, { persist: ev.type !== 'action_progress' }); // Wave 4 review follow-up: chunks ride the next event's persistence
 
         if (ev.type === 'action_end') {
+          const m_ok = (ev.result?.success !== false) && (ev.result?.result?.success !== false);
           turnActionCount++;
-          if (!['listTools', 'toolInfo'].includes(ev.tool)) turnHadRealAction = true;
+          if (m_ok && !['listTools', 'toolInfo'].includes(ev.tool)) turnHadRealAction = true;
         }
         // texto final pode vir de done OU de assistant/response_delta (done as vezes vem vazio)
         if ((ev.type === 'assistant' || ev.type === 'response_delta') && content) turnFinalText = content;

@@ -17,3 +17,26 @@ Pendências: - Fotos próprias da equipe HDM — aguardando envio do cliente
 - Logo final — PDF pendente de reenvio pelo Matheus
 - Aba de currículos (CLIENT_REVIEWING) — aguardando revisão do cliente no painel
 
+
+## 2026-10 (atualização 09/10) — Luna
+
+09/10: mensagem do time do cliente (08:16) informando que estão na parte final do site, fazendo SEO desde o zero, e perguntando onde está o espaço web (IONOS ou antigo provedor) para configurar DNS e subir o site. O Vênus falhou no processamento (erro de tool-call) e a mensagem ficou 3h sem resposta; a Luna assumiu às 11:31 (+02), pediu desculpas pela demora (instabilidade interna da manhã), agradeceu o update e disse que confirma com o time interno onde está a hospedagem, pedindo que o cliente separe o acesso do painel IONOS se houver.
+
+Pendências: - **Confirmar com Abner/time onde está hospedado o espaço web HDM (IONOS vs antigo provedor) e responder o grupo — cliente aguardando**
+- Fotos próprias da equipe HDM — aguardando envio do cliente
+- Logo final — PDF pendente de reenvio pelo Matheus
+- Aba de currículos (CLIENT_REVIEWING) — aguardando revisão do cliente no painel
+
+## 2026-10 (atualização 09/10, 11:45) — Luna
+
+Cliente respondeu (08:28, resgatada às 11:45): espaço web está **guardado com o antigo provedor** e perguntaram se conseguimos acesso (resposta: sim, idealmente eles pedem as credenciais; nosso time ajuda no contato se precisar). Também pediram geração de imagens "o mais natural possível" com IA para gerar confiança no site/Google Maps (aceito — geramos e tratamos qualidade). Entre a mensagem e a resposta, o Vênus vazou um tool call cru no grupo de cliente; a Luna pediu desculpas em nome da Nexo e respondeu tudo (msg e7731298).
+
+Pendências: - **Time interno: acompanhar obtenção das credenciais do antigo provedor HDM para configurar DNS/subir site**
+- Gerar imagens naturais com IA para o site HDM (reforço de confiança/web + Google Maps)
+- Fotos próprias da equipe HDM — aguardando envio do cliente
+- Logo final — PDF pendente de reenvio pelo Matheus
+- Aba de currículos (CLIENT_REVIEWING) — aguardando revisão do cliente no painel
+
+## 2026-10 (atualização 09/10, 12:03) — Luna
+
+Resposta agregada no grupo (msg 35484b91) fechando o combinado da thread: (1) Google Maps — direção fica pra depois, Nexo avisa quando for adicionar a empresa; (2) cliente vai conseguir mais fotos e envia no grupo — Nexo trata qualidade e usa no site; (3) acesso ao antigo provedor já sendo visto internamente. Contexto operacional: surto de vazamentos de tool call do Vênus no grupo (6 no dia, 4 aqui); a Luna esvaziou a fila HDM dele como contenção e pediu desculpas ao cliente 4 vezes no total — o combinado real sempre foi reforçado.
