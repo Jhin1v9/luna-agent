@@ -15,7 +15,7 @@ import {
   Moon, BrainCircuit, ShieldCheck, Send, Activity, Server, Inbox as InboxIcon,
   ArrowLeftRight, Sparkles, CheckCircle2, XCircle, RefreshCw, RotateCcw, ChevronDown,
   ArrowUpRight, Loader2, LayoutDashboard, MessageSquare, Terminal, Settings2,
-  Plus, Trash2, KeyRound, Zap,
+  Plus, Trash2, KeyRound, Zap, Globe,
 } from "lucide-react";
 
 type Modo = { KIMI_ADAPTER_MODE: string; LIVE_BRAIN_PROVIDER: string; VENUS_AUTONOMO: string };
@@ -39,6 +39,17 @@ type ProviderEntry = {
 type ProvidersConfig = { fastBrain: string; liveBrain: string; providers: ProviderEntry[] };
 type PDraft = { enabled: boolean; model: string; priority: number };
 type TestResult = { ok: boolean; detail: string; latencyMs: number };
+type LunaWebRodaEntry = { id: string; label: string; model: string; enabled: boolean; priority: number; hasKey: boolean };
+type LunaWebStatus = {
+  ok?: boolean;
+  kernelOnline: boolean;
+  transport?: string;
+  useAgentConfig?: boolean;
+  manual?: { baseUrl: string; model: string; hasKey: boolean };
+  agentsConfigFound?: boolean;
+  roda?: LunaWebRodaEntry[];
+  error?: string;
+};
 
 const ADAPTER_MODES = ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'];
 const PROVIDERS = ['kimi', 'kimiwork'];
@@ -197,6 +208,13 @@ export default function Painel() {
   const [savingCfg, setSavingCfg] = useState(false);
   const [addSel, setAddSel] = useState('');
   const [custom, setCustom] = useState({ label: '', transport: 'openai' as ProviderEntry['transport'], baseUrl: '', apiKeyEnv: '', model: '', models: '' });
+  // ── luna web (kernel :3458) ──
+  const [lwStatus, setLwStatus] = useState<LunaWebStatus | null>(null);
+  const [lwUseLive, setLwUseLive] = useState(true);
+  const [lwTransport, setLwTransport] = useState<'auto' | 'api' | 'cdp'>('auto');
+  const [lwProviderId, setLwProviderId] = useState('');
+  const [lwModel, setLwModel] = useState('');
+  const [lwSaving, setLwSaving] = useState(false);
   const [applying, setApplying] = useState(false);
   const [invoking, setInvoking] = useState(false);
   const [tarefa, setTarefa] = useState('');
@@ -236,6 +254,21 @@ export default function Painel() {
   const loadFccModels = useCallback(async () => {
     try { const r = await getJSON<{ fcc: string[] }>('/api/config/models'); setFccModels(r.fcc); } catch { /* FCC fora — lista vazia */ }
   }, []);
+  const loadLunaWeb = useCallback(async () => {
+    try {
+      const s = await getJSON<LunaWebStatus>('/api/luna-web');
+      setLwStatus(s);
+      setLwUseLive(s.useAgentConfig !== false);
+      setLwTransport((s.transport as 'auto' | 'api' | 'cdp') || 'auto');
+      if (!s.useAgentConfig && s.manual?.baseUrl) {
+        // pré-seleciona o provider cujo baseUrl bate com a config manual do kernel
+        const cfg = await getJSON<ProvidersConfig>('/api/config').catch(() => null);
+        const match = cfg?.providers.find((p) => s.manual && p.baseUrl.replace(/\/$/, '') === s.manual.baseUrl.replace(/\/$/, ''));
+        setLwProviderId(match?.id ?? '');
+        setLwModel(s.manual.model ?? match?.model ?? '');
+      }
+    } catch { /* kernel offline — card mostra status */ }
+  }, []);
 
   useEffect(() => {
     loadModo().catch(() => toast.error('falha ao ler modo atual'));
@@ -244,7 +277,8 @@ export default function Painel() {
     loadAuto();
     loadProviders().catch(() => toast.error('falha ao ler providers'));
     loadFccModels();
-  }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels]);
+    loadLunaWeb();
+  }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels, loadLunaWeb]);
 
   // auto-refresh 10s com countdown visível + refresh ao voltar pra aba
   useEffect(() => {
@@ -348,6 +382,26 @@ export default function Painel() {
       toast.success(`${p.label} removido`);
       await loadProviders();
     } catch (e: any) { toast.error(e.message); }
+  }
+
+  // ── luna web: salvar transporte/cérebro no kernel (route /api/luna-web) ──
+  async function salvarLunaWeb() {
+    setLwSaving(true);
+    try {
+      const body: Record<string, unknown> = { useLiveConfig: lwUseLive, transport: lwTransport };
+      if (!lwUseLive) {
+        if (!lwProviderId) { toast.error('selecione um provider pro modo manual'); return; }
+        body.providerId = lwProviderId;
+        if (lwModel) body.model = lwModel;
+      }
+      const r = await postJSON<{ ok: boolean; kernelOnline: boolean; error?: string; saved?: string[] }>('/api/luna-web', body);
+      if (r.ok) {
+        toast.success(`kernel gravou: ${(r.saved || []).join(', ') || 'envs atualizadas'}`);
+        await loadLunaWeb();
+      } else {
+        toast.error(r.kernelOnline === false ? 'kernel (3458) offline — sobe ele primeiro' : (r.error || 'falha ao gravar no kernel'));
+      }
+    } finally { setLwSaving(false); }
   }
 
   async function adicionarPreset(presetId: string) {
@@ -1089,6 +1143,113 @@ export default function Painel() {
           )}
         </AnimatePresence>
         <div className="hint mt-3">Keys ficam no .env — o json guarda só o NOME da env, nunca o valor. Gravação atômica tmp+rename.</div>
+      </Card>
+
+      <Card index={3}>
+        <Title icon={Globe} extra={
+          <span className={`badge ${lwStatus?.kernelOnline ? 'badge-ok' : 'badge-fail'}`}>
+            <span className={`size-1.5 rounded-full ${lwStatus?.kernelOnline ? 'bg-ok' : 'bg-fail'}`} />
+            kernel {lwStatus?.kernelOnline ? 'online :3458' : 'offline'}
+          </span>
+        }>
+          🌙 Luna Web — cérebro do chat
+        </Title>
+        <div className="mb-3 rounded-lg border border-line/60 bg-bg/50 p-2.5 text-[12px] leading-snug text-dim">
+          Configuração do <span className="text-fg">chat da Luna</span> (localhost:3458) — como ela pensa:
+          pela <span className="text-luna">roda deste painel</span> (recomendado, failover automático) ou por
+          um provider fixo. O modo <span className="text-fg">cdp</span> é o MODO PLAYWRIGHT (Chrome), preservado
+          pra quando for aperfeiçoar. Aplica no próximo restart do kernel.
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-line bg-bg/60 px-3 py-2">
+          <span className="text-[12px] text-dim">usar mesmas configurações do cérebro <b className="text-fg">LIVE</b> (roda da luna agent)</span>
+          <Toggle on={lwUseLive} onClick={() => setLwUseLive(!lwUseLive)} />
+        </div>
+
+        {lwUseLive ? (
+          <div className="mt-2 rounded-lg border border-luna/40 bg-luna/5 p-2.5 text-[12px] leading-snug">
+            {!lwStatus?.kernelOnline ? (
+              <span className="text-warn">kernel offline — não consegui ler a roda dele. Sobe o luna-server (porta 3458) e recarrega.</span>
+            ) : lwStatus?.useAgentConfig === false ? (
+              <span className="text-warn">atenção: o kernel está em modo manual — salvar aqui vai reativar a roda.</span>
+            ) : (
+              <>
+                <span className="text-luna">🔄 roda compartilhada com o LIVE brain.</span>{' '}
+                {(() => {
+                  const roda = (lwStatus?.roda || []).filter((r) => r.enabled).sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+                  const next = roda.find((r) => r.hasKey) || roda[0];
+                  return next
+                    ? <>próximo da fila: <b className="text-fg">{next.label}</b> <span className="mono">({next.model})</span> · {roda.length} provider(s) ligados{roda.some((r) => !r.hasKey) ? ` · ${roda.filter((r) => !r.hasKey).length} sem key` : ''}</>
+                    : 'nenhum provider habilitado na roda — liga pelo menos um abaixo.';
+                })()}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-dim">Provider fixo (transport openai)</label>
+              <select className="input" value={lwProviderId} onChange={(e) => {
+                const id = e.target.value;
+                setLwProviderId(id);
+                const p = pconf?.providers.find((x) => x.id === id);
+                if (p) setLwModel(p.model || p.models[0] || '');
+              }}>
+                <option value="">— selecione —</option>
+                {(pconf?.providers ?? []).filter((p) => p.transport === 'openai').map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}{p.enabled ? '' : ' (desativado)'}{p.apiKeyEnv ? '' : ' · sem key'}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-dim">Modelo</label>
+              {(() => {
+                const p = pconf?.providers.find((x) => x.id === lwProviderId);
+                const opts = p ? (p.models.includes(lwModel) ? p.models : [lwModel, ...p.models].filter(Boolean)) : [];
+                return opts.length ? (
+                  <select className="input mono" value={lwModel} onChange={(e) => setLwModel(e.target.value)}>
+                    {opts.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <input className="input mono" placeholder="id do modelo" value={lwModel} onChange={(e) => setLwModel(e.target.value)} />
+                );
+              })()}
+            </div>
+            {(() => {
+              const p = pconf?.providers.find((x) => x.id === lwProviderId);
+              if (!p) return null;
+              return (
+                <div className="text-[11px] text-dim md:col-span-2">
+                  {p.apiKeyEnv
+                    ? (p.keyStatus?.configured
+                      ? <span className="badge badge-ok">key {p.apiKeyEnv} configurada {p.keyStatus.preview}</span>
+                      : <span className="badge badge-fail">key {p.apiKeyEnv} AUSENTE no .env — a tool falha sem ela</span>)
+                    : <span className="badge badge-info">sem key (local/grátis)</span>}
+                  {' '}<span className="mono">{p.baseUrl}</span>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-dim">Transporte</label>
+            <select className="input" value={lwTransport} onChange={(e) => setLwTransport(e.target.value as 'auto' | 'api' | 'cdp')}>
+              <option value="auto">auto — API primeiro, CDP de fallback (recomendado)</option>
+              <option value="api">api — só APIs (sem Chrome)</option>
+              <option value="cdp">cdp — MODO PLAYWRIGHT (Kimi Web no Chrome)</option>
+            </select>
+          </div>
+          <button className="btn btn-primary shrink-0" onClick={salvarLunaWeb} disabled={lwSaving}>
+            {lwSaving ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+            Salvar no kernel
+          </button>
+        </div>
+        <div className="hint mt-3">
+          Grava LUNA_WEB_USE_AGENT_CONFIG / LUNA_TRANSPORT / LUNA_API_* no .env do kernel (server-to-server, key nunca volta na resposta).
+          Abre o chat em <a className="text-luna underline" href="http://localhost:3458" target="_blank" rel="noreferrer">localhost:3458</a>.
+        </div>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">

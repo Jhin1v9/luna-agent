@@ -43,6 +43,7 @@ export const KEY_ALLOWLIST = [
   'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'XAI_API_KEY', 'DEEPSEEK_API_KEY',
   'OPENWEBUI_API_KEY', 'GITHUB_API_KEY', 'CEREBRAS_API_KEY', 'SAMBANOVA_API_KEY',
   'MISTRAL_API_KEY', 'TOGETHER_API_KEY', 'ZAI_API_KEY',
+  'OVH_API_KEY', 'GLHF_API_KEY', 'HF_TOKEN', 'HETZNER_API_KEY',
 ];
 
 const TRANSPORTS: Transport[] = ['openai', 'anthropic', 'fcc-local'];
@@ -217,6 +218,30 @@ export const PRESETS: ProviderEntry[] = [
     id: 'fcc-local', label: 'FCC (local)', transport: 'fcc-local',
     baseUrl: FCC_BASE, apiKeyEnv: null, model: 'auto', models: [],
     enabled: true, priority: 99, builtin: false,
+  },
+  {
+    id: 'ovh-ai', label: 'OVH AI Endpoints (grátis · Llama 3.3 70B)', transport: 'openai',
+    baseUrl: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1', apiKeyEnv: 'OVH_API_KEY',
+    model: 'Llama-3.3-70B-Instruct', models: ['Llama-3.3-70B-Instruct'],
+    enabled: false, priority: 99, builtin: false,
+  },
+  {
+    id: 'glhf', label: 'glhf.chat (grátis · Llama 3.1 70B)', transport: 'openai',
+    baseUrl: 'https://glhf.chat/api/openai/v1', apiKeyEnv: 'GLHF_API_KEY',
+    model: 'hf:meta-llama/Llama-3.1-70B-Instruct', models: ['hf:meta-llama/Llama-3.1-70B-Instruct'],
+    enabled: false, priority: 99, builtin: false,
+  },
+  {
+    id: 'hf-router', label: 'Hugging Face router (grátis)', transport: 'openai',
+    baseUrl: 'https://router.huggingface.co/v1', apiKeyEnv: 'HF_TOKEN',
+    model: 'meta-llama/Llama-3.1-8B-Instruct', models: ['meta-llama/Llama-3.1-8B-Instruct'],
+    enabled: false, priority: 99, builtin: false,
+  },
+  {
+    id: 'hetzner', label: 'Hetzner Inference (grátis · Qwen3.6)', transport: 'openai',
+    baseUrl: 'https://inference.hetzner.com/api/v1', apiKeyEnv: 'HETZNER_API_KEY',
+    model: 'qwen3.6-35b-a3b', models: ['qwen3.6-35b-a3b'],
+    enabled: false, priority: 99, builtin: false,
   },
 ];
 

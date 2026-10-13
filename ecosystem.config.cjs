@@ -74,5 +74,26 @@ module.exports = {
       autorestart: true,
       max_memory_restart: '256M',
     },
+    // ── kernel Luna Web (:3458 — cérebro do chat) ──
+    {
+      name: 'luna-kernel',
+      script: 'C:\\Users\\Abner\\Documents\\luna-kernel\\apps\\dashboard\\luna-server.js',
+      cwd: 'C:\\Users\\Abner\\Documents\\luna-kernel\\apps\\dashboard',
+      interpreter: 'C:\\Program Files\\nodejs\\node.exe',
+      autorestart: true,
+      max_memory_restart: '1G',
+      env: { NODE_ENV: 'production' },
+    },
+    // ── FCC gateway local (:8082 — rota LIVE brain, Anthropic-style) ──
+    {
+      name: 'fcc-server',
+      script: 'C:\\Users\\Abner\\.local\\bin\\fcc-server.exe',
+      autorestart: true,
+      max_memory_restart: '1G',
+      env: {
+        MODEL: 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+        MODEL_FALLBACKS: 'nvidia_nim/openai/gpt-oss-20b,nvidia_nim/deepseek-ai/deepseek-v4.1-flash',
+      },
+    },
   ],
 };

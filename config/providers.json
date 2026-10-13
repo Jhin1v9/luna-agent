@@ -1,6 +1,6 @@
 {
-  "fastBrain": "pollinations",
-  "liveBrain": "fcc-local",
+  "fastBrain": "gemini",
+  "liveBrain": "github-models",
   "providers": [
     {
       "id": "groq",
@@ -12,9 +12,10 @@
       "models": [
         "llama-3.3-70b-versatile"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 13,
-      "builtin": true
+      "builtin": true,
+      "role": "conversa"
     },
     {
       "id": "gemini",
@@ -27,8 +28,9 @@
         "gemini-3.6-flash"
       ],
       "enabled": true,
-      "priority": 2,
-      "builtin": true
+      "priority": 1,
+      "builtin": true,
+      "role": "ambos"
     },
     {
       "id": "openrouter",
@@ -40,9 +42,10 @@
       "models": [
         "deepseek/deepseek-chat-v3-0324:free"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 15,
-      "builtin": true
+      "builtin": true,
+      "role": "ambos"
     },
     {
       "id": "xai",
@@ -50,15 +53,16 @@
       "transport": "openai",
       "baseUrl": "https://api.x.ai/v1",
       "apiKeyEnv": "XAI_API_KEY",
-      "model": "grok-4.5",
+      "model": "grok-3-mini",
       "models": [
         "grok-4.5",
         "grok-3",
         "grok-3-mini"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 14,
-      "builtin": true
+      "builtin": true,
+      "role": "ambos"
     },
     {
       "id": "fcc-local",
@@ -66,11 +70,12 @@
       "transport": "fcc-local",
       "baseUrl": "http://127.0.0.1:8082",
       "apiKeyEnv": null,
-      "model": "auto",
+      "model": "nvidia_nim/deepseek-ai/deepseek-v4.1-flash",
       "models": [],
       "enabled": true,
-      "priority": 6,
-      "builtin": true
+      "priority": 3,
+      "builtin": true,
+      "role": "ambos"
     },
     {
       "id": "kimi-coding",
@@ -78,7 +83,7 @@
       "transport": "openai",
       "baseUrl": "https://api.kimi.com/coding/v1",
       "apiKeyEnv": "KIMI_API_KEY",
-      "model": "kimi-for-coding",
+      "model": "kimi-k2.6",
       "models": [
         "kimi-for-coding",
         "k3",
@@ -86,8 +91,9 @@
         "kimi-k2.6"
       ],
       "enabled": true,
-      "priority": 3,
-      "builtin": true
+      "priority": 4,
+      "builtin": true,
+      "role": "coding"
     },
     {
       "id": "nvidia-nim",
@@ -95,16 +101,16 @@
       "transport": "openai",
       "baseUrl": "https://integrate.api.nvidia.com/v1",
       "apiKeyEnv": "NVIDIA_API_KEY",
-      "model": "moonshotai/kimi-k3",
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "models": [
+        "nvidia/nemotron-3-super-120b-a12b",
         "moonshotai/kimi-k3",
-        "deepseek-ai/deepseek-v4.1-flash",
-        "z-ai/glm-5.3",
-        "nvidia/nemotron-3-super-120b-a12b"
+        "z-ai/glm-5.3"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 7,
-      "builtin": true
+      "builtin": true,
+      "role": "ambos"
     },
     {
       "id": "colibri-local",
@@ -116,9 +122,10 @@
       "models": [
         "qwen3-coder-30b-a3b-colibri"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 99,
-      "builtin": true
+      "builtin": true,
+      "role": "coding"
     },
     {
       "id": "open-webui",
@@ -128,14 +135,12 @@
       "apiKeyEnv": "OPENWEBUI_API_KEY",
       "model": "openai-fast",
       "models": [
-        "openai-fast",
-        "openai",
-        "mistral",
-        "llama"
+        "openai-fast"
       ],
       "enabled": true,
-      "priority": 4,
-      "builtin": false
+      "priority": 2,
+      "builtin": false,
+      "role": "ambos"
     },
     {
       "id": "github-models",
@@ -149,9 +154,10 @@
         "openai/gpt-4o-mini",
         "meta/Llama-3.3-70B-Instruct"
       ],
-      "enabled": true,
-      "priority": 5,
-      "builtin": false
+      "enabled": false,
+      "priority": 3,
+      "builtin": false,
+      "disabledReason": "endpoint responde OK degenerado (2026-10-13) — verificar token/rede"
     },
     {
       "id": "luna-kernel",
@@ -164,9 +170,131 @@
         "kimi-for-coding",
         "k3"
       ],
-      "enabled": false,
+      "enabled": true,
       "priority": 98,
-      "builtin": false
+      "builtin": false,
+      "role": "coding"
+    },
+    {
+      "id": "pollinations",
+      "label": "Pollinations (grátis, sem key)",
+      "transport": "openai",
+      "baseUrl": "https://text.pollinations.ai/openai",
+      "apiKeyEnv": null,
+      "model": "openai",
+      "models": [
+        "openai"
+      ],
+      "enabled": true,
+      "priority": 5,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "cerebras",
+      "label": "Cerebras (grátis, ultrarrápido)",
+      "transport": "openai",
+      "baseUrl": "https://api.cerebras.ai/v1",
+      "apiKeyEnv": "CEREBRAS_API_KEY",
+      "model": "llama-3.3-70b",
+      "models": [
+        "llama-3.3-70b"
+      ],
+      "enabled": false,
+      "priority": 6,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "zai-glm",
+      "label": "Z.AI GLM (grátis, forte p/ coding)",
+      "transport": "openai",
+      "baseUrl": "https://api.z.ai/api/paas/v4",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "model": "glm-4.7-flash",
+      "models": [
+        "glm-4.7-flash"
+      ],
+      "enabled": false,
+      "priority": 7,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral (tier grátis, Codestral)",
+      "transport": "openai",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "apiKeyEnv": "MISTRAL_API_KEY",
+      "model": "codestral-latest",
+      "models": [
+        "codestral-latest",
+        "mistral-small-latest"
+      ],
+      "enabled": false,
+      "priority": 8,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "ovh-ai",
+      "label": "OVH AI Endpoints (grátis, Llama 3.3)",
+      "transport": "openai",
+      "baseUrl": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "apiKeyEnv": "OVH_API_KEY",
+      "model": "Llama-3.3-70B-Instruct",
+      "models": [
+        "Llama-3.3-70B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 9,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "glhf",
+      "label": "glhf.chat (grátis, Llama 3.1 70B)",
+      "transport": "openai",
+      "baseUrl": "https://glhf.chat/api/openai/v1",
+      "apiKeyEnv": "GLHF_API_KEY",
+      "model": "hf:meta-llama/Llama-3.1-70B-Instruct",
+      "models": [
+        "hf:meta-llama/Llama-3.1-70B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 10,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "hf-router",
+      "label": "Hugging Face router (grátis)",
+      "transport": "openai",
+      "baseUrl": "https://router.huggingface.co/v1",
+      "apiKeyEnv": "HF_TOKEN",
+      "model": "meta-llama/Llama-3.1-8B-Instruct",
+      "models": [
+        "meta-llama/Llama-3.1-8B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 11,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "hetzner",
+      "label": "Hetzner Inference (grátis, Qwen3.6)",
+      "transport": "openai",
+      "baseUrl": "https://inference.hetzner.com/api/v1",
+      "apiKeyEnv": "HETZNER_API_KEY",
+      "model": "qwen3.6-35b-a3b",
+      "models": [
+        "qwen3.6-35b-a3b"
+      ],
+      "enabled": false,
+      "priority": 12,
+      "builtin": true,
+      "role": "ambos"
     }
   ]
 }
