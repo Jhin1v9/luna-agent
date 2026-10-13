@@ -63,6 +63,7 @@ const {
   getToolsForCategory,
   isDashboardTool,
 } = require('./dashboard-tool-registry.cjs');
+const { TOOL_REGISTRY } = require('./lib/tool-registry.cjs');
 
 // v11.0-fix: Tolerant JSON parser using jsonrepair to handle LLM output with
 // unescaped quotes inside HTML/code strings (common with DeepSeek writeFile).
@@ -2429,6 +2430,87 @@ class LunaSoul extends EventEmitter {
    * Receives a natural-language command string and routes to the correct dashboard action.
    * Returns { success, tool, result, friendly }.
    */
+  // ── Wave 6: auto-correção de nomes de tools (modelos fracos inventam nomes) ──
+  _normalizeToolName(n) {
+    return String(n || '').toLowerCase().replace(/[_\-\s]/g, '');
+  }
+
+  _resolveToolNameFuzzy(name) {
+    if (!name || typeof name !== 'string') return null;
+    const norm = this._normalizeToolName(name);
+    if (!norm) return null;
+    const candidates = {};
+    for (const [key, entry] of Object.entries(TOOL_REGISTRY)) {
+      const canonical = (entry && entry.aliasOf) || key;
+      candidates[this._normalizeToolName(key)] = canonical;
+      candidates[this._normalizeToolName(canonical)] = canonical;
+    }
+    // aliases extras comuns que modelos inventam
+    const EXTRA_ALIASES = {
+      sendwhatsappmessage: 'dashboardSendWhatsApp',
+      enviarwhatsapp: 'dashboardSendWhatsApp',
+      enviarmensagemwhatsapp: 'dashboardSendWhatsApp',
+      whatsapp: 'dashboardSendWhatsApp',
+      listtools: 'toolInfo',
+      tools: 'toolInfo',
+      toollist: 'toolInfo',
+      help: 'toolInfo',
+      bash: 'executeShell',
+      shell: 'executeShell',
+      terminal: 'executeShell',
+      cmd: 'executeShell',
+      runcommand: 'executeShell',
+      readfile: 'readFile',
+      openfile: 'readFile',
+      writefile: 'writeFile',
+      createfile: 'writeFile',
+      listdir: 'listDir',
+      ls: 'listDir',
+      listfiles: 'listDir',
+      search: 'searchWeb',
+      websearch: 'searchWeb',
+      google: 'searchWeb',
+    };
+    for (const [alias, canonical] of Object.entries(EXTRA_ALIASES)) {
+      candidates[this._normalizeToolName(alias)] = canonical;
+    }
+    // 1) match exato normalizado
+    if (candidates[norm]) return candidates[norm];
+    // 2) match por contenção (ex: send_whatsapp -> dashboardSendWhatsApp)
+    const keys = Object.keys(candidates);
+    let best = null, bestLen = 0;
+    for (const k of keys) {
+      if (k.includes(norm) || norm.includes(k)) {
+        const canonical = candidates[k];
+        if (typeof lunaTools[canonical] === 'function' && k.length > bestLen) {
+          best = canonical; bestLen = k.length;
+        }
+      }
+    }
+    if (best) return best;
+    return null;
+  }
+
+  _mapGenericParamAliases(params) {
+    const GENERIC = { to: 'phone', numero: 'phone', recipient: 'phone', command: 'cmd', file: 'path', filename: 'path', filepath: 'path', folder: 'path', directory: 'path', content: 'text' };
+    const out = { ...params };
+    for (const [from, to] of Object.entries(GENERIC)) {
+      if (out[from] !== undefined && out[to] === undefined) out[to] = out[from];
+    }
+    return out;
+  }
+
+  _listAvailableToolNames() {
+    try {
+      const names = new Set();
+      for (const [key, entry] of Object.entries(TOOL_REGISTRY)) {
+        const canonical = (entry && entry.aliasOf) || key;
+        if (typeof lunaTools[canonical] === 'function') names.add(canonical);
+      }
+      return [...names].sort();
+    } catch { return ['toolInfo']; }
+  }
+
   async _execDashboardCommandRouter(params = {}) {
     const text = (params.command || '').toLowerCase().trim();
     if (!text) {
@@ -5484,7 +5566,20 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
             result = await routerFn();
           }
         } else {
-          result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
+          // Auto-correção (Wave 6): fuzzy match contra o catálogo oficial.
+          const resolvedName = this._resolveToolNameFuzzy(tool);
+          if (resolvedName) {
+            const mappedParams = this._mapGenericParamAliases(params || {});
+            const fn = () => lunaTools[resolvedName](mappedParams);
+            result = guard
+              ? await guard.execute(resolvedName, mappedParams, fn)
+              : await fn();
+            if (result && result.success !== false) {
+              result.friendlyMessage = `[auto-corrigido: '${tool}' -> '${resolvedName}'] ` + (result.friendlyMessage || result.stdout || 'ok');
+            }
+          } else {
+            result = { success: false, error: `Ferramenta desconhecida: ${tool}. Ferramentas disponiveis: ${this._listAvailableToolNames().join(', ')}` };
+          }
         }
       } catch (err) {
         result = { success: false, error: err.message };
