@@ -606,7 +606,7 @@ router.post('/api/chat', async (req, res) => {
     // Wave 12 (nudge): turno terminou em texto puro mas o pedido pedia AÇÃO.
     // Modelos fracos da roda ignoram a regra 8 do master prompt — o servidor
     // reinjeta UM lembrete duro e re-pergunta, em vez de aceitar o teatro.
-    const ACTION_INTENT_RE = /(envia|enviar|manda|mandar|mensagem|cria|criar|escreve|escrever|ler|leia|lista|listar|mostra|mostrar|checa|checar|busca|buscar|atualiza|atualizar|apaga|apagar|remove|remover|executa|executar|roda|rodar|gera|gerar|poema|whatsapp)/i;
+    const ACTION_INTENT_RE = /(envia|enviar|manda|mandar|mensagem|cria|criar|escreve|escrever|ler|leia|lista|listar|mostra|mostrar|mostre|checa|checar|busca|buscar|atualiza|atualizar|apaga|apagar|remove|remover|executa|executar|roda|rodar|gera|gerar|poema|whatsapp|acessa|acessar|ver|vê|consulta|consultar|olha|pega|clientes|contatos|pessoas|leads|brain|cérebro)/i;
     if (!myStreamMeta.cancelled && !turnHadRealAction && turnFinalText &&
         !turnFinalText.includes('[[') && ACTION_INTENT_RE.test(message)) {
       console.log(`[WEB-NUDGE] turno sem ações para pedido de ação — reinjetando lembrete (sessão ${session.id})`);
