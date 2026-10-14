@@ -917,3 +917,53 @@ conta própria" sem um gatilho; se o owner quer rodadas proativas periódicas,
 - **Owner: REINICIAR O APP KIMI WORK** — automação f5c70c00 (varredura) só ativa no boot do app.
 - whatsplay continua com restarts crônicos (1838) — sweep pode morrer no meio do ciclo; vale olhar a estabilidade da página WA.
 - Kimi Code estava ajustando o whatsapp (watcher/browser) — conferir conflitos com os patches de allowlist/outbound antes de merge.
+
+---
+
+## 2026-10-14 noite — tools de providers no kernel + merge VPS↔PC + organização
+
+### Tools dashboardConfigProvider (kernel 1ff856e)
+- `packages/kernel/dashboard-providers-tools.cjs` — 5 exports: router `dashboardConfigProvider` + `dashboardListProviders` / `dashboardSetProviderKey` / `dashboardAddProvider` (preset ou custom) / `dashboardRemoveProvider`.
+- Ponte com o painel :3101 `/api/config` (GET lista providers+keyStatus; POST actions save/set-key/add-provider/remove-provider). Auth opcional: se `LUNA_API_KEY` estiver no ambiente do painel, POST exige `Authorization: Bearer`.
+- Painel (`apps/painel/lib/providers.ts`) aceita `role` ('conversa'|'coding'|'ambos') e `disabledReason`; campos desconhecidos viram console.warn (forward-compat, agent ad23ab1).
+- BUG real encontrado no teste: painel devolve `keyStatus.configured`, a tool lia `keyStatus.present` → tudo "sem key". Corrigido (`configured ?? present`). Testado no VPS: 29 providers listados, openrouter 🔑 sk-or-•••2b3c, fcc-local 🔑 ok.
+- Aliases PT no tool-alias-resolver (providers/listaproviders/rodaproviders/configproviders/addprovider/novoprovider/setkey/setapikey/salvarkey/removeprovider), categoria '⚙️ Painel — Providers & Roda' no tool-catalog.
+
+### Instalador (agent 21d08c6)
+- `scripts/install/`: install.sh (Linux) + install.ps1 (Windows, BOM UTF-8) + README com um-liners (Linux: `curl ... | bash`; Windows: `irm ... | iex`).
+- Sem hardcoded: clona kernel+agent, sobe Postgres docker (porta 5433), migra, instala deps, pm2 ecosystem, build painel+kernel. Opção de importar .env + roda/providers.json + perfil Chrome WhatsApp (~/.luna/chrome-whatsapp).
+
+### Merge VPS↔PC (o grande trabalho da noite)
+- O VPS tinha ~26 arquivos modificados SEM commit (hotfixes da kimi-code feitos DIRETO no VPS: voice.call, fix grupo JID, retry com backoff no outbound, rodadas ilimitadas no investigate, progresso WhatsApp). O PC tinha commits não-puxados (painel, instalador, migração 016).
+- Resolução: wip commit local (608d922) → merge (945e416) → resolução de conflito arquivo a arquivo. **Veredito em TODOS: a versão VPS era supersede** (decreto owner 14/10 "SEM LIMITES DE INTERAÇÃO" + fixes de bug ao vivo), EXCETO watchdog (só CRLF) e providers.json (só formatação).
+- investigate.ts: VPS tem loop ILIMITADO por wall-clock (10min) + progresso WhatsApp (sendProgress/pickProgress) + repasse origem_conversation_id pro voice.call; origin tinha maxRounds=6 + "economia de rodadas" (versão mais velha). Ficou a do VPS.
+- outbound.ts: VPS tem resolução de grupo por NOME (contact_name → chat_registry → conversations.metadata.chat_name, failed explícito sem retry) + retry com backoff (máx 4, não aplica pra bloqueio de segurança) + next_retry_at; origin tinha isGroupJid simples. Ficou a do VPS (superset).
+- watcher.ts: abertura de chat pelo TÍTULO visível (decreto 14/10 19:48 — JID não indexa na busca do WA) + isSelfMsg (SELF_AUTHOR). Teste atualizado (e7cd65b): readCalls espera 'Pai'/'Fora Do Escopo', ingest continua pelo chat_id.
+- live-tools.ts (voice.call): estava UNTRACKED no VPS; salvo em /tmp, merge trouxe a versão origin, voice.call re-aplicado por cima. Segue UNTRACKED (trabalho em andamento da kimi-code).
+- Normalização watchdog CRLF→LF (f24fe4a). Organização da raiz do PC: 68 tmp-* + logs → tmp/ (ignorada), scripts de operação → scripts/ (vps-cp, vps-run, read-session, scorecard), e2e → tests/, tmp-LUNA_API.md → docs/LUNA_API.md (02b56bc). .membrane/ e tsbuildinfo adicionados ao .gitignore.
+- Estado final: PC == VPS == origin (agent 02b56bc, kernel 1ff856e). typecheck OK em todos os apps. Testes whatsplay: 150/154 — 4 falhas, sendo 2 de voz (call-conductor captureTranscript, operator-session readLatestReply) PRÉ-EXISTENTES no origin (zona kimi-code, arquivos src/voice/* não tocados pelo merge).
+- Processos reiniciados no VPS: luna-whatsplay, luna-worker, luna-watchdog (online).
+
+### Pendências
+- kimi-code: 2 testes de voz falhando no origin; voice.call ainda não commitado (untracked no VPS); SILENCE do FAST.
+- Owner: reiniciar o app Kimi Work (automação f5c70c00 parada desde ontem).
+
+---
+
+## 2026-10-14 madrugada — listTools na FAST + call.respond (arquitetura da chamada)
+
+### FAST WhatsApp ganha consciência das próprias tools (agent a9fc28a)
+- `orchestrator/src/agent/router/tools.ts`: nova tool `listTools` + `TOOL_CATALOG` (descrição/args de todas as 18 tools: conversation.recent, client.summary, brain.search, brain.client_ficha, voice.call_place, nexo.* x12). Testada no VPS — catalogo completo volta como resultado.
+- `structured.ts` (prompt da FAST): bloco LISTTOOLS no system prompt — "em dúvida de qual tool usar, chame TOOL_CALL listTools"; destaca as de WhatsApp (conversation.recent relê msgs, voice.call_place liga, brain.search acha qualquer info).
+- `router.ts`: mensagem pós-tool agora permite encadear OUTRA tool (não manda parar no JSON final) — alinhado com decreto "sem tool paro tool paro". Loop segue com tope de 5 iterações (TOOL_CALL_MAX_ITERATIONS).
+- Orchestrator reiniciado no VPS; typecheck OK; 27/27 testes do router passando.
+
+### call.respond — a Luna fala na chamada via tool (kernel 2122215 + agent a9fc28a)
+- Mistério do auth RESOLVIDO: o "Não autorizado" da kimi-code vinha da porta **3500** (dashboard ANTIGO server.js, que tem requireAuth). O luna-server real roda na **3458** (config.PORTS.luna) e o POST /api/chat é ABERTO (CORS permissivo, zero guard) — confirmado com POST real: `{"ok":true,"sessionId":"web-mv8lc9oe-sfuk","status":"processing"}` e roundtrip de mensagens. O adaptador do call-executor fala com 127.0.0.1:3458 SEM token.
+- **Kernel** `call-response-tools.cjs`: tool `callRespond` (aliases call.respond/responderchamada/falarluna) — valida texto, `pg_notify('call_responses', {texto, origem})`. Registrada no dispatcher/catálogo (categoria '📞 Chamada — Operador'). Loader de pg com candidatos (mesmo padrão luna-tools).
+- **whatsplay** `index.ts`: LISTEN call_responses → OperatorSession.connect() → ensureChatGptTab() → sendText("📟 Luna → Operador: ...") — mesmo caminho que call-conductor.ts:318 já usa em produção. No ar: log confirma "ouvindo NOTIFY call_responses".
+- FALTA (próximo passo, zona kimi-code): o adaptador `LunaWebChatAdapter` no @luna/agent (fala com /api/chat da 3458) + o call-executor usar ele como conductorLive com priming do prompt ("Abner está em chamada, mando transcrições, anota no brain, responde via call.respond") + relay de captions da chamada como mensagens da sessão. Com call.respond + LISTEN prontos, a ponta de saída já está funcional.
+
+### Estado
+- PC == VPS == origin: kernel 2122215, agent a9fc28a. whatsplay + luna-web + orchestrator reiniciados e online.
+- Teste de fogo do call.respond: a próxima chamada real (a sessão conductor precisa existir — hoje o KimiWebLocalAdapter antigo segue como conductor até o adaptador novo).
