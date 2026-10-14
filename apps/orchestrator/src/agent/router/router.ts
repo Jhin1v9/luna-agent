@@ -65,7 +65,13 @@ async function structuredTurn(
     prompt: `${STRUCTURED_INSTRUCTIONS}\n${toolBlock}\n\n---\n${prompt}`,
     ...(imageBase64 ? { image_base64: imageBase64 } : {}),
   });
-  const { output } = parseStructured(turn.reply_text);
+  const { output, degraded } = parseStructured(turn.reply_text);
+  if (degraded) {
+    deps.log.warn(
+      { raw: turn.reply_text.slice(0, 200), model: turn.model },
+      'router: parse degradado — modelo não devolveu JSON estruturado puro',
+    );
+  }
   return { output, turn, toolRounds };
 }
 
@@ -181,6 +187,21 @@ export async function runFastRoute(deps: RouterDeps, input: {
       toolRounds: trace.toolRounds,
       handoff: false,
       escalate: true,
+    };
+  }
+
+  // SILENCE (decreto owner 14/10): passa INTACTO pro handler — lá a decisão
+  // vira audit + conversa RESOLVED, sem outbound. Bug ao vivo 05:38 UTC: o
+  // catch-all de ANSWER daqui degradava SILENCE pra ANSWER com o JSON cru,
+  // e o grupo recebia o "pensamento" literal da Luna.
+  if (output.type === 'SILENCE') {
+    return {
+      answerText: '',
+      turn: trace.turn,
+      output,
+      toolRounds: trace.toolRounds,
+      handoff: false,
+      escalate: false,
     };
   }
 

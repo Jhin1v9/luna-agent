@@ -437,3 +437,10 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
 - **Crontasks/capacidade:** carga atual mínima (brain.watch ~horário, 0 ordens/24h, 2 agent_runs/24h). VPS folgada (ram 51%, cpu <10%). Gargalo futuro = rate-limit dos providers grátis com braços potentes, não a Luna.
 - **Brain:** sync completo já validado antes (239 comuns hash-idênticos, VPS com 1.857 arquivos). Changelog do brain gravado em `/opt/nexo-brain/changelog/entries/2026-10-14-luna-bracos-potentes.md`.
 - **PENDENTE pro owner:** (1) mandar msg de GRUPO da allowlist sem menção → a Luna decide (SILENCE ou ANSWER); (2) pegar keys groq/mistral/cerebras/sambanova amanhã e avisar p/ ativar; (3) se gemini não recuperar a quota sozinha, trocar a key.
+
+### Addendum 08:05 (14/10) — FIX: SILENCE degradado pra ANSWER no router (pensamento vazava no grupo)
+- **Bug ao vivo 05:38 UTC:** o modelo respondeu `{"type":"SILENCE",...}` certinho, mas o catch-all final de `runFastRoute` (router.ts) convertia QUALQUER saída não-ANSWER/HANDOFF em ANSWER com `reply_text` cru — o grupo recebeu o JSON literal ("diário interno que vazou", nas palavras dela).
+- **Fix:** ramo explícito pro SILENCE no router — passa intacto pro handler (que faz audit `agent.reply.silence` + RESOLVED, sem outbound). Bônus: log warn quando `parseStructured` degrada (antes era silencioso).
+- Deployado VPS (hash conferido PC=VPS), typecheck verde, 16/16 testes do router passando.
+- **Tools via WhatsApp: SIM** — o loop TOOL_CALL (tope 5 rodadas) é agnóstico de canal. Catálogo no boot: `conversation.recent`, `client.summary`, `brain.search`, `brain.client_ficha`, `nexo.*` (finance, clients, leads, tasks, cashbox, expenses, payments, quotes, ideas, system.status, ops.overview, notifications, reports, client_orders, client_history), `voice.call_place`.
+- Observação: 6 eventos `whatsapp.message` parados 'pending' na kimiwork_inbox (ponte Kimi Work desligada no VPS — modo default não é kimiwork). Se a ponte for religada, esses eventes voltam a ser consumidos; se não, podem ser limpos.
