@@ -34,3 +34,4 @@ tmp/
 apps/whatsplay/tmp/
 .tmp-check/
 scripts/tmp-*.json
+.env.vps

@@ -73,7 +73,7 @@
       if (key === 'SYSTEM_PROMPT') continue;
       if (value !== undefined && value !== '') env[key] = value;
     }
-    await fetch('/api/config', {
+    await fetch('api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ env, systemPrompt })
@@ -83,7 +83,7 @@
 
   async function handleRestartLuna() {
     try {
-      const res = await fetch('/api/system/restart', { method: 'POST' });
+      const res = await fetch('api/system/restart', { method: 'POST' });
       const data = await res.json();
       alert(data.message || 'Reiniciando...');
     } catch (e) {

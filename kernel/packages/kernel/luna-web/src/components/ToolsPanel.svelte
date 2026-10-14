@@ -27,7 +27,7 @@
 
   async function loadStats() {
     try {
-      const res = await fetch('/api/tools/stats');
+      const res = await fetch('api/tools/stats');
       const data = await res.json();
       if (data.ok && data.stats) {
         stats = data.stats;

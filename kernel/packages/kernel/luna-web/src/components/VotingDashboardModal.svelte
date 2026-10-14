@@ -14,7 +14,7 @@
     loading = true;
     error = false;
     try {
-      const res = await fetch('/api/tools/voting');
+      const res = await fetch('api/tools/voting');
       const data = await res.json();
       if (data.ok && data.voting) {
         voting = data.voting;

@@ -63,6 +63,7 @@ const {
   getToolsForCategory,
   isDashboardTool,
 } = require('./dashboard-tool-registry.cjs');
+const { TOOL_REGISTRY } = require('./lib/tool-registry.cjs');
 
 // v11.0-fix: Tolerant JSON parser using jsonrepair to handle LLM output with
 // unescaped quotes inside HTML/code strings (common with DeepSeek writeFile).
@@ -2429,6 +2430,93 @@ class LunaSoul extends EventEmitter {
    * Receives a natural-language command string and routes to the correct dashboard action.
    * Returns { success, tool, result, friendly }.
    */
+  // ── Wave 6: auto-correção de nomes de tools (modelos fracos inventam nomes) ──
+  _normalizeToolName(n) {
+    return String(n || '').toLowerCase().replace(/[_\-\s]/g, '');
+  }
+
+  _resolveToolNameFuzzy(name) {
+    if (!name || typeof name !== 'string') return null;
+    const norm = this._normalizeToolName(name);
+    if (!norm) return null;
+    const candidates = {};
+    for (const [key, entry] of Object.entries(TOOL_REGISTRY)) {
+      const canonical = (entry && entry.aliasOf) || key;
+      candidates[this._normalizeToolName(key)] = canonical;
+      candidates[this._normalizeToolName(canonical)] = canonical;
+    }
+    // aliases extras comuns que modelos inventam
+    const EXTRA_ALIASES = {
+      sendwhatsappmessage: 'dashboardSendWhatsApp',
+      enviarwhatsapp: 'dashboardSendWhatsApp',
+      enviarmensagemwhatsapp: 'dashboardSendWhatsApp',
+      whatsapp: 'dashboardSendWhatsApp',
+      listtools: 'toolInfo',
+      tools: 'toolInfo',
+      toollist: 'toolInfo',
+      help: 'toolInfo',
+      bash: 'executeShell',
+      shell: 'executeShell',
+      terminal: 'executeShell',
+      cmd: 'executeShell',
+      runcommand: 'executeShell',
+      clientes: 'dashboardListClients',
+      cliente: 'dashboardListClients',
+      contatos: 'dashboardListClients',
+      contacts: 'dashboardListClients',
+      pessoas: 'dashboardListClients',
+      leads: 'dashboardListLeads',
+      readfile: 'readFile',
+      openfile: 'readFile',
+      writefile: 'writeFile',
+      createfile: 'writeFile',
+      listdir: 'listDir',
+      ls: 'listDir',
+      listfiles: 'listDir',
+      search: 'searchWeb',
+      websearch: 'searchWeb',
+      google: 'searchWeb',
+    };
+    for (const [alias, canonical] of Object.entries(EXTRA_ALIASES)) {
+      candidates[this._normalizeToolName(alias)] = canonical;
+    }
+    // 1) match exato normalizado
+    if (candidates[norm]) return candidates[norm];
+    // 2) match por contenção (ex: send_whatsapp -> dashboardSendWhatsApp)
+    const keys = Object.keys(candidates);
+    let best = null, bestLen = 0;
+    for (const k of keys) {
+      if (k.includes(norm) || norm.includes(k)) {
+        const canonical = candidates[k];
+        if (typeof lunaTools[canonical] === 'function' && k.length > bestLen) {
+          best = canonical; bestLen = k.length;
+        }
+      }
+    }
+    if (best) return best;
+    return null;
+  }
+
+  _mapGenericParamAliases(params) {
+    const GENERIC = { to: 'phone', numero: 'phone', recipient: 'phone', command: 'cmd', file: 'path', filename: 'path', filepath: 'path', folder: 'path', directory: 'path', content: 'text' };
+    const out = { ...params };
+    for (const [from, to] of Object.entries(GENERIC)) {
+      if (out[from] !== undefined && out[to] === undefined) out[to] = out[from];
+    }
+    return out;
+  }
+
+  _listAvailableToolNames() {
+    try {
+      const names = new Set();
+      for (const [key, entry] of Object.entries(TOOL_REGISTRY)) {
+        const canonical = (entry && entry.aliasOf) || key;
+        if (typeof lunaTools[canonical] === 'function') names.add(canonical);
+      }
+      return [...names].sort();
+    } catch { return ['toolInfo']; }
+  }
+
   async _execDashboardCommandRouter(params = {}) {
     const text = (params.command || '').toLowerCase().trim();
     if (!text) {
@@ -2715,6 +2803,9 @@ class LunaSoul extends EventEmitter {
 
     // Auto-continue loop: Kimi decides → Luna executes → result goes back to Kimi → Kimi responds
     let loopInput = messageInput;
+    // Wave 12 (anti-loop): rastreia repetição consecutiva da MESMA tool no turno
+    let prevToolName = null;
+    let prevToolRepeat = 0;
     let checkAlreadySent = false; // v12.0-fix: single reformat retry (the old string-compare broke once the message carried the raw excerpt)
     let truncatedToolRetries = 0; // v13.0 (LB1): bounded re-emission requests for truncated tool JSON
 
@@ -3529,6 +3620,17 @@ class LunaSoul extends EventEmitter {
         const successCount = domActionResults.filter(d => d.result?.success).length;
         const totalCount = domActionResults.length || (result.tool ? 1 : 0);
         const statusEmoji = successCount === totalCount ? '✅' : '⚠️';
+
+        // Wave 12 (anti-loop): mesmo tool consecutivo = aviso duro no feedback
+        {
+          const tName = String(toolsUsed || '');
+          if (tName && tName === prevToolName) prevToolRepeat++; else { prevToolName = tName; prevToolRepeat = 0; }
+          if (prevToolRepeat >= 1) {
+            outputText += `
+
+🚨 ANTI-LOOP: você JÁ executou '${tName}' ${prevToolRepeat + 1}x seguidas. NÃO chame a mesma tool novamente. Leia o resultado acima e PROSSIGA com a tarefa original do usuário: chame a PRÓXIMA tool DIFERENTE necessária, ou finalize com [[response]]. Se está sem saber o próximo passo, chame toolInfo com o nome da tool que pretende usar.`;
+          }
+        }
 
         // v13.0 (owner directive 2026-08-13): NO char cap on tool results —
         // the model receives the FULL output. Luna ilimitada.
@@ -4955,7 +5057,7 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
 
   /** ACTION mode — execute a tool */
   async _handleAction(parsed, sessionId, options, emitProgress = null, eventBus = null, toolInstanceId = null) {
-    const tool = parsed.tool || parsed.action?.type;
+    let tool = parsed.tool || parsed.action?.type; // Wave 12: let (fuzzy no topo pode renomear)
     const params = parsed.params || parsed.action?.params || {};
     const reasoning = parsed.reasoning || '';
     let result;
@@ -5022,6 +5124,15 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
     // Detect if it's a file tool or desktop tool
     const FILE_TOOLS = Object.keys(lunaTools);
     const DESKTOP_TOOLS = ['shell', 'click', 'doubleClick', 'rightClick', 'type', 'keypress', 'hotkey', 'scroll', 'screenshot', 'ocr', 'open_app', 'wait'];
+    // Wave 6: normaliza nome inventado pelo modelo (fuzzy) antes de qualquer rota
+    if (typeof tool === 'string' && tool && !lunaTools[tool]) {
+      const fuzzy = this._resolveToolNameFuzzy(tool);
+      if (fuzzy && typeof lunaTools[fuzzy] === 'function') {
+        console.log(`[LunaSoul] tool '${tool}' auto-corrigida -> '${fuzzy}'`);
+        tool = fuzzy;
+      }
+    }
+
     const isFileTool = FILE_TOOLS.includes(tool);
     const isDesktopTool = DESKTOP_TOOLS.includes(tool);
 
@@ -5296,7 +5407,13 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
               case 'dashboardVoteInSession': return lunaTools.dashboardVoteInSession(p);
               case 'dashboardDeleteVotingSession': return lunaTools.dashboardDeleteVotingSession(p);
               case 'dashboardCommandRouter': return this._execDashboardCommandRouter(p);
-              default: return { success: false, error: `Ferramenta desconhecida: ${tool}` };
+              default: {
+                // Wave 6-fix: export sem case explícito (ex: listTools/toolInfo) executa genericamente
+                if (typeof lunaTools[tool] === 'function') {
+                  return lunaTools[tool](p);
+                }
+                return { success: false, error: `Ferramenta desconhecida: ${tool}. Ferramentas disponiveis: ${this._listAvailableToolNames().join(', ')}` };
+              }
             }
           };
           // v9.4-fix: Real execution timer — source of truth for tool duration
@@ -5484,7 +5601,20 @@ COMECE AGORA — primeira ferramenta (sem introdução, sem explicação):`;
             result = await routerFn();
           }
         } else {
-          result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
+          // Auto-correção (Wave 6): fuzzy match contra o catálogo oficial.
+          const resolvedName = this._resolveToolNameFuzzy(tool);
+          if (resolvedName) {
+            const mappedParams = this._mapGenericParamAliases(params || {});
+            const fn = () => lunaTools[resolvedName](mappedParams);
+            result = guard
+              ? await guard.execute(resolvedName, mappedParams, fn)
+              : await fn();
+            if (result && result.success !== false) {
+              result.friendlyMessage = `[auto-corrigido: '${tool}' -> '${resolvedName}'] ` + (result.friendlyMessage || result.stdout || 'ok');
+            }
+          } else {
+            result = { success: false, error: `Ferramenta desconhecida: ${tool}. Ferramentas disponiveis: ${this._listAvailableToolNames().join(', ')}` };
+          }
         }
       } catch (err) {
         result = { success: false, error: err.message };

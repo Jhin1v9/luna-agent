@@ -13,7 +13,7 @@
     loading = true;
     error = false;
     try {
-      const res = await fetch('/api/tools/finance');
+      const res = await fetch('api/tools/finance');
       const data = await res.json();
       if (data.ok && data.finance) {
         finance = data.finance;

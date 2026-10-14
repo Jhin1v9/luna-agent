@@ -524,6 +524,11 @@ router.post('/api/chat', async (req, res) => {
     // thinking updates and repeated response/tool events.
     const emittedEventIds = new Set();
 
+    // Wave 12 (nudge): conta ações do turno pra detectar 'texto puro em pedido de ação'
+    let turnActionCount = 0;
+    let turnHadRealAction = false; // listTools/toolInfo não contam — são informativas
+    let turnFinalText = '';
+
     for await (const ev of stream) {
       // v10.16-fix: Check OUR captured meta, not activeStreams.get() which may return
       // a newer stream object if user sent a new message while this one runs.
@@ -583,9 +588,70 @@ router.post('/api/chat', async (req, res) => {
           timestamp: new Date().toISOString(),
         }, { persist: ev.type !== 'action_progress' }); // Wave 4 review follow-up: chunks ride the next event's persistence
 
+        if (ev.type === 'action_end') {
+          const m_ok = (ev.result?.success !== false) && (ev.result?.result?.success !== false);
+          turnActionCount++;
+          if (m_ok && !['listTools', 'toolInfo'].includes(ev.tool)) turnHadRealAction = true;
+        }
+        // texto final pode vir de done OU de assistant/response_delta (done as vezes vem vazio)
+        if ((ev.type === 'assistant' || ev.type === 'response_delta') && content) turnFinalText = content;
+        if (ev.type === 'done' && content) turnFinalText = content;
+
         // W6-T8: close the stream once the final done is persisted — any
         // straggler events after this are dropped by the gate above.
         if (ev.type === 'done') session._streamClosed = true;
+      }
+    }
+
+    // Wave 12 (nudge): turno terminou em texto puro mas o pedido pedia AÇÃO.
+    // Modelos fracos da roda ignoram a regra 8 do master prompt — o servidor
+    // reinjeta UM lembrete duro e re-pergunta, em vez de aceitar o teatro.
+    const ACTION_INTENT_RE = /(envia|enviar|manda|mandar|mensagem|cria|criar|escreve|escrever|ler|leia|lista|listar|mostra|mostrar|mostre|checa|checar|busca|buscar|atualiza|atualizar|apaga|apagar|remove|remover|executa|executar|roda|rodar|gera|gerar|poema|whatsapp|acessa|acessar|ver|vê|consulta|consultar|olha|pega|clientes|contatos|pessoas|leads|brain|cérebro)/i;
+    if (!myStreamMeta.cancelled && !turnHadRealAction && turnFinalText &&
+        !turnFinalText.includes('[[') && ACTION_INTENT_RE.test(message)) {
+      console.log(`[WEB-NUDGE] turno sem ações para pedido de ação — reinjetando lembrete (sessão ${session.id})`);
+      session._streamClosed = false; // W6-T8: reabre o stream pro turno de nudge
+      const nudgeMsg = '[SYSTEM NUDGE — PRIORIDADE MÁXIMA] O usuário pediu uma AÇÃO: "' + message.slice(0, 200) +
+        '". Você respondeu apenas TEXTO e NÃO executou nada — isso é FALHA. ' +
+        'Regra 8: pedido de ação = um bloco [[action]] executando a tool AGORA. ' +
+        'Se não sabe o nome exato da tool, use [[action]] {"tool":"listTools","params":{"busca":"assunto"}} primeiro. ' +
+        'NUNCA responda [[response]] antes de executar a ação pedida.';
+      const nudgeStream = luna.processMessageStream(nudgeMsg, {
+        sessionId: session.id,
+        userId: 'web-' + session.id,
+        mode: 'instant',
+        persona: session.persona || 'default',
+        provider: session.provider || 'kimi',
+        messageId,
+      });
+      for await (const ev2 of nudgeStream) {
+        if (myStreamMeta.cancelled) break;
+        if (session._streamClosed) continue;
+        if (ev2.type === 'response_done') continue;
+        if (messageId && ev2.messageId === undefined) ev2.messageId = messageId;
+        if (['response_delta', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta', 'thinking_update', 'system', 'assistant', 'mode_detected'].includes(ev2.type)) {
+          const content2 = ev2.type === 'done'
+            ? (ev2.result?.response || ev2.response || ev2.text || '')
+            : ev2.type === 'assistant'
+              ? (ev2.response || ev2.text || '')
+              : (ev2.type === 'error' || ev2.type === 'system')
+                ? (ev2.message || ev2.error || ev2.text || '')
+                : (ev2.fullText || ev2.text || '');
+          addMessageToSession(session.id, {
+            id: 'ev-' + Date.now() + '-' + (++eventSeq),
+            role: 'assistant',
+            type: ev2.type,
+            content: content2,
+            fullThinking: ev2.fullThinking || undefined,
+            tool: ev2.tool,
+            toolInstanceId: ev2.toolInstanceId || undefined,
+            params: ev2.params,
+            result: ev2.result,
+            messageId: messageId,
+            timestamp: new Date().toISOString(),
+          }, { persist: ev2.type !== 'action_progress' });
+          if (ev2.type === 'done') session._streamClosed = true;
+        }
       }
     }
   } catch (e) {
