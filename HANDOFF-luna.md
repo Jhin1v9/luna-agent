@@ -465,3 +465,455 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
 - **Bug ao vivo na 1ª versão:** modelo gastou as 6 rodadas só lendo e nunca deu final → escalei. Fixes: fs.read agora devolve `lines`, prompt ganhou regra de economia de rodadas, rodada bônus, max 8.
 - **TESTE DE FOGO ✅:** "leia HANDOFF-luna.md e diga quantas linhas tem + crie arquivo X" → fs.read + fs.write em ~3s → "O arquivo HANDOFF-luna.md tem 460 linhas. O arquivo .luna-live-tools-test.md foi criado..." → **sent no WhatsApp do Abner**. 23/23 testes (14 novos do live-tools), typecheck PC+VPS.
 - Segurança honesta: shell roda como usuário nexo com denylist; não é sandbox de hardware — é guard contra desastre acidental. Toda chamada auditada.
+
+---
+
+## 2026-10-14 11:30 CEST — Grupo Production: fim da msg fixa, updates de progresso, fim do loop de eco
+
+**Diagnosticado ao vivo (DOM do WA Web na build nova + events/outbox/DLQ):**
+
+1. **"Fica falando toda hora" = loop de eco próprio**: mensagem da Luna recém-enviada
+   chega ao sweep SEM tail-out e SEM o aria "Tú:" montado (corrida pós-envio) →
+   fallback inbound → ela ingeria a própria fala e respondia de novo. Fixes em
+   3 camadas: msg-meta status de entrega como sinal de outbound
+   (page-scripts.ts, 2 scripts), sweep ignora autor Tú/Você (watcher.ts), eco
+   puro (overlap ≥ 0.9) + strip de prefixo "Tú:" (self-echo.ts).
+2. **"Lê e não fala nada" = HUMAN_HANDLING** (ADR-026, escalación aberta — por
+   design). Conversa voltou pra RESOLVED sozinha.
+3. **Msg de espera fixa** → rotação de 6 acks naturais (router.ts HANDOFF_ACKS).
+4. **Updates de progresso no investigate** (estilo tool card em texto): 1 no
+   início + 1 na primeira tool, com frase por categoria de tool
+   (arquivos/solicitação/mensagens/comandos) — worker/src/jobs/investigate.ts,
+   sendProgress(), metadata.kind=progress_update.
+5. **REGRA OWNER 14/10: rodadas ILIMITADAS** — removida a "ECONOMIA DE RODADAS"
+   e o cap de rodadas; único freio é o timeout de parede (payload.timeout_ms,
+   default 10min), checado por rodada.
+
+**Teste de fogo (evento publicado via publishEvent, corr_firetest_*):**
+HANDOFF_LIVE → ack variado → "deixa eu ver isso direitinho, já volto" →
+"deixa eu abrir os arquivos rapidinho" (fs.read) → resposta real (468 linhas,
+seção nova confirmada) — **4 mensagens entregues no grupo, todas sent**.
+
+Pendente: investigar rounds do live brain que completam em ~40ms (roda stateless
+ADR-042 sem worker-tools — resposta genérica), e a quota 5h do kimi (fallback
+kimi-2/gemini também esgota — verificar rotação de providers).
+
+---
+
+## 2026-10-14 ~11:45 UTC — Luna Web ganha braços (tool-alias-resolver) ✅
+
+**Pedido do owner:** a Luna Web estava "burrinha" — o agente do WhatsApp tinha
+braços e a web não. Mandou herdar a estrutura de tools.
+
+**Diagnóstico ao vivo (sessão web-test-burra):**
+- brainSearch/listTools/dashboardSendWhatsApp JÁ existiam no kernel
+  (tool-catalog.cjs + luna-tools.cjs + dispatch na luna-soul.cjs) — a kimi code
+  tinha montado isso na madrugada.
+- Causa real da mensagem "ferramenta desconhecida": o modelo (Kimi Web)
+  **inventou o nome** `sendMessageWhatsApp {to, message}` em vez de usar o
+  canônico `dashboardSendWhatsApp {phone, message}`. Qualquer nome não exportado
+  caía no "Ferramenta desconhecida" e a Luna ficava sem braços.
+- Detalhe: sessões antigas carregam o tool_result de falha no histórico — o
+  modelo passa a recusar tentar de novo. **Sessões novas não têm esse fardo.**
+
+**Fix implementado (deploy VPS, kernel):**
+- `packages/kernel/tool-alias-resolver.cjs` (NOVO): resolve nomes inventados
+  em 4 camadas — 1) exato, 2) alias explícito (~70 aliases: sendMessage,
+  sendMessageWhatsApp, enviarMensagem, listTools/tools/ferramentas, shell,
+  python, fs.read, edit_file, ls...), 3) match normalizado (lowercase+alfa-num),
+  4) contenção única (ex.: listTasks → dashboardListTasks). Ambíguo = não adapta.
+- `luna-soul.cjs`: `_handleAction` resolve o nome antes do dispatch e avisa o
+  modelo no tool result quando adapta (`[tool 'X' entendida como 'Y']`).
+- `luna-prompt-config.json`: hint de listTools no toolResultPrompt e no
+  miniReminder (decreto owner 22:25 de 13/10: "se quiser saber suas tools
+  execute listTools" em todos os prompts).
+
+**Backups:** luna-soul.cjs.bak-alias-20261014, luna-prompt-config.json.bak-alias-20261014
+
+**Testes E2E (todos passaram):**
+1. brainSearch "Abner whatsapp" → achou número comercial +34 685 093 192 ✅
+2. **dashboardSendWhatsApp 34685093192 → send_state=sent no Postgres** ✅
+   (mensagem "Luna Web com braços funcionando — teste de envio 🌙" entregue)
+3. listTools {"search":"whatsapp"} → listou as 5 tools WhatsApp ✅
+4. executeShell wc -l → executou (caminho errado do HANDOFF — o certo é
+   /home/nexo/luna-agent/HANDOFF-luna.md, NÃO luna-kernel/) ✅
+5. dashboardListTasks → 21 tarefas do painel ✅
+
+**Pendente / observações:**
+- kimi code tem edições não commitadas em: luna-soul.cjs, luna-tools.cjs,
+  tool-catalog.cjs, luna-prompt-config.json, luna-chat-routes.js,
+  routes/luna-tools.js, api-bridge.cjs, bridge-factory.cjs (trabalho dela da
+  madrugada + meu patch de alias misturado nos dois primeiros). Commitei SÓ o
+  tool-alias-resolver.cjs (arquivo novo, 100% meu).
+- Modo instant da web roda UMA tool por mensagem do usuário (chatModeNeverLoops
+  no loopRules) — para cadeias, o owner manda uma mensagem por passo ou a gente
+  revisita o loopRules depois.
+
+---
+
+## 2026-10-14 ~13:15 UTC — Cadeia autônoma de tools na Luna Web (decreto owner) ✅
+
+**Pedido do owner:** quebrar o "1 tool por mensagem" em TODOS os modos (instant e
+thinking). A Luna só para quando ELA decidir que a tarefa acabou. Naturalidade
+total (incl. crontasks disparando WhatsApp do nada).
+
+**Diagnóstico (3 camadas de causa):**
+1. O ENGINE do loop já estava certo: ACTION/PLAN sempre alimenta o resultado de
+   volta e continua; só CHAT/DONE puro encerra. Não era engine.
+2. A CÂMERA LENTA: o prompt ensinava "UMA tool por mensagem; espere o Tool
+   Result" + toolResultPrompt dizia "só chame outra tool se o resultado estiver
+   incompleto". Reescrito: CADEIA AUTÔNOMA (continuar até completar tudo),
+   anti-padrões proibidos (resposta parcial, pedir confirmação entre passos).
+3. A Causa RAIZ descoberta no teste: o transporte ativo é o **ApiBridge
+   stateless** (bridge-factory auto → roda:github-models gpt-4o primeiro) — ele
+   envia SÓ `{role:user, content:prompt}` sem system message e sem histórico
+   server-side. O template toolLoop shipped (`{{miniReminder}}+{{toolResult}}`)
+   não incluía {{history}} → o modelo recebia o resultado DA TOOL SEM SABER
+   QUAL ERA A TAREFA. Respondia genérico e parava. Por isso "modo stateless
+   responde em ~40ms sem tools" (nota da kimi code) — não era limitação da roda,
+   era prompt sem contexto.
+
+**Fixes aplicados (kernel VPS):**
+- `luna-prompt-config.json`:
+  - systemPrompt: [REGRA DE OURO] virou CADEIA AUTÔNOMA + anti-padrões proibidos;
+    nova seção [AMBIENTE — VOCÊ ESTÁ DENTRO DA VPS]: acesso TOTAL (qualquer
+    caminho, shell, logs, processos, banco) — "não existe fora do workspace".
+  - toolResultPrompt: ⛓️ MODO CADEIA ATIVA no topo; próxima tool imediata quando
+    a tarefa não estiver completa.
+  - prompts.toolLoop e prompts.followUp REESCRITOS autocontidos: persona Luna +
+    protocolo JSON + ⛓️ cadeia + {{systemContext}} + {{history}} + input — o
+    prompt inteiro precisa ser self-contained porque o ApiBridge é stateless.
+- `luna-soul.cjs`: slice de histórico do toolLoop -3 → -12 (a tarefa sobrevive
+  a cadeias de ~5 passos); removido path traversal de `_createScript`/`_editFile`
+  (decreto owner: VPS inteira é o workspace); fallback do master prompt sem
+  [WORKSPACE ISOLATION].
+- `luna-tools.cjs`: dashboardSendWhatsApp aceita params.to/target/recipient/
+  destinatario (modelos adoram `to`).
+- `tool-alias-resolver.cjs`: +aliases messagesendwhatsapp/sendwhatsappmsg.
+
+**Teste E2E definitivo (sessão web-test-cadeia-04, UMA mensagem, zero intervenção):**
+executeShell(wc -l → 550) → dashboardListTasks(21 tarefas) →
+sendWhatsappMessage(alias→dashboardSendWhatsApp) → **send_state=sent** ✅
+Resposta final em persona confirmando tudo.
+
+**Aprendizado-chave:** com transporte stateless, CADA prompt precisa carregar
+persona + protocolo + histórico + tarefa. Nada de assumir memória server-side.
+
+**Pendente (pra kimi code / próximos ciclos):**
+- Item 1 do radar dela: decidir se o modo stateless fica ou sai (agora que o
+  contexto chega completo, ele FUNCIONA — recomendo ficar como principal).
+- Chip de provider na UI ainda mostra "Kimi Web" mas o transporte real é
+  API/gpt-4o (rótulo da sessão, não do transporte).
+- Crontasks disparando WhatsApp espontâneo: pipeline já existe (orchestrator +
+  pg_notify); falta agendar tarefas.
+- Sessões antigas (pre-fix) carregam tool_result de falha no histórico — o
+  modelo se recusa a tentar de novo; usar sessão nova.
+
+---
+
+## 2026-10-14 ~15:00 UTC — Luna enxerga o Workspace Nexo (solicitações dos clientes) ✅
+
+**Pedido do owner:** a Luna não sabia onde estava nem que existia o workspace do
+cliente. Queria: ela SABER que está dentro da VPS com todos os arquivos, o nome
+do workspace cliente, TODAS as tools do workspace na lista, e o prompt dizendo
+"você pode tudo — mapeie o que quiser".
+
+**Descoberta:** o "fui bloqueada fora do permitido" que ela relatou pro owner era
+alucinação de sessão antiga (era do prompt pré-fix com WORKSPACE ISOLATION) —
+testei viewDirectory('/home') direto na tool e funciona. Ainda assim removi o
+que restava de gaiola.
+
+**Implementado (kernel VPS):**
+- `workspace-nexo-tools.cjs` (NOVO): 8 tools de autenticação real no portal
+  /nexo (login admin NEXO_API_USERNAME/PASSWORD do .env do luna-agent, sessão
+  cacheada com re-login automático em 401):
+  workspaceListRequests, workspaceGetRequest, workspaceCreateRequest,
+  workspaceUpdateRequest, workspaceAddComment, workspaceListProjects,
+  workspaceListOrganizations, workspaceListClients.
+  Endpoints: /nexo/api/admin/* (mapa na skill solicitacoes-painel).
+- Wiring: exports em luna-tools.cjs (spread), dispatch cases na luna-soul.cjs,
+  categoria '🗂️ Workspace Nexo — Solicitações' no tool-catalog.cjs (aparece no
+  TOOL_INDEX automaticamente), aliases solicitacoes/pedidos/solicitacao no
+  tool-alias-resolver.cjs.
+- luna-prompt-config.json [AMBIENTE]: workspace cliente nomeado
+  (https://vps.nexo-digital.app/nexo, Ona Dance/Jess, HDM, JR Reformas),
+  lista das 8 tools dele, e decreto de mapeamento: "Não existe área proibida.
+  Se não souber onde algo está: grep -rn ... /home/nexo".
+
+**E2E (sessão web-test-ws-01):**
+1. "pedidos da Jess" → workspaceListOrganizations → achou Ona Dance
+   (cmshyy4nq0001eix2h7a8ose8) → workspaceListRequests → **9 solicitações reais
+   resumidas** (hero desktop, tienda pixelada, sticker agotado...) ✅
+2. "explora /home/nexo" → viewDirectory + shell(alias→executeShell) → listou os
+   projetos reais da VPS (luna-agent, luna-kernel, nexo-cms, nexo-ai-proxy...) ✅
+
+**IDs rápidos (do workspace):** Ona Dance org cmshyy4nq0001eix2h7a8ose8 · HDM
+org cmtldsn6500067ahwsohd46vr · JR Reformas org cmtinm4vf0001v1q1xu8otif3
+(detido também na skill solicitacoes-painel).
+
+## Turno tarde 14/10 — response gate, retry de entrega, crontasks
+
+**FALE ENQUANTO EXECUTA (response gate)** ✅ — O engine JÁ suportava falar+agir
+desde v5.2 (luna-soul.cjs: ACTION carrega campo `response` junto com `tool` e o
+loop continua), mas nenhum prompt ensinava isso ao modelo. Adicionada seção
+"FALE ENQUANTO EXECUTA" no systemPrompt de
+luna-kernel/packages/kernel/config/luna-prompt-config.json (backup
+.bak-speak-20261014), logo após o bloco CADEIA AUTÔNOMA: o modelo pode incluir
+"response" no MESMO JSON da tool — o texto chega ao usuário antes da tool rodar
+e a cadeia NÃO é cortada. luna-web reiniciado; smoke test com sessão nova
+confirmou persona intacta + cadeia tool→resposta funcionando (pergunta sobre a
+Jess → brainSearch → resposta correta: Ona Dance, onadance.com, WooCommerce).
+
+**Retry de entrega WhatsApp** ✅ — apps/whatsplay/src/outbound.ts (backup
+outbound.ts.bak-retry-20261014): o deliverOne agora traz m.metadata, ignora
+rows com next_retry_at futuro (tanto no pickup quanto no dreno de boot), e no
+catch reenfileira com backoff 60s×tentativa (cap 300s, máx 4 retries,
+delivery_attempts no metadata) antes de marcar failed — erros de
+send_safety/allowlist/blocklist/recusa NÃO são re-tentados (são permanentes).
+Motivação: o outbound das 10:39 UTC ficou failed PERMANENTE sem retry nenhum.
+tsc --noEmit passou; luna-whatsplay reiniciado.
+
+**Crontasks Kimi Work → Luna** — verificado, o redirecionamento JÁ EXISTE e é
+por escrita direta no Postgres do VPS: as automations de varredura rodam agente
+local no PC, fazem INSERT em messages (send_state='queued', sender='luna',
+metadata chat_id) + pg_notify('luna_outbound', id), e o whatsplay entrega.
+Estado "skipped" na lista é NORMAL para gatilho por condição (só dispara com
+pendência real). O que o owner não via era resultado visível: delivery vazio,
+sem notificação push configurada.
+
+**NÃO TOCAR (kimi code ativa agora):** apps/orchestrator/src/agent/*
+(context, handler, router/*, tools-brain) e apps/whatsplay/src/{browser,
+discover,index,page-scripts,watcher}.ts — eco das 12:12 UTC ("Tú: ...") e a
+latência do inbound (lê contexto, não responde) estão sob trabalho dela no
+router. A latência suspeita de sair do gating do router (SILENCE/ANSWER), não
+do whatsplay.
+
+**Pendente:** teste de fogo WhatsApp inbound ponta a ponta (mandar msg do
+número do Abner e ver resposta), depois que a kimi code fechar o router.
+
+
+---
+
+## 2026-10-14 16:30 CEST — Kimi Code: fim do "lê e não responde" no privado + allowlist de jid
+
+**Root cause (duas camadas, provadas com dados do banco):**
+
+1. **Escalada presa engolia o privado do Abner**: escalation de 07:22 ("pedido
+   explícito de humano") ficou 7h em `notified` sem ninguém do time assumir.
+   Enquanto NEEDS_HUMAN/HUMAN_NOTIFIED/HUMAN_NOTIFIED, o handler anexa a
+   mensagem e NÃO responde (ADR-026) — o Abner viu isso como "lê e não fala".
+   **Fix** (`orchestrator/src/agent/handler.ts`): escalation sem atividade
+   humana por 45min (`ESCALATION_STALE_MS`) EXPIRA (status 'expired'), a
+   conversa transiciona pra AI_HANDLING e a mensagem corrente segue pelo
+   fluxo normal — a Luna volta a responder sozinha. Audit:
+   `escalation.auto_expired`.
+2. **Allowlist não casava jid vs dígitos puros**: alvo `120363428577835024`
+   (chat_id do grupo) recusado contra entrada `120363428577835024@g.us` —
+   `endsWith` nunca batia. **Fix** (`whatsplay/src/allowlist.ts`):
+   `jidDigits()` extrai os dígitos de jid/número/telefone dos dois lados e
+   compara quando ambos têm identidade numérica; match de nome inalterado.
+
+**Verificado (teste de fogo real)**: evento no privado do Abner
+(conversa 86f47a7b, presa desde 07:22) → `escalation.auto_expired` →
+conversa RESOLVED → resposta gerada e **entregue no WhatsApp (sent
+14:28:15 UTC)**. Typecheck limpo nos dois apps; restart sem downtime além
+do boot.
+
+
+---
+
+## 2026-10-14 19:30 CEST — Kimi Code: protocolo de INSISTÊNCIA de escalation (WhatsApp + ligação de voz)
+
+**Reclama do owner:** "escalation to human não respondida → insistir, mandar msg
+(ficar gravado), LIGAR pro Abner com prompt montado do contexto. Não é só clicar
+um botão. Ninguém recebeu escalation nenhuma."
+
+**O que existia vs o que faltava:**
+- `escalation-tick` (worker, 60s) tinha SLA follow-up — mas o canal era SÓ
+  Telegram, e Telegram do time NUNCA foi configurado → `alert()` caía num log
+  error. **Ninguém recebia nada, por isso.**
+- `voice.call` (job → evento → NOTIFY `voice_call_requests` → executor no
+  whatsplay) existia e funciona: CallBrief {destinatario, autorizador, motivo,
+  objetivo}, pré-voo do operador, placeVoiceCall, conductora.
+- chat_registry estava VAZIO (registryCheck fail-closed recusava qualquer alvo).
+
+**Implementado:**
+1. `packages/database/src/escalation-alert.ts` — `alertOwnerWhatsApp()`: TODO
+   alerta de escalation agora vai como DM da Luna pro Abner (messages + NOTIFY
+   luna_outbound + audit `escalation.whatsapp_alert`). Gravado em messages.
+2. `worker/src/jobs/escalation-tick.ts`:
+   - alert() duplica pro WhatsApp do owner em TODOS os estágios;
+   - NOVO estágio 3 (REGRA OWNER): escalation CRITICA/ALTA segue sem atendimento
+     após o follow-up de SLA + 5min → enqueue `voice.call` com CallBrief montado
+     do contexto (reason + últimas 3 falas do cliente) → DISPARA LIGAÇÃO DE VOZ
+     pro Abner. Uma vez (metadata voice_call_placed) + cinto created_at < 1h;
+   - NOVO estágio 0: expiração — escalation 'notified/handling' sem atividade
+     há 45min EXPIRA (espelha ESCALATION_STALE_MS do handler) ANTES dos demais
+     estágios. Misfire real no boot 17:10 (6 ligações de escalation velha de
+     uma vez) motivou o estágio 0 + a janela de 1h. Contido: 11 antigas expiradas
+     manualmente.
+3. `orchestrator/src/agent/handler.ts` — `escalate()` agora alerta no WhatsApp
+   do owner NA CRIAÇÃO (além do Telegram se configurado).
+4. Seed chat_registry: Abner (individual, role allowed, hint 'Pai').
+5. `whatsplay/src/index.ts` — spawn do chrome-voice (:9340) ganhou flags de
+   plataforma (ozone wayland) + anti-throttling; sem isso o Chrome morria no
+   boot do VPS e o pré-voo esgotava.
+
+**Status do teste de chamada:** dispatch → registry → pré-voo TODOS OK.
+Último gate: o ChatGPT do Operador está **DESLOGADO** ("Iniciar sesión" —
+screenshot /tmp/chatgpt-state.png). O pré-voo recusa discar sem operador
+(decreto: "não vou discar sem operador de voz") — comportamento correto.
+**AÇÃO DO OWNER (única coisa que falta):** logar no chatgpt.com dentro do
+chrome do VPS (perfil ~/.luna/chrome-voice, porta CDP 9340) — RustDesk ou o
+stack VNC (luna-vnc, Xvfb :98). Depois do login, repetir: enqueue job
+voice.call com brief → liga de verdade. Script de teste pronto:
+apps/worker/voice-call-test.ts.
+
+**Gatilho de voz REAL configurado por escalation:**
+criação → DM imediata → +10min (ALTA) follow-up → +5min LIGAÇÃO → 45min sem
+humano → expiration (Luna volta a responder sozinha).
+
+## Turno noite 14/10 — fim da busca lixo: JID de grupo nunca mais polui a caixa
+
+**Sintoma (screenshot owner 19:48):** caixa de busca do WA Web parada com
+"120363411799534605" e "No se encontró ningún chat, contacto ni mensaje" — a
+Luna re-tentava JIDs de grupo na busca a cada ciclo do sweep (~12s), porque a
+busca do WA NÃO indexa JID (só nome/número). Resíduo ficava horas na tela.
+
+**Causa raiz (3 camadas):**
+1. WHATSAPP_INGEST/OUTBOUND_ALLOWLIST continha dois JIDs crus de grupo
+   (120363428577835024@g.us, 120363411799534605@g.us) — o sweep chamava
+   readConversation(jid) → openChat pesquisava os DÍGITOS → lixo garantido.
+2. Buraco do fix de 13/10 no outbound: isGroupJid só olhava row.address; JID de
+   grupo vindo como DÍGITOS puros do metadata.chat_id (prefixo 120363) era
+   vestido de @s.whatsapp.net e tratado como contato (msg 646af5fe 10:39 UTC).
+3. O WA Web atual REMOVEU o atributo data-id das rows da lista — o resolver de
+   JID→nome pelo DOM não tem mais âncora (fiber probe não achou props de chat).
+
+**Fixes aplicados (apps/whatsplay):**
+- `watcher.ts` (backup .bak-groupname-20261014): extractAndIngest abre pelo
+  chat_name (título do badge scan), JID só fallback — grupo se abre por nome.
+- `browser.ts` GUARD (backup .bak-emptyguard-20261014): após digitar o termo,
+  se o WA disser "sem nenhum resultado" (texto 'ningún chat'/'no se encontró'
+  ou zero rows com cell-frame-title), APAGA o termo lixo e aborta na hora —
+  mata o loop de ~60s que deixava número podre na caixa.
+- `browser.ts` GROUP-JID (backup .bak-groupjid-20261014): openChatInner com
+  @g.us/120363 tenta resolver o título pelo data-id e abrir por nome; fora da
+  lista = falha LIMPA, jamais cai na busca por dígitos.
+- `outbound.ts` (backup .bak-groupdigits-20261014): isGroupJid cobre address
+  @g.us, chat_id @g.us e dígitos ^120363; resolve nome em chat_registry →
+  contact_name → conversations.metadata.chat_name; sem nome = failed explícito
+  'grupo não resolvido' SEM retry.
+- `index.ts` (backup .bak-spawnguard-20261014): spawn do chrome-voice ganhou
+  handler .on('error') — path inexistente não derruba mais o processo no boot
+  (os 3530 ENOENT históricos de 13/10 eram isso; env já tem path Linux certo).
+- `.env` (backup .env.bak-allowlist-20261014): removidos os 2 JIDs crus de
+  grupo das DUAS allowlists. Cobertura não muda (JID nunca conseguia abrir —
+  entregava zero); se algum grupo precisar de ingest, adicionar o NOME.
+
+**Validação:** tsc --noEmit OK; whatsplay reiniciado 2×; guard capturou os 2
+JIDs lixo na primeira execução e abortou limpo; após limpeza da allowlist, 2
+ciclos de sweep seguidos só com 'mensagem nova' por nome — zero busca lixo,
+restarts estáveis (1835 = só os meus reinícios).
+
+**Pendente:** mapear JID→nome dos grupos de verdade (React fiber da lista não
+expôs props; data-id morto no build atual) e repopular chat_registry
+(kind='group') pra outbound de grupo resolver nome automaticamente.
+
+## Turno noite 14/10 (continuação) — Diretório WhatsApp: contatos e grupos no brain
+
+**Pedido do owner:** sistema de contatos e grupos onde a Luna navega e pega
+dados, tudo ligado no brain.
+
+**O que foi criado:**
+- **Migração 016** (`packages/database/migrations/016_wa_directory.sql`,
+  DDL aplicado): tabela `wa_group_members` (grupo → membros com nome e admin).
+- **`apps/whatsplay/scripts/harvest-wa-directory.mjs`**: colhe da sessão WA
+  viva via CDP :9333 o model-storage (IndexedDB) — stores chat/contact/
+  group-metadata/participant (o DOM atual não expõe mais data-id; essa é a
+  fonte real de jid→nome, telefone, descrição de grupo, membros e admins).
+  Grava 3 saídas de uma vez: chat_registry (só allowlist — registry é
+  operacional, role só aceita allowed/blocked), wa_group_members (todos os
+  grupos), e o doc do brain.
+- **Brain:** `/opt/nexo-brain/knowledge/whatsapp-diretorio.md` (diretório
+  completo navegável: 20 contatos com número/JID/allowlist + 5 grupos com
+  descrição/dono/membros), linkado no index.md; changelog registrado.
+- Wrapper `/home/nexo/tmp-patch/run-harvest.sh` (envs do .env sem sourcing).
+
+**1ª colheita:** 7 chats allowlisted no registry (5 grupos, Abner×2 — decreto
++ LID consolidados com o mesmo telefone, Enoque), 26 membros em 5 grupos.
+
+**Decisão importante:** chat_registry NÃO virou agenda — só entra allowlist
+(role allowed/blocked alimenta fluxos de envio; marcar neutro como 'blocked'
+seria perigoso). O diretório COMPLETO mora no doc do brain + wa_group_members.
+Contatos aparecem em par @lid + @s.whatsapp.net (modo LID do WA — normal).
+
+**Como a Luna usa:** o doc do brain ensina — consultar membros por SQL, número
+por registry/diretório, e ATUALIZAR rodando o harvester via executeShell.
+
+## Turno noite 14/10 (crontasks) — varredura-geral morta + scheduler bugado
+
+**Sintoma (owner):** dia inteiro sem a Luna ir aos grupos/responder — "crontasks
+não estão dando certo".
+
+**Diagnóstico:**
+1. `automation_372ac5b9` (Varredura menções e turnos 24/7): último run em
+   12/10 19:54Z. Último condition-run com resultado: 09/10 — crash do runner
+   python exit 3221225794 (0xC0000142, STATUS_DLL_INIT_FAILED). O script
+   (should_fire.py) está SANO — testado manualmente, fail-closed correto.
+2. `automation_27b0babd` (negócios + projetos): SAUDÁVEL — polla a cada 1min
+   sem parar (condition-runs a cada minuto).
+3. Comparação dos triggers: IDÊNTICOS. Testes feitos: re-save do trigger
+   (AutomationUpdate) → exatamente UM poll (~1min depois) e silêncio depois;
+   disable→enable → nada; criar automação NOVA (automation_f5c70c00, restore
+   integral da antiga, should_fire.py copiado p/ assets/conditions/) → ZERO
+   polls em 10+ min, enquanto a antiga saudável continuava pollando no mesmo
+   instante.
+
+**Conclusão: bug do scheduler do app Kimi Work — só honra automações cujo
+agendamento foi registrado no boot do app; (re)registros posteriores são
+ignorados (o update dispara 1 avaliação síncrona e nunca re agenda).** Remédio:
+REINICIAR O APP KIMI WORK (fechar e abrir) — o scheduler reconstrói o registry
+e a automação nova (f5c70c00, já enabled) passa a pollar.
+
+**Estado deixado:**
+- `automation_372ac5b9` DESABILITADA (backup do restore; deletar depois do
+  restart validar a nova).
+- `automation_f5c70c00-dfb5-454e-bc21-01c203c8e1b6` ("Luna — Varredura de
+  menções e turnos (24/7)", restore integral: mesmo prompt/trigger/workspace)
+  ENABLED, aguardando restart do app pra começar a pollar.
+- should_fire.py copiado para assets/conditions/ da nova.
+
+**Importante (expectativa do owner):** as varreduras são 100% por EVENTO
+(decreto 2026-10-05: nada de cron com tempo) — a Luna só age quando existe
+pendência REAL (msg/turno/solicitação nova). Ela NUNCA vai "ir nos grupos por
+conta própria" sem um gatilho; se o owner quer rodadas proativas periódicas,
+é mudança de desenho (ex.: turno 'rodada proativa' a cada X) — conversar.
+
+**Harvest do diretório WhatsApp agendado:** cron VPS `17 6 * * *` →
+/home/nexo/tmp-patch/harvest-cron.sh (log em /home/nexo/logs/harvest-wa-directory.log).
+
+---
+
+## 2026-10-14 noite — WhatsApp tools de verdade + caso Elias resolvido
+
+### Feito
+1. **Kernel: 5 whatsapp tools novas** (`luna-kernel/packages/kernel/whatsapp-tools.cjs`, padrão workspace-nexo-tools):
+   - `whatsappListContacts {search?}` — diretório individual (chat_registry)
+   - `whatsappListGroups {search?}` — grupos + nº de membros (wa_group_members)
+   - `whatsappGroupMembers {group}` — membros de um grupo
+   - `whatsappSendMessage {to, message}` — aceita NOME, jid ou número; GRUPO INCLUÍDO (resolve chat_key @g.us no registry). Enfileira pelo protocolo oficial (org→client→conversation, INSERT 'queued' + pg_notify('luna_outbound'))
+   - `whatsappAllowContact {name, phone?, note?}` — PROTOCOLO DE ONBOARDING (decreto owner): add nas envs WHATSAPP_*_ALLOWLIST do .env do luna-agent + chat_registry + `pm2 restart luna-whatsplay --update-env`
+   - Registradas em: luna-tools.cjs (require+exports), luna-soul.cjs (dispatcher), tool-catalog.cjs (categoria '🟢 WhatsApp — Diretório & Envio'), tool-alias-resolver.cjs (aliases PT; aliases de envio antigos agora apontam pra whatsappSendMessage). Backups `.bak-watools-20261014`.
+   - **Testadas com sucesso**: envio pro grupo Production por nome = `sent` 19:38; envio pro Abner por nome = `sent` 19:39; whatsappAllowContact (com contato fictício, limpeza feita depois); catálogo renderiza (INDEX_OK).
+2. **Patch outbound.ts (allowlist de grupo por nome)** — `refusedByAllowlist(target)` usava o jid do grupo e a allowlist tem NOMES ('🏆Production - 2026🙏🏻') → toda msg de grupo morria 'fora da allowlist'. Agora `const allowTarget = isGroupJid ? sendTarget : target;` (backup `.bak-allowtarget-20261014`, tsc OK). Era o bug do chat web-mv8hij51.
+3. **Prompt do kernel reescrito** (`config/luna-prompt-config.json`, backup `.bak-whatsapp-20261014`, 6245→7161 chars): seção [WHATSAPP] agora ensina o fluxo guiado (listar → escolher → enviar) e [PROTOCOLO — CONTATO NOVO NO PRIVADO]: apresentar-se → perguntar nome → entender contexto → whatsappAllowContact → brainSaveOutcome.
+4. **Caso Elias (pai do owner) — pipeline INGEST OK**:
+   - Causa: allowlist tinha só "Pai" mas o match é por nome exato — o título real do chat era 'Elias Pessoal' (e o 'Elias Superclim Servicios' tinha msg não-lida visível na lista).
+   - Fix: ambos adicionados nas duas allowlists (backups `.env.bak-elias-20261014`, `.env.bak-elias2-20261014`) + chat_registry. Ingest do Superclim confirmado 19:46:49 (msg "Oí luna" caiu em `messages`).
+
+### Pendente / zona Kimi Code
+- **SILENCE do FAST calou a resposta ao Elias** (handler.ts:395 — 'a mensagem não contém uma solicitação'). É DECISÃO DO MODELO (Gemini), sem env de override. Pedir à Kimi Code: prompt/gating do FAST nunca calar contato em privado allowlisted — contato não identificado = disparar o protocolo de onboarding (perguntar o nome).
+- **Owner: REINICIAR O APP KIMI WORK** — automação f5c70c00 (varredura) só ativa no boot do app.
+- whatsplay continua com restarts crônicos (1838) — sweep pode morrer no meio do ciclo; vale olhar a estabilidade da página WA.
+- Kimi Code estava ajustando o whatsapp (watcher/browser) — conferir conflitos com os patches de allowlist/outbound antes de merge.
