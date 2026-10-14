@@ -37,6 +37,9 @@ export interface InvestigateDeps {
   live: KimiLiveAdapter;
   log: Logger;
   telegram?: TelegramConfig;
+  /** ADR-042: live brain API (roda) roda sem ferramentas — prompt adaptado.
+   *  Default true (kimi-cli/pi/kimi-web-local têm ferramentas reais). */
+  liveHasTools?: boolean;
 }
 
 interface InvestigatePayload {
@@ -57,7 +60,7 @@ interface Round {
   duration_ms: number;
 }
 
-const SINGLE_PROMPT = (objective: string, context: string): string =>
+const SINGLE_PROMPT_TOOLS = (objective: string, context: string): string =>
   [
     'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE). Você tem FERRAMENTAS REAIS,',
     'incluindo ESCRITA: Write, Edit, Read, Grep/Glob e Bash. EXECUTE a tarefa de verdade com',
@@ -71,6 +74,27 @@ const SINGLE_PROMPT = (objective: string, context: string): string =>
     'Termine a resposta com a linha "CONCLUSAO_PRONTA:" seguida da RESPOSTA FINAL para o cliente',
     '(direta, em PT-BR, sem mencionar ferramentas). Se de fato não for possível concluir, escreva',
     '"NÃO RESOLVIDO: <motivo>" no lugar do marcador.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+/** ADR-042 — live brain API (roda): stateless, SEM ferramentas. A tarefa é
+ *  resolvida com raciocínio + o contexto que o FAST passou; ação/escrita real
+ *  fica pro modo com ferramentas — nesse caso o modelo declara NÃO RESOLVIDO
+ *  e a Luna responde o grupo com o que dá pra fazer. */
+const SINGLE_PROMPT_NOTOOLS = (objective: string, context: string): string =>
+  [
+    'Você é a Luna no CÉREBRO VIVO (investigação HANDOFF_LIVE, modo API).',
+    'Você NÃO tem ferramentas neste modo: resolva com raciocínio e com os dados',
+    'do contexto abaixo — NUNCA finja que executou ação no mundo real.',
+    '',
+    `TAREFA DESTA INVESTIGAÇÃO: ${objective}`,
+    context ? `Contexto que o cérebro rápido juntou: ${context}` : '',
+    'Esta é a ÚNICA chamada que você vai receber para este pedido: seja completo',
+    'agora. Termine com a linha "CONCLUSAO_PRONTA:" seguida da RESPOSTA FINAL',
+    '(direta, em PT-BR, pronta pra mandar no WhatsApp). Se a tarefa exigir ação/',
+    'escrita que só o modo com ferramentas consegue executar, escreva',
+    '"NÃO RESOLVIDO: <o exatamente que falta>" no lugar do marcador.',
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -217,16 +241,17 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
     }
 
     // 1b) DEDUPE SEMÂNTICO: mesma intenção em PARÁFRASE (o match exato acima
-    //     não pega) já DESPACHADA nesta conversa nas últimas 24h → não reenvia.
-    //     A fonte da verdade são os eventos `router.investigation.dispatched`
-    //     (não a tabela jobs): jobs só ENFILEIRADOS ainda não enviaram nada —
-    //     dois pedidos simultâneos sobre o mesmo tema não podem se cancelar.
-    //     Turnos que escalaram (falharam) são ignorados: re-pedido pós-falha
-    //     é legítimo ("só 1x" vale para o pedido ATENDIDO — depois esquece).
+    //     não pega) já ATENDIDA nesta conversa nas últimas 24h → não reenvia.
+    //     Bug ao vivo 14/10: a fonte era `router.investigation.dispatched` —
+    //     um pedido só DESPACHADO (e que falhou/capou no live brain) bloqueava
+    //     para sempre os re-pedidos legítimos ("só 1x" do decreto vale pro
+    //     pedido ATENDIDO — completado com resposta entregue). Turnos que
+    //     escalaram (falharam) também são ignorados: re-pedido pós-falha é
+    //     legítimo.
     const recent = await pool.query<{ objective: string }>(
       `SELECT DISTINCT payload->'payload'->>'objective' AS objective
          FROM events
-        WHERE event_type = 'router.investigation.dispatched'
+        WHERE event_type = 'router.investigation.completed'
           AND recorded_at > now() - interval '24 hours'
           AND conversation_id = $1`,
       [payload.conversation_id],
@@ -293,7 +318,9 @@ export function createInvestigateHandler(deps: InvestigateDeps): JobHandler {
     try {
       const turn = await live.sendTurn({
         session_key: `investigate:${job.id}`,
-        prompt: SINGLE_PROMPT(payload.objective, payload.context_summary ?? ''),
+        prompt: (deps.liveHasTools ?? true)
+          ? SINGLE_PROMPT_TOOLS(payload.objective, payload.context_summary ?? '')
+          : SINGLE_PROMPT_NOTOOLS(payload.objective, payload.context_summary ?? ''),
       });
       finding = turn.reply_text;
     } catch (err) {

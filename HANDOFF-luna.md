@@ -444,3 +444,16 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
 - Deployado VPS (hash conferido PC=VPS), typecheck verde, 16/16 testes do router passando.
 - **Tools via WhatsApp: SIM** — o loop TOOL_CALL (tope 5 rodadas) é agnóstico de canal. Catálogo no boot: `conversation.recent`, `client.summary`, `brain.search`, `brain.client_ficha`, `nexo.*` (finance, clients, leads, tasks, cashbox, expenses, payments, quotes, ideas, system.status, ops.overview, notifications, reports, client_orders, client_history), `voice.call_place`.
 - Observação: 6 eventos `whatsapp.message` parados 'pending' na kimiwork_inbox (ponte Kimi Work desligada no VPS — modo default não é kimiwork). Se a ponte for religada, esses eventes voltam a ser consumidos; se não, podem ser limpos.
+
+### Addendum 08:45 (14/10) — WAKE-UP LOOP do HANDOFF consertado: live brain = roda (ADR-042)
+- **Sintoma do owner:** "vou dar uma olhadinha" e nunca voltava. Causas reais (tudo verificado ao vivo):
+  1. Live brain era `kimiwork`, com **cap de segurança de 12h atingido** — todo HANDOFF_LIVE falhava no sendTurn → escalate pro time, nada pro cliente.
+  2. Dedupe semântico usava `router.investigation.dispatched` — pedido que só FOI DESPACHADO (e falhou) bloqueava re-pedidos legítimos pra sempre (3 skips com score 1.0 ao vivo).
+  3. 1 job investigate travado 'running' desde 06:20 (kimiwork pollando varredura que nunca vinha).
+- **Fix (sua arquitetura, exatamente):** live brain agora pode ser `LIVE_BRAIN_PROVIDER=roda` — a MESMA roda de providers do FAST (github gpt-4o primeiro). Stateless, OpenAI-compatible, com fallback entre providers grátis. Troca = só .env.
+  - `packages/shared/config.ts`: enum + `LIVE_BRAIN_RODA_CONFIG` (default `/home/nexo/luna-kernel/roda/providers.json`).
+  - `apps/worker/src/index.ts`: branch roda no liveAdapter + `liveHasTools` pro investigate.
+  - `apps/worker/src/jobs/investigate.ts`: prompt NOTOOLS pro modo API (sem prometer Write/Edit/Bash; NÃO RESOLVIDO se a tarefa exigir ação real) + dedupe agora só conta `router.investigation.completed` (atendido, não despachado).
+- **VPS configurado:** `LIVE_BRAIN_PROVIDER=roda` + `OPENROUTER_API_KEY` no `.env` (faltava lá também — só existia no roda/.env).
+- **TESTE DE FOGO ✅:** job investigate manual → roda (gpt-4o) respondeu em ~2s → "O cérebro vivo da Luna voltou a funcionar, e este é o modelo GPT-4 respondendo." → entregue no WhatsApp do Abner (`send_state='sent'`). 9/9 testes do investigate, typecheck PC+VPS verde.
+- Limitação honesta do modo roda: sem ferramentas — pesquisa/raciocínio com o contexto que o FAST passa. Ação real (escrever arquivo, ligar, mexer no painel) volta a precisar de kimi-cli/pi/kimi-web-local quando houver quota.
