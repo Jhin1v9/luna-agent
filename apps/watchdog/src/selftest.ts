@@ -9,6 +9,14 @@ import type { Logger } from 'pino';
 const execFileP = promisify(execFile);
 
 /**
+ * Root do luna-agent no disco. No PC é o caminho Windows default; no VPS
+ * (e qualquer outro host) sobrescreve com LUNA_AGENT_ROOT=/caminho/do/repo.
+ * 2026-10-13: paths estavam hardcoded — watchdog no VPS falhava self-test
+ * (.brain, git -C, statfs apontando pra C:/Users/Abner/... inexistente).
+ */
+const AGENT_ROOT = process.env.LUNA_AGENT_ROOT ?? 'C:/Users/Abner/Documents/Luna cto/luna-agent';
+
+/**
  * Self-test periódico (§20): Luna testa a si mesma — DB, Brain, Kimi API,
  * WhatsPlay, browser, Git, storage. Corrige o que pode (restart via watchdog),
  * alerta o que não pode. Rodada agendada (6h) + ao boot. Resultados em
@@ -33,8 +41,15 @@ async function checkDb(pool: Pool): Promise<SelfTestResult> {
 async function checkBrain(): Promise<SelfTestResult> {
   try {
     const { existsSync, readdirSync } = await import('node:fs');
-    const brain = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain';
-    if (!existsSync(brain)) return { name: 'brain', ok: false, detail: '.brain não existe' };
+    const brain = `${AGENT_ROOT}/.brain`;
+    if (!existsSync(brain)) {
+      // Sem brain LOCAL em host remoto é o modo normal (kernel/brain via HTTP):
+      // o check local só é significativo no PC (root default).
+      if (process.env.LUNA_AGENT_ROOT) {
+        return { name: 'brain', ok: true, detail: 'sem .brain local — brain remoto (HTTP)' };
+      }
+      return { name: 'brain', ok: false, detail: '.brain não existe' };
+    }
     const files = readdirSync(`${brain}/luna/selectors`);
     return { name: 'brain', ok: files.length > 0, detail: `selector memory com ${files.length} arquivo(s)` };
   } catch (err) {
@@ -53,7 +68,7 @@ async function checkKimi(adapter: KimiLiveAdapter): Promise<SelfTestResult> {
 
 async function checkGit(): Promise<SelfTestResult> {
   try {
-    await execFileP('git', ['-C', 'C:/Users/Abner/Documents/Luna cto/luna-agent', 'rev-parse', '--short', 'HEAD'], { timeout: 10_000 });
+    await execFileP('git', ['-C', AGENT_ROOT, 'rev-parse', '--short', 'HEAD'], { timeout: 10_000 });
     return { name: 'git', ok: true, detail: 'repo acessível' };
   } catch (err) {
     return { name: 'git', ok: false, detail: String(err).slice(0, 120) };
@@ -63,7 +78,7 @@ async function checkGit(): Promise<SelfTestResult> {
 async function checkStorage(): Promise<SelfTestResult> {
   try {
     const statfs = await import('node:fs/promises').then((m) => m.statfs);
-    const s = await statfs('C:/Users/Abner/Documents/Luna cto/luna-agent');
+    const s = await statfs(AGENT_ROOT);
     const freePct = (s.bavail / s.blocks) * 100;
     return {
       name: 'storage',

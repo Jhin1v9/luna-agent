@@ -16,8 +16,8 @@ const config = loadConfig();
 const log = createLogger({ name: 'whatsplay-discover' });
 
 const userDataDir =
-  config.WHATSAPP_USER_DATA_DIR || 'C:/Users/Abner/.luna/chrome-whatsapp';
-const evidenceDir = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain/luna/incidents';
+  config.WHATSAPP_USER_DATA_DIR || '/home/nexo/.luna/chrome-whatsapp';
+const evidenceDir = '/home/nexo/luna-agent/.brain/luna/incidents';
 const loginMode = process.argv.includes('--login');
 
 async function main(): Promise<void> {

@@ -2,7 +2,6 @@ import type { Pool } from 'pg';
 import { resolveIngressIdentity, insertInboundMessage, publishEvent, recordAudit, insertKimiWorkEvent } from '@luna/database';
 import type { Logger } from 'pino';
 import type { UnreadMessage, WhatsAppTransport } from './transport.js';
-import { shouldRespond } from './rules.js';
 import { detectSelfEcho } from './self-echo.js';
 
 /**
@@ -76,21 +75,10 @@ export function createIngest(deps: IngestDeps) {
       }
     }
 
-    // Foto pura (sem legenda) não menciona ninguém — no grupo segue o silêncio
-    // absoluto (§5); no privado sempre responde (regra fixa).
+    // 2026-10-14 (decreto owner "braços potentes"): grupo sem menção NÃO é
+    // mais engolido aqui — o evento sobe pro FAST e é O MODELO que decide
+    // entre ANSWER e SILENCE (saída estruturada nova). Antes: skip duro §5.
     const effectiveText = msg.text || (msg.image_path ? '[imagem]' : '');
-
-    if (
-      !shouldRespond({
-        is_group: msg.is_group,
-        text: msg.text,
-        mentioned_luna: msg.mentioned_luna,
-        reply_to_luna: quotedFromLuna,
-      })
-    ) {
-      log.debug({ chat: msg.chat_name }, 'grupo sem menção/reply — silêncio absoluto (§5)');
-      return 'skipped';
-    }
 
     // 📇 Diretório de pessoas (decreto owner 01/10): junto com cada mensagem a
     // Luna recebe nome + número + papel + org do autor (ex.: "Abner 34685...
@@ -136,6 +124,7 @@ export function createIngest(deps: IngestDeps) {
         text: msg.text,
         author_name: msg.author_name ?? msg.chat_name,
         is_group: msg.is_group,
+        mentioned_luna: msg.mentioned_luna === true,
         deliver: true,
         chat_id: msg.chat_id,
         quoted_text: msg.quoted_text ?? null,

@@ -18,7 +18,7 @@ loadDotEnv();
 const config = loadConfig();
 const log = createLogger({ name: 'luna-watchdog' });
 
-const ROOT = 'C:/Users/Abner/Documents/Luna cto/luna-agent';
+const ROOT = process.env.LUNA_AGENT_ROOT ?? 'C:/Users/Abner/Documents/Luna cto/luna-agent';
 const CHECK_INTERVAL_MS = 20_000;
 const SELFTEST_INTERVAL_MS = 6 * 60 * 60_000; // 6h (§20: todo dia; 6h é mais útil em dev)
 const RESTART_COOLDOWN_MS = 120_000;

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 /**
@@ -25,7 +26,10 @@ export interface RouterConfig {
 }
 
 export function loadRouterConfig(
-  path = 'C:/Users/Abner/Documents/Luna cto/luna-agent/apps/orchestrator/config/routes.json',
+  // 2026-10-14: era caminho Windows absoluto hardcoded — quebrava na VPS
+  // (ENOENT no handler whatsapp.message.received, dead letter). Agora
+  // resolve relativo ao modulo: funciona no PC e na VPS sem configuracao.
+  path = fileURLToPath(new URL('../../../config/routes.json', import.meta.url)),
 ): RouterConfig {
   const raw = JSON.parse(readFileSync(path, 'utf8')) as { routes: Record<string, unknown> };
   const routes: Record<string, RouteConfig> = {};

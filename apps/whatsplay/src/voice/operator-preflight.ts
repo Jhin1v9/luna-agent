@@ -33,6 +33,8 @@ export interface CallBrief {
   motivo: string;
   /** O que a Luna precisa que o Operador faça. */
   objetivo: string;
+  /** 🆕 conversa de onde o pedido partiu — o report-back volta lá. */
+  origem_conversation_id?: string | null;
 }
 
 export interface PreflightDeps {
@@ -62,6 +64,9 @@ const COMPOSE_PROMPT = (brief: CallBrief): string =>
     'mantém a conversa viva (marca de espera padrão quando processando); trata a Luna como colega;',
     'PAPÉIS (explícitos): o Operador é SÓ A VOZ — nunca decide nada, segue o que aparecer no chat;',
     'a Kimi (Live) é a conductora que vê tudo e intervem; e SEMPRE se despede curto e simpático ao encerrar.',
+    'REGRA OWNER 14/10: (1) antes de desligar, confira se o pedido foi SATISFEITO — se faltar algo, pergunte agora;',
+    '(2) durante a conversa, CONVIDE o participante a pedir à Luna: "se quiser algo, fala \"Luna, ...\" aqui no chat',
+    'que ela está lendo a transcrição" — perguntas à Luna são respondidas por escrito no chat em segundos.',
   ].join('\n');
 
 /** Confirmação = resposta do assistente apareceu na conversa. */

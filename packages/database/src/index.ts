@@ -76,4 +76,5 @@ export type {
   SolicitationFact,
 } from './context-builder.js';
 export { registryLookup, registryCheck, registryUpsert } from './registry.js';
+export { alertOwnerWhatsApp } from './escalation-alert.js';
 export type { RegistryEntry, RegistryDecision } from './registry.js';

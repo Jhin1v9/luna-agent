@@ -14,7 +14,7 @@ export interface SelectorChange {
 }
 
 const MEMORY_PATH =
-  'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain/luna/selectors/whatsapp.md';
+  '/home/nexo/luna-agent/.brain/luna/selectors/whatsapp.md';
 
 export function appendSelectorMemory(change: SelectorChange): void {
   const now = new Date().toISOString().slice(0, 10);

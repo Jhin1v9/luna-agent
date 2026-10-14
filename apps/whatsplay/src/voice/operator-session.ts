@@ -325,7 +325,7 @@ export class OperatorSession {
         continue;
       }
       this.say(`cliquei no ícone de voz (${sel}) — verificando`);
-      if (await this.waitVoiceModeActive(page, 12_000)) {
+      if (await this.waitVoiceModeActive(page, 20_000)) {
         this.say('voice mode ativo ✅');
         return;
       }
@@ -343,7 +343,7 @@ export class OperatorSession {
       })()`)
       .catch(() => false);
     if (fallback === true) {
-      if (await this.waitVoiceModeActive(page, 12_000)) {
+      if (await this.waitVoiceModeActive(page, 20_000)) {
         this.say('voice mode ativo ✅ (fallback posicional)');
         return;
       }
@@ -364,16 +364,44 @@ export class OperatorSession {
     return false;
   }
 
-  /** Best-effort: lê a última resposta do assistente na página. */
+  /** Best-effort: lê a última resposta do assistente na página.
+   *  2026-10-14: o ChatGPT trocou o DOM do modo voz — o seletor antigo
+   *  [data-message-author-role] morreu e o pré-voo abortava SEMPRE ("Operador
+   *  não confirmou") mesmo com o ChatGPT respondendo ao vivo. Estratégias em
+   *  cascata, validadas no DOM vivo do perfil do owner:
+   *  1. comentário da sessão de voz (voice-commentary-message);
+   *  2. blocos de transcript .text-size-chat que NÃO são fala do usuário
+   *     ("Tú dijiste"/"You said" num ancestral);
+   *  3. botão de parar/encerrar visível = sessão de voz gerando/falando AGORA. */
   async readLatestReply(page: import('playwright-core').Page): Promise<string | null> {
     const replies = await page
       .evaluate(`(() => {
-        const els = document.querySelectorAll('[data-message-author-role="assistant"]');
-        const last = els[els.length - 1];
-        return last ? (last.textContent || '').trim().slice(0, 500) : null;
+        const vis = (e) => {
+          if (!e) return false;
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const vc = document.querySelector('[data-testid="voice-commentary-message"]');
+        if (vis(vc) && (vc.textContent || '').trim().length > 2) return (vc.textContent || '').trim().slice(0, 500);
+        const blocks = Array.from(document.querySelectorAll('.text-size-chat.whitespace-pre-wrap'));
+        for (let i = blocks.length - 1; i >= 0; i--) {
+          const b = blocks[i];
+          let anc = b.parentElement, selfSpoken = false;
+          for (let d = 0; d < 4 && anc; d++) {
+            if (/^(tú|você|you)\s+dijiste|^(tú|você|you)\s+said/i.test(((anc.textContent || '')).trim().slice(0, 40))) { selfSpoken = true; break; }
+            anc = anc.parentElement;
+          }
+          if (selfSpoken) continue;
+          const t = (b.textContent || '').trim();
+          if (t.length > 2) return t.slice(0, 500);
+        }
+        const stop = Array.from(document.querySelectorAll('button')).find((b2) =>
+          /detener|parar|stop|encerrar|finalizar/i.test(b2.getAttribute('aria-label') || '') && vis(b2));
+        if (stop) return 'voice-session-ativa';
+        return null;
       })()`)
       .catch(() => null);
-    return typeof replies === 'string' ? replies : null;
+    return typeof replies === 'string' && replies ? replies : null;
   }
 
   /**

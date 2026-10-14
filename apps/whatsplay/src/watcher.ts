@@ -158,6 +158,7 @@ export class IngestWatcher {
     this.ingest = deps.ingestFn ?? createIngest({ pool: deps.pool, transport: deps.transport, log: deps.log }).ingestOne;
     this.ingestAllowlist = parseAllowlist(deps.ingestAllowlist?.join(','));
     this.enforceIngest = deps.enforceIngestAllowlist ?? false;
+    // 2026-10-14 diagnostico: gate do sweep explicito no boot
   }
 
   private async collect(): Promise<ChatBadge[]> {
@@ -254,15 +255,49 @@ export class IngestWatcher {
       // jid (decreto: número do owner, ex. 34685093192@s.whatsapp.net):
       // o browser busca pelo número — sweep suporta; nome segue igual.
       try {
-        const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
-        const last = msgs[msgs.length - 1];
-        if (!last) continue;
+        await this.sweepOne(entry);
+      } catch (err) {
+        // 2026-10-14: era silencioso — inbound morria aqui sem rastro.
+        this.deps.log.warn({ entry, err: String(err).slice(0, 200) }, 'watcher(sweep): leitura falhou — retry em 8s');
+        // Sweep adaptativo (decreto owner "badge é frágil"): em vez de esperar
+        // o ciclo inteiro (60s), espera a página sair do reload e tenta 1x mais.
+        await new Promise((r) => setTimeout(r, 8000));
+        await this.sweepOne(entry).catch((err2) =>
+          this.deps.log.warn({ entry, err: String(err2).slice(0, 200) }, 'watcher(sweep): retry falhou — próximo ciclo'),
+        );
+      }
+    }
+  }
+
+  /** Lê um chat allowlisted e dispara ingest quando a última mensagem MUDA. */
+  private async sweepOne(entry: string): Promise<void> {
+    {
+      const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
+        // 2026-10-14 (bug ao vivo): olhar SO a ultima mensagem do painel
+        // engolia pedido respondido — quando a Luna responde, o painel termina
+        // com outbound DELA e o sweep pulava o cliente pra sempre (mensagem do
+        // Abner ficou horas sem resposta por causa do 'pronto Abner' outbound
+        // por cima). Agora: candidata = ultima mensagem DEPOIS da ultima
+        // resposta da Luna (outbound sem mencao).
+        // 2026-10-14 (loop de eco no grupo): msg PRÓPRIA pode chegar sem
+        // tail-out (corrida pós-envio) e o fallback do read marca 'inbound'.
+        // Autor 'Tú'/'Você' é inequívoco — trata como outbound aqui também.
+        const SELF_AUTHOR = /^(tú|você|voce|you|tu)$/i;
+        const isSelfMsg = (m: { direction: string; author?: string | null }) =>
+          m.direction === 'outbound' || (m.author != null && SELF_AUTHOR.test(m.author));
+        let lastOutIdx = -1;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (isSelfMsg(msgs[i]!) && !extractMention(msgs[i]!.text)) { lastOutIdx = i; break; }
+        }
+        const pendente = msgs.slice(lastOutIdx + 1);
+        const last = pendente[pendente.length - 1];
+        if (!last) return;
         const key = `${last.direction}:${last.text}`;
         const prev = this.lastSeenMsg.get(entry);
         this.lastSeenMsg.set(entry, key);
         const isSelfTest = last.direction === 'outbound' && extractMention(last.text);
-        if (last.direction === 'outbound' && !isSelfTest) continue; // resposta da própria Luna
-        if (prev === key) continue; // mesma mensagem da última varredura
+        if (isSelfMsg(last) && !isSelfTest) return; // resposta da própria Luna
+        if (prev === key) return; // mesma mensagem da última varredura
         // Primeira vista (prev undefined): dispara SE acionável (inbound ou
         // self-test do owner); dedupe fino de repetição fica no unique
         // (channel, external_id) de messages.
@@ -270,7 +305,16 @@ export class IngestWatcher {
         const msg: UnreadMessage = {
           chat_id: entry,
           chat_name: entry,
-          is_group: (await this.deps.transport.currentChatIsGroup?.().catch(() => false)) ?? false,
+          // 2026-10-14 (bug ao vivo): currentChatIsGroup lia o header com o
+          // painel JÁ fechado pelo readConversation (finally closeCurrentChat)
+          // → false SEMPRE; além disso o testid antigo morreu no DOM novo.
+          // Detecção estrutural pelo que acabou de ser lido: em GRUPO todo
+          // membro vem com label de autor (elemento [data-testid="author"]);
+          // no privado inbound não tem author e outbound sai como 'Tú' (sem
+          // elemento). Falso negativo só se as últimas 3 fossem 100% da Luna.
+          is_group: msgs.some(
+            (m) => m.author != null && m.author !== 'Tú' && m.author !== 'Você' && m.author !== 'You',
+          ),
           // transcrição com AUTOR (quem falou o quê) — prompt rico pra Luna
           text:
             msgs
@@ -283,7 +327,10 @@ export class IngestWatcher {
           // para textos-prefixo ("@luna teste diga 1" vs "...diga 123" =
           // mesmo hash, mensagem engolida como "duplicada"; ao vivo
           // 2026-09-22) e o hash de texto puro engolia reenvio idêntico.
-          external_id: `wa:${entry}:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
+          // (2026-10-14) sem o prefixo do entry: 'Abner' e
+          // '34685093192@s.whatsapp.net' abrem o MESMO chat — com entry no id,
+          // a mesma msg ingeria 2x (resposta duplicada).
+          external_id: `wa:${Buffer.from(`${(last as { author?: string | null }).author ?? ''}|${last.text}`).toString('base64')}`,
           mentioned_luna: extractMention(last.text),
           quoted_from_luna: false,
           quoted_text: (last as { quoted?: string | null }).quoted ?? null,
@@ -301,9 +348,6 @@ export class IngestWatcher {
             );
           },
         );
-      } catch {
-        // chat não abriu agora (virtualizado?), tenta no próximo ciclo
-      }
     }
   }
 
@@ -355,7 +399,12 @@ export class IngestWatcher {
   /** Abre só o chat novidade, extrai mensagens inbound recentes, ingere.
    *  Retorna 'ingested' (achou texto) ou 'empty' (só mídia/sem texto). */
   private async extractAndIngest(badge: ChatBadge): Promise<'ingested' | 'empty'> {
-    const messages = await this.deps.transport.readConversation(badge.chat_id, 10);
+    // 2026-10-14 (decreto owner, bug ao vivo 19:48): JID de grupo na busca do WA
+    // não acha NADA ("No se encontró") — grupo se abre pelo TÍTULO visível na
+    // lista (o badge scan já captura os dois em page-scripts.ts). chat_name é o
+    // alvo; o JID fica só de fallback (nunca deve acontecer: scan sempre tem nome).
+    const openTarget = badge.chat_name?.trim() || badge.chat_id;
+    const messages = await this.deps.transport.readConversation(openTarget, 10);
     let inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
     // ECO-FILTER (incidente 2026-10-09 — "Vênus respondendo a msm coisa toda
     // hora"): mensagens NOSSAS (Luna/Vênus) às vezes são capturadas como
@@ -393,7 +442,10 @@ export class IngestWatcher {
     const msg: UnreadMessage = {
       chat_id: badge.chat_id,
       chat_name: badge.chat_name,
-      is_group: badge.is_group,
+      is_group: badge.is_group || inbound.some(
+        (m) => (m as { author?: string | null }).author != null &&
+          !/^(tú|você|voce|you|tu)$/i.test(String((m as { author?: string | null }).author)),
+      ),
       text: inbound
         .slice(-3)
         .map((m) => `${(m as { author?: string | null }).author ?? m.sender ?? 'contato'}: ${m.text}`)

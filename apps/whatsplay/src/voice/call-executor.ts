@@ -117,7 +117,9 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
       brief.destinatario = decision.entry.canonicalName;
       log.info({ brief, correlation_id: correlationId }, 'voice.call: pedido recebido — pré-voo');
 
-      const tab = await preflightOperator({ operator, live, log, timeoutMs: 30_000 }, brief);
+      // 2026-10-14: 30s era curto demais pra sessão de voz do Operador estabilizar
+    // após login fresco (warmup do WebRTC) — 90s com saneamento de sessão no erro.
+    const tab = await preflightOperator({ operator, live, log, timeoutMs: 90_000 }, brief);
       log.info('voice.call: operador ativo — discando');
       await (transport as never as { placeVoiceCall: (c: string) => Promise<void> }).placeVoiceCall(brief.destinatario);
       log.info({ destinatario: brief.destinatario }, 'voice.call: chamando');
@@ -148,6 +150,36 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
         correlationId,
         pollMs: 3_000,
         executeAction: async (name, detail) => {
+          // 2026-10-14 (decreto owner): investigação DURANTE a chamada — mesmo
+          // núcleo do WhatsApp (Postgres). A conductora pergunta, o daemon
+          // executa e devolve o resultado pra ela falar pro participante.
+          if (name === 'wa_recent') {
+            const alvo = detail.trim();
+            if (!alvo) return 'falhou: informe o nome do contato/grupo';
+            const r = await pool.query(
+              `SELECT m.body, m.author_name, m.created_at FROM messages m
+               JOIN conversations cv ON cv.id = m.conversation_id
+               WHERE m.direction = 'inbound' AND (
+                 cv.metadata->>'chat_id' ILIKE $1 OR cv.subject ILIKE $1
+                 OR EXISTS (SELECT 1 FROM contacts ct WHERE ct.id = cv.contact_id AND ct.name ILIKE $1))
+               ORDER BY m.created_at DESC LIMIT 5`,
+              ['%' + alvo + '%'],
+            );
+            if (!r.rowCount) return `nenhuma mensagem recente de "${alvo}" no WhatsApp`;
+            return r.rows.map((m) => `${m.author_name ?? 'contato'} (${new Date(m.created_at).toLocaleString('pt-BR')}): ${String(m.body).slice(0, 160)}`).join(' | ');
+          }
+          if (name === 'solicitacoes') {
+            const alvo = detail.trim();
+            if (!alvo) return 'falhou: informe o nome do cliente';
+            const r = await pool.query(
+              `SELECT t.title, t.status, t.created_at FROM tasks t
+               JOIN clients cl ON cl.id = t.client_id
+               WHERE cl.name ILIKE $1 ORDER BY t.created_at DESC LIMIT 5`,
+              ['%' + alvo + '%'],
+            ).catch(() => ({ rows: [] as Array<{ title: string; status: string; created_at: string }>, rowCount: 0 }));
+            if (!r.rowCount) return `nenhuma solicitação registrada para "${alvo}"`;
+            return r.rows.map((t) => `${t.title} [${t.status}]`).join(' | ');
+          }
           if (name === 'wa_msg') {
             // detail: "para=<alvo> | texto=<conteúdo>" — envia pela fila normal
             // (messages + pg_notify luna_outbound); notify_send=1 habilita o
@@ -176,7 +208,12 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
       const handle = conductor.start(tab, {
         participantes: [brief.destinatario, 'quem atender'],
         objetivo: brief.objetivo,
-        poderes: ['escrever no chat do Operador', 'escalar pro owner'],
+        poderes: [
+          'escrever no chat do Operador',
+          'escalar pro owner',
+          'investigar WhatsApp (wa_recent: últimas msgs de um contato/grupo)',
+          'consultar solicitações dos clientes (solicitacoes)',
+        ],
         tom: 'parceira de time, direta, PT-BR',
       });
       // encerra quando a chamada cair (poll do estado) — o owner também pode desligar na janela
@@ -233,6 +270,47 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
         }
       } catch (err) {
         log.warn({ err: String(err).slice(0, 200) }, 'voice.call: capture da transcrição falhou (best-effort, não derruba a chamada)');
+      }
+      // REPORT-BACK (REGRA OWNER 14/10 — o loop NÃO morre no hangup): lê a
+      // transcrição, resume o resultado e VOLTA pro chat de origem contar.
+      // SEMPRE roda — "não atendeu" também é resultado. Sem transcrição, o
+      // resumo assume a não-resposta.
+      try {
+        const turns2 = await conductor.captureTranscript(tab).catch(() => [] as Array<{ role: string; text: string }>);
+        const transcriptText = turns2.map((t) => `${t.role === 'user' ? 'Participante' : 'Operador/Luna'}: ${t.text}`).join('\n');
+        const rep = await live.sendTurn({
+          session_key: `call:report:${correlationId ?? Date.now()}`,
+          prompt: [
+            'Você acabou de terminar uma LIGAÇÃO DE VOZ em nome da Luna.',
+            `Quem pediu: ${brief.autorizador}. Motivo: ${brief.motivo}.`,
+            `Objetivo: ${brief.objetivo}`,
+            '',
+            transcriptText ? `Transcrição da chamada:\n${transcriptText}` : 'A chamada NÃO foi atendida ou não gerou transcrição.',
+            '',
+            'Escreva APENAS a mensagem de retorno pro WhatsApp (PT-BR, 1-3 frases, tom humano da Luna):',
+            'o que aconteceu, se o pedido foi SATISFEITO e o que ficou pendente (se houver).',
+          ].join('\n'),
+        }).catch(() => null);
+        const reportText = rep?.reply_text?.trim() ?? '';
+        if (reportText) {
+          let destId: string | null = null;
+          if (brief.origem_conversation_id) {
+            const ins = await pool.query<{ id: string }>(
+              `INSERT INTO messages (conversation_id, direction, channel, sender, body, author_name, metadata, send_state)
+               VALUES ($1, 'outbound', 'whatsapp', 'luna', $2, 'Luna', $3, 'queued') RETURNING id`,
+              [brief.origem_conversation_id, reportText, { reply_source: 'voice_call_report', correlation_id: correlationId ?? null, destinatario: brief.destinatario }],
+            ).catch(() => ({ rows: [] as Array<{ id: string }> }));
+            destId = ins.rows[0]?.id ?? null;
+            if (destId) await pool.query('SELECT pg_notify($1, $2)', ['luna_outbound', destId]);
+          }
+          if (!destId) {
+            const { alertOwnerWhatsApp } = await import('@luna/database');
+            await alertOwnerWhatsApp(pool, reportText, { escalation_id: `voice_call:${correlationId ?? 'x'}`, stage: 'report_back' });
+          }
+          log.info({ destinatario: brief.destinatario }, 'voice.call: report-back enviado pro chat de origem');
+        }
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 160) }, 'voice.call: report-back falhou (best-effort)');
       }
       // Decreto owner 2026-09-26: desligou a chamada da Luna → a do Operador
       // (ChatGPT) desliga junto — fecha a aba e reabre limpa (best-effort).

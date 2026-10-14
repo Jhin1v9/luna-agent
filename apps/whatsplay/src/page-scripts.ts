@@ -84,7 +84,16 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
     // EXCLUÍDOS do texto da mensagem nova. Antes o textContent puxava o
     // preview da citação junto: quem respondia a msg da Luna com um emoji
     // entregava o "chat inteiro" pra ela (bug reportado pelo owner 26/09).
-    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    // 2026-10-14 (WA atualizou o DOM): data-pre-plain-text agora existe no
+    // wrapper de COPIA de TODA mensagem ("[hora, data] Autor: "), nao so
+    // em citacoes — o filtro antigo (e o 1o fix por msg-meta, que falhava
+    // quando o meta ficava fora do wrapper) excluia o proprio texto da
+    // mensagem (sweep cego, inbound morto). Regra correta, validada no DOM
+    // vivo: o wrapper da mensagem e o pre-plain EXTERNO; o bloco citado,
+    // quando existe, fica ANINHADO dentro dele. So e citacao o pre-plain
+    // que tem OUTRO pre-plain como ancestral no row.
+    const allPre = Array.from(row.querySelectorAll('[data-pre-plain-text]'));
+    const quotedEl = allPre.find((q) => allPre.some((o) => o !== q && o.contains(q))) || null;
     const textEls = Array.from(row.querySelectorAll(sel.messageText))
       .filter((el) => !quotedEl || !quotedEl.contains(el));
     const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');
@@ -99,6 +108,22 @@ export const READ_PANEL_MESSAGES_SCRIPT = `(sel) => {
         const m = aria.match(/^(.*?)\\s*:\\s*$/);
         if (m) { sender = m[1].trim(); direction = SELF.test(sender) ? 'outbound' : 'inbound'; break; }
       }
+    }
+    if (!direction) {
+      // 2026-10-14 (corrida pós-envio, validado no DOM vivo): mensagem
+      // PRÓPRIA recém-enviada chega ao sweep SEM tail-out e SEM o aria
+      // "Tú:" montado — caía no fallback inbound e a Luna ingeria a própria
+      // fala como se fosse do cliente (loop de eco no grupo). O msg-meta tem
+      // o status de entrega ("Enviado"/"Entregado"/"Leído"/"Pendiente"...) —
+      // SÓ mensagem nossa tem — então ele é sinal estrutural de outbound.
+      const metaEl = row.querySelector('[data-testid="msg-meta"]');
+      const statusAria = metaEl
+        ? Array.from(metaEl.querySelectorAll('[aria-label]'))
+            .concat(metaEl.getAttribute('aria-label') ? [metaEl] : [])
+            .map((e) => e.getAttribute('aria-label') || '')
+            .join(' ')
+        : '';
+      if (/pendiente|enviado|entregado|le[ií]do|visto|aguardando/i.test(statusAria)) direction = 'outbound';
     }
     if (!direction) direction = 'inbound'; // fallback explícito: sem marcadores, assume inbound
     // Autor: seletor semântico [data-testid="author"] (grupo); outbound = "Tú".
@@ -122,7 +147,16 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
     // citando entregava o texto da citada junto, atribuído ao autor da
     // RESPOSTA (bug owner 12/10: "vc manda OLA, eu mando 'oi luna' marcando
     // sua msg e vc fala q eu escrevi OLA").
-    const quotedEl = row.querySelector('[data-pre-plain-text]');
+    // 2026-10-14 (WA atualizou o DOM): data-pre-plain-text agora existe no
+    // wrapper de COPIA de TODA mensagem ("[hora, data] Autor: "), nao so
+    // em citacoes — o filtro antigo (e o 1o fix por msg-meta, que falhava
+    // quando o meta ficava fora do wrapper) excluia o proprio texto da
+    // mensagem (sweep cego, inbound morto). Regra correta, validada no DOM
+    // vivo: o wrapper da mensagem e o pre-plain EXTERNO; o bloco citado,
+    // quando existe, fica ANINHADO dentro dele. So e citacao o pre-plain
+    // que tem OUTRO pre-plain como ancestral no row.
+    const allPre = Array.from(row.querySelectorAll('[data-pre-plain-text]'));
+    const quotedEl = allPre.find((q) => allPre.some((o) => o !== q && o.contains(q))) || null;
     const textEls = Array.from(row.querySelectorAll(sel.messageText))
       .filter((el) => !quotedEl || !quotedEl.contains(el));
     const text = textEls.map((el) => (el.textContent || '').trim()).filter(Boolean).join(' ');
@@ -144,6 +178,22 @@ export const READ_CONVERSATION_SCRIPT = `({ sel, lim }) => {
         const m = aria.match(/^(.*?)\\s*:\\s*$/);
         if (m) { sender = m[1].trim(); direction = SELF.test(sender) ? 'outbound' : 'inbound'; break; }
       }
+    }
+    if (!direction) {
+      // 2026-10-14 (corrida pós-envio, validado no DOM vivo): mensagem
+      // PRÓPRIA recém-enviada chega ao sweep SEM tail-out e SEM o aria
+      // "Tú:" montado — caía no fallback inbound e a Luna ingeria a própria
+      // fala como se fosse do cliente (loop de eco no grupo). O msg-meta tem
+      // o status de entrega ("Enviado"/"Entregado"/"Leído"/"Pendiente"...) —
+      // SÓ mensagem nossa tem — então ele é sinal estrutural de outbound.
+      const metaEl = row.querySelector('[data-testid="msg-meta"]');
+      const statusAria = metaEl
+        ? Array.from(metaEl.querySelectorAll('[aria-label]'))
+            .concat(metaEl.getAttribute('aria-label') ? [metaEl] : [])
+            .map((e) => e.getAttribute('aria-label') || '')
+            .join(' ')
+        : '';
+      if (/pendiente|enviado|entregado|le[ií]do|visto|aguardando/i.test(statusAria)) direction = 'outbound';
     }
     if (!direction) direction = 'inbound';
     const authorEl = row.querySelector('[data-testid="author"]');

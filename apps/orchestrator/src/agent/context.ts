@@ -1,5 +1,7 @@
 import { buildAdminFullPack as buildAdminFullPackDb } from '@luna/database';
 import type { Sql } from '@luna/database';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * Context Builder mínimo (§7.9) — pack CLIENT_CONVERSATION.
@@ -76,6 +78,29 @@ export async function buildClientConversationPack(
   };
 }
 
+// Persona completa: .kimi-code/agents/luna.md (sobe do cwd até achar).
+// Cache por mtime — editar o arquivo pega na hora, sem restart.
+let lunaMdCache: { mtime: number; content: string } | null = null;
+function loadLunaPersona(): string {
+  try {
+    let dir = process.cwd();
+    for (;;) {
+      const candidate = resolve(dir, '.kimi-code/agents/luna.md');
+      if (existsSync(candidate)) {
+        const mtime = statSync(candidate).mtimeMs;
+        if (!lunaMdCache || lunaMdCache.mtime !== mtime) {
+          lunaMdCache = { mtime, content: readFileSync(candidate, 'utf8') };
+        }
+        return lunaMdCache.content;
+      }
+      const parent = resolve(dir, '..');
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch { /* persona completa indisponível — segue com o resumo */ }
+  return '';
+}
+
 /** Persona resumida — a identidade completa mora em .kimi-code/agents/luna.md. */
 export const PERSONA_SUMMARY = [
   'IDENTIDADE: você é a Luna, parceira e CTO virtual da NEXO DIGITAL — uma pessoa',
@@ -136,8 +161,10 @@ export function renderConversationPrompt(
 
   const quem = authorName ? `de ${authorName}` : '';
 
+  const personaFull = loadLunaPersona();
   return [
     PERSONA_SUMMARY,
+    ...(personaFull ? ['', '═══ IDENTIDADE COMPLETA (.kimi-code/agents/luna.md) ═══', personaFull] : []),
     '',
     `Cliente: ${pack.client_name}${pack.contact_name ? ` (contato: ${pack.contact_name})` : ''} — canal ${pack.channel}, estado da conversa: ${pack.conversation_state}.`,
     `Preferências de canal: ${prefs}.`,

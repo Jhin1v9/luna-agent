@@ -14,6 +14,9 @@ const normTxt = (s: string): string =>
     .replace(/@luna/gi, ' ')
     .replace(/[—–-]\s*luna\s*$/i, ' ') // assinatura do relay no fim
     .replace(/^luna\s*:\s*/gim, ' ') // linhas "Luna: ..." do transcript
+    // 2026-10-14 (loop de eco no grupo): a transcrição do sweep prefixa
+    // "Tú: " nas falas PRÓPRIAS — sem strip, o eco dela mesma nunca batia.
+    .replace(/^(tú|você|voce|you|tu)\s*:\s*/gim, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
@@ -42,7 +45,12 @@ export function detectSelfEcho(text: string, quotedFromLuna: boolean, recentOutb
   const relaySignature = /[—–-]\s*luna\s*$/i.test(text.trim());
   const best = Math.max(0, ...recentOutbounds.map((b) => overlapWith(inboundTok, b ?? '')));
   return {
-    echo: (relaySignature && best >= 0.7) || (quotedFromLuna && best >= 0.85),
+    echo:
+      (relaySignature && best >= 0.7) ||
+      (quotedFromLuna && best >= 0.85) ||
+      // 2026-10-14: relay VERBATIM da fala da Luna (sem assinatura e sem
+      // citação detectada) — overlap quase total é eco, puro.
+      best >= 0.9,
     overlap: Number(best.toFixed(2)),
     relaySignature,
   };

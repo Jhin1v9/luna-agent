@@ -25,8 +25,31 @@ export function normalizeName(s: string): string {
   return s.replace(/[‪-‮‎‏]/g, '').trim();
 }
 
+/** Dígitos de identidade numérica: local do jid ("5511...@g.us"), número
+ *  puro ("34685093192"), telefone formatado ("+34 685 09 31 92") ou com
+ *  prefixo "whatsapp:". Nomes retornam null (seguem pelo match de nome). */
+function jidDigits(s: string): string | null {
+  const bare = normalizeName(s).replace(/^whatsapp:/i, '');
+  if (bare.includes('@')) {
+    const local = bare.slice(0, bare.indexOf('@'));
+    const d = local.replace(/\D/g, '');
+    return d.length >= 6 ? d : null;
+  }
+  if (/^[+\d][\d\s().-]*$/.test(bare)) {
+    const d = bare.replace(/\D/g, '');
+    return d.length >= 6 ? d : null;
+  }
+  return null;
+}
+
 export function matchesAllowlist(entries: string[], target: string): boolean {
-  return entries.some((entry) =>
-    entry.includes('@') ? target.endsWith(entry) : normalizeName(entry) === normalizeName(target),
-  );
+  // 2026-10-14 (bug ao vivo): alvo "120363428577835024" (dígitos puros do
+  // chat_id) recusado contra entrada "120363428577835024@g.us" — endsWith
+  // nunca casava. Quando AMBOS têm identidade numérica, compara os dígitos.
+  const tDigits = jidDigits(target);
+  return entries.some((entry) => {
+    const eDigits = jidDigits(entry);
+    if (eDigits && tDigits) return eDigits === tDigits;
+    return entry.includes('@') ? target.endsWith(entry) : normalizeName(entry) === normalizeName(target);
+  });
 }

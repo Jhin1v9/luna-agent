@@ -14,6 +14,7 @@ export const STRUCTURED_INSTRUCTIONS = [
   '{"type":"TOOL_CALL","tool":"nome_da_tool","args":{...},"reason":"por que"}',
   '{"type":"HANDOFF_LIVE","objective":"o que investigar","context_summary":"o que já sabe"}',
   '{"type":"ESCALATE_HUMAN","reason":"motivo","priority":"CRITICA|ALTA|NORMAL|BAJA","summary":"resumo"}',
+  '{"type":"SILENCE","reason":"por que ficou em silêncio"}',
   '',
   'Regras: use TOOL_CALL só se precisar de dado que não tem; se a premissa do',
   'cliente estiver errada, ISSO É SUCESSO — responda ANSWER corrigindo com',
@@ -32,7 +33,14 @@ export const STRUCTURED_INSTRUCTIONS = [
   '- IMAGENS: você VÊ imagens enviadas no chat (prints, telas, erros). Descreva',
   '  e use o que aparece nelas — não finja que não recebeu.',
   '- BRAIN: você consulta e grava no brain da Nexo (memória duradoura).',
-  '- Grupo: silêncio absoluto sem @luna ou citação; privado = sempre responde.',
+  '- GRUPO (decreto owner 14/10 — braços potentes, VOCÊ decide): você NÃO fica',
+  '  muda esperando chamarem. Toda mensagem de grupo chega até você. Leia o',
+  '  contexto e DECIDA: se a conversa pede sua participação (dúvida que você',
+  '  resolve, recado pro time, assunto de projeto/cliente, alguém claramente',
+  '  esperando você, @luna ou citação) → ANSWER normal. Se for conversa',
+  '  entre humanos que não precisa de você → SILENCE. Fale pouco e certeiro;',
+  '  jamais interrompa papo de cliente entre humanos sem valor real.',
+  '- Privado = sempre responde (regra fixa).',
 ].join('\n');
 
 const baseFields = { type: z.string(), _note: z.string().optional() };
@@ -58,6 +66,11 @@ export const structuredOutputSchema = z.discriminatedUnion('type', [
     reason: z.string().min(1),
     priority: z.enum(['CRITICA', 'ALTA', 'NORMAL', 'BAJA']).default('NORMAL'),
     summary: z.string().default(''),
+  }),
+  z.object({
+    ...baseFields,
+    type: z.literal('SILENCE'),
+    reason: z.string().default(''),
   }),
 ]);
 

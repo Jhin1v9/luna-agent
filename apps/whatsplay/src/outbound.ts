@@ -38,6 +38,7 @@ interface OutboundMessageRow {
   conversation_id: string;
   address: string | null;
   contact_name: string | null;
+  conversation_chat_id: string | null;
   correlation_id: string | null;
   /** 🆕 CITAÇÃO (mention.respond v2): trecho da mensagem a citar — quando
    *  presente, a entrega usa replyToMessage (citação visual) em vez de
@@ -197,20 +198,77 @@ export function createOutboundListener(deps: OutboundDeps) {
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
       `SELECT m.id, m.body, m.conversation_id, ct.address, ct.name AS contact_name,
+              cv.metadata->>'chat_id' AS conversation_chat_id,
               m.metadata->>'correlation_id' AS correlation_id,
-              m.metadata->>'reply_to_query' AS reply_to_query
+              m.metadata->>'reply_to_query' AS reply_to_query,
+              m.metadata
        FROM messages m
        JOIN conversations cv ON cv.id = m.conversation_id
        LEFT JOIN contacts ct ON ct.id = cv.contact_id
-       WHERE m.id = $1 AND m.send_state = 'queued'`,
+       WHERE m.id = $1 AND m.send_state = 'queued'
+         AND (m.metadata->>'next_retry_at' IS NULL OR (m.metadata->>'next_retry_at')::timestamptz <= now())`,
       [messageId],
     );
     if (!res.rowCount) return; // já entregue ou não existe
     const row = res.rows[0]!;
-    const target = row.address ?? row.contact_name;
+    // 2026-10-13 (bug ao vivo): conversas criadas pelo fallback do painel
+    // (org→client→conversation) chegam SEM contact_id — mas o metadata.chat_id
+    // tem o jid/dígitos do destino. Sem esse fallback TODA resposta morria em
+    // 'sem contato/alvo de entrega' antes mesmo de abrir o chat.
+    const chatIdFallback = row.conversation_chat_id
+      ? /^\d{8,}$/.test(row.conversation_chat_id)
+        ? `${row.conversation_chat_id}@s.whatsapp.net`
+        : row.conversation_chat_id
+      : null;
+    const target = row.address ?? row.contact_name ?? chatIdFallback;
     if (!target) {
       await mark(messageId, 'failed', 'sem contato/alvo de entrega');
       return;
+    }
+    // 2026-10-13 (bug ao vivo, screenshot do owner): GRUPO chegava aqui como jid
+    // (@g.us) e o openChat pesquisava os DÍGITOS do id na busca do WA — que não
+    // acha grupo nenhum ("No se encontró ningún chat"). Busca de grupo é por
+    // NOME (igual humano faz). Contatos privados seguem pelo número/jid
+    // (deeplink /send resolve direto). Allowlist/send-safety continuam no jid.
+    // 2026-10-14 (bug ao vivo, msg 646af5fe 10:39 UTC): dígitos puros com prefixo
+    // 120363 são JID de GRUPO (novos grupos do WA) — o fallback de cima os veste de
+    // @s.whatsapp.net e o deeplink/busca por número nunca acha nada. Grupo se abre
+    // por NOME (busca do WA não indexa JID): contact_name → chat_registry →
+    // conversations.metadata.chat_name. Sem nome resolvido = failed EXPLÍCITO sem
+    // retry (re-tentar só polui a busca com número lixo, screenshot owner 19:48).
+    const isGroupJid =
+      /@g\.us$/.test(row.address ?? '') ||
+      /@g\.us$/.test(row.conversation_chat_id ?? '') ||
+      /^120363\d{9,}$/.test(row.conversation_chat_id ?? '');
+    let sendTarget = target;
+    if (isGroupJid) {
+      const jidDigits = (row.conversation_chat_id ?? row.address ?? '').replace(/\D/g, '');
+      let groupName: string | null = row.contact_name ?? null;
+      if (!groupName && jidDigits) {
+        try {
+          const reg = await pool.query<{ canonical_name: string }>(
+            `SELECT canonical_name FROM chat_registry
+             WHERE kind = 'group' AND (chat_key = $1 OR chat_key LIKE $2) LIMIT 1`,
+            [jidDigits, jidDigits + '@%'],
+          );
+          groupName = reg.rows[0]?.canonical_name ?? null;
+        } catch { groupName = null; }
+      }
+      if (!groupName && jidDigits) {
+        try {
+          const cvn = await pool.query<{ n: string | null }>(
+            `SELECT NULLIF(metadata->>'chat_name','') AS n FROM conversations
+             WHERE metadata->>'chat_id' = $1 LIMIT 1`,
+            [jidDigits],
+          );
+          groupName = cvn.rows[0]?.n ?? null;
+        } catch { groupName = null; }
+      }
+      if (!groupName) {
+        await mark(messageId, 'failed', 'grupo não resolvido: JID sem nome no registry');
+        return;
+      }
+      sendTarget = groupName;
     }
     // SEND-SAFETY antes de tudo: vínculo pergunta→resposta íntegro.
     try {
@@ -219,8 +277,13 @@ export function createOutboundListener(deps: OutboundDeps) {
       if (String(err).includes('send_safety_blocked')) return; // já auditado/alertado/bloqueado
       throw err;
     }
-    const refusal = (await refusedByAllowlist(target)) && !(await notifySendExempt(messageId, target))
-      ? refusedByAllowlist(target)
+    // 2026-10-14 (bug ao vivo): pra GRUPO o allowlist check tem que ser no
+    // NOME resolvido (sendTarget) — a allowlist do owner tem nomes de grupo,
+    // e o jid @g.us nunca casa com entrada de nome. Individual: inalterado
+    // (sendTarget === target).
+    const allowTarget = isGroupJid ? sendTarget : target;
+    const refusal = (await refusedByAllowlist(allowTarget)) && !(await notifySendExempt(messageId, target))
+      ? refusedByAllowlist(allowTarget)
       : null;
     if (refusal) {
       // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.
@@ -269,12 +332,12 @@ export function createOutboundListener(deps: OutboundDeps) {
         // (mention.respond v2). Falha explícita dentro de replyToMessage —
         // nunca degrada pra envio sem citação.
         if (row.reply_to_query && transport.replyToMessage) {
-          deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60) }, 'entrega com CITAÇÃO (reply_to_query)');
-          return withSendLock(() => transport.replyToMessage!(target, row.reply_to_query!, texto));
+          deps.log.info({ message_id: messageId, query: row.reply_to_query.slice(0, 60), alvo: sendTarget }, 'entrega com CITAÇÃO (reply_to_query)');
+          return withSendLock(() => transport.replyToMessage!(sendTarget, row.reply_to_query!, texto));
         }
         return withSendLock(() =>
           transport.sendMessage(
-            target,
+            sendTarget,
             texto,
             opts.suggestedSelector ? { inputSelector: opts.suggestedSelector } : undefined,
           ),
@@ -303,6 +366,24 @@ export function createOutboundListener(deps: OutboundDeps) {
       log.info({ message_id: messageId, target }, 'resposta entregue no WhatsApp');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      // 2026-10-14 (silêncio ao vivo): falha única de entrega (página WA
+      // instável) virava 'failed' PERMANENTE e o usuário nunca sabia. Agora
+      // reenfileira com backoff (máx 4 retries). Bloqueios de segurança
+      // (send-safety/allowlist) continuam falha imediata — nunca retentam.
+      const seguranca = /send_safety|allowlist|blocklist|recusa/i.test(errorMsg);
+      const attempts = Number((row as unknown as { metadata?: { delivery_attempts?: number } }).metadata?.delivery_attempts ?? 0) + 1;
+      if (!seguranca && attempts < 5) {
+        const backoffSec = Math.min(60 * attempts, 300);
+        await pool.query(
+          `UPDATE messages SET metadata = COALESCE(metadata,'{}'::jsonb) || $2::jsonb WHERE id = $1`,
+          [messageId, JSON.stringify({ delivery_attempts: attempts, next_retry_at: new Date(Date.now() + backoffSec * 1000).toISOString() })],
+        );
+        log.warn({ message_id: messageId, attempts, backoffSec }, 'entrega falhou — reenfileirada com backoff');
+        setTimeout(() => {
+          deliverOne(messageId).catch((e2: unknown) => log.error({ err: e2 }, 'retry de entrega falhou'));
+        }, backoffSec * 1000);
+        return;
+      }
       await mark(messageId, 'failed', errorMsg);
       await recordAudit(pool, {
         actor: 'whatsplay',
@@ -354,6 +435,7 @@ export function createOutboundListener(deps: OutboundDeps) {
       .query<{ id: string }>(
         `SELECT id FROM messages
          WHERE send_state = 'queued' AND created_at > now() - interval '6 hours'
+           AND (metadata->>'next_retry_at' IS NULL OR (metadata->>'next_retry_at')::timestamptz <= now())
          ORDER BY created_at LIMIT 20`,
       )
       .catch(() => ({ rows: [] as Array<{ id: string }> }));

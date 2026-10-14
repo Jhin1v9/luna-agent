@@ -146,6 +146,8 @@ export class CallConductor {
   private startCount = 0;
   private lastRelayKey = '';
   private voiceSeen = new Set<string>();
+  /** Resultado de investigação pendente — entra como contexto no próximo relay. */
+  private pendingInvestigation: string | null = null;
 
   constructor(private readonly deps: ConductorDeps) {}
 
@@ -254,24 +256,64 @@ export class CallConductor {
             const relayKey = fresh[fresh.length - 1]!.text.slice(0, 120);
             if (relayKey !== this.lastRelayKey) {
             this.lastRelayKey = relayKey;
-            const reply = await this.deps.live.sendTurn({
-              session_key: `conductor:${this.deps.correlationId ?? 'call'}`,
-              prompt: [
+            // 2026-10-14 (decreto owner): PERGUNTA à Luna durante a chamada vira
+            // INVESTIGAÇÃO REAL no mesmo núcleo do WhatsApp/painel (Postgres):
+            // o cérebro pede a ação, o daemon executa com o pool e devolve o
+            // resultado pra rodada seguinte — aí sim a resposta vai pro Operador.
+            let relayPrompt = [
                 '[CHAMADA AO VIVO — novas falas na transcrição, em tempo real]',
                 transcript,
                 '',
-                "Regras deste turno: se a fala pede algo (ORDEM), EXECUTE com suas tools agora e responda com o resultado.",
-                "Se é uma PERGUNTA cuja resposta exige dado (brain/painel/arquivos), CONSULTE com as tools antes de responder.",
-                "Responda SEMPRE no formato de instrução pro Operador (ele é a voz do Abner):",
-                '"Fale para o Abner que <resultado/ resposta>." — curto, PT-BR, personalidade Luna.',
-              ].join('\n'),
+                'Regras deste turno:',
+                '- Se a fala é uma ORDEM direta ao sistema (mandar msg etc.): responda {"action":"act","name":"wa_msg","detail":"para=<alvo> | texto=<conteúdo>"}.',
+                '- Se é uma PERGUNTA cuja resposta exige dado (o que fulano pediu/falou, solicitações, status): NÃO responda de cabeça — peça a investigação:',
+                '  {"action":"act","name":"wa_recent","detail":"<nome do contato/grupo>"} para últimas mensagens dele(a) no WhatsApp,',
+                '  {"action":"act","name":"solicitacoes","detail":"<nome do cliente>"} para pedidos/solicitações registrados.',
+                '  O resultado da investigação volta no PRÓXIMO turno como [RESULTADO DA INVESTIGAÇÃO] — aí responda ao Abner com ele.',
+                '- Se a resposta você já sabe do contexto/histórico: responda direto no formato de instrução pro Operador.',
+                '- Respostas ao participante SEMPRE: "Fale para o Abner que <resposta>." — curto, PT-BR, personalidade Luna.',
+                'Responda APENAS o JSON da ação OU a instrução pro Operador (uma linha).',
+            ].join('\n');
+            if (this.pendingInvestigation) {
+              relayPrompt = [
+                '[RESULTADO DA INVESTIGAÇÃO — use para responder ao participante]',
+                this.pendingInvestigation,
+                '',
+                'Histórico recente da chamada:',
+                this.history.slice(-6).join('\n'),
+                '',
+                'Agora responda ao participante no formato: "Fale para o Abner que <resposta>." (curto, PT-BR).',
+              ].join('\n');
+              this.pendingInvestigation = null;
+            }
+            const reply = await this.deps.live.sendTurn({
+              session_key: `conductor:${this.deps.correlationId ?? 'call'}`,
+              prompt: relayPrompt,
             }).catch((err) => {
               this.failures++;
               this.say(`Kimi Web fora (${String(err).slice(0, 80)}) — segue sem copiloto`);
               return null;
             });
             if (reply && reply.reply_text && reply.reply_text.trim()) {
-              const texto = reply.reply_text.trim().replace(/^📟s*Luna → Operador:s*/i, '');
+              const raw = reply.reply_text.trim();
+              // ação de investigação? executa no núcleo local e agenda o resultado
+              const actMatch = raw.match(/\{\s*"action"\s*:\s*"act"[^}]*\}/s);
+              if (actMatch && this.deps.executeAction) {
+                try {
+                  const act = JSON.parse(actMatch[0]) as { name?: string; detail?: string };
+                  if (act.name === 'wa_recent' || act.name === 'solicitacoes') {
+                    const resultado = await this.deps.executeAction(act.name, act.detail ?? '');
+                    this.pendingInvestigation = `${act.name}("${act.detail ?? ''}") → ${resultado}`;
+                    this.say(`investigação ${act.name} executada — resultado vai no próximo relay`);
+                    await this.audit('conductor.investigate', { name: act.name, detail: (act.detail ?? '').slice(0, 120) });
+                    continue;
+                  }
+                } catch (e) {
+                  this.say(`investigação falhou (${String(e).slice(0, 80)}) — segue sem dado`);
+                }
+              }
+              const texto = raw.replace(/^📟s*Luna → Operador:s*/i, '').replace(/^\{[\s\S]*\}\s*$/, '').trim();
+              if (!texto) continue;
               this.say(`relay: "${texto.slice(0, 90)}"`);
               await this.deps.operator.sendText(tab, `📟 Luna → Operador: ${texto}`).catch(() => {});
               await this.audit('conductor.relay', { texto: texto.slice(0, 160), turnos: fresh.length });

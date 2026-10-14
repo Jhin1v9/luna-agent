@@ -1,5 +1,8 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getPool, closePool, checkConnection, writeHeartbeat } from '@luna/database';
 import { createAdapter } from '@luna/agent';
 import { WhatsAppWebTransport } from './browser.js';
@@ -33,9 +36,13 @@ const repairAdapter = createAdapter({
   apiModel: isGeminiMode && !llmIsGemini ? config.GEMINI_MODEL : config.LLM_MODEL,
 });
 
+// 2026-10-14: caminhos eram absolutos do PC — quebravam na VPS (e exigiam
+// manter 2 arquivos). Agora: perfil do Chrome em <home>/.luna (mesma regra
+// no PC e na VPS) e evidenceDir relativo ao repo (este arquivo está em
+// apps/whatsplay/src/ → repo root = ../../../). Env continua ganhando.
 const userDataDir =
-  config.WHATSAPP_USER_DATA_DIR || 'C:/Users/Abner/.luna/chrome-whatsapp';
-const evidenceDir = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain/luna/incidents';
+  config.WHATSAPP_USER_DATA_DIR || join(homedir(), '.luna/chrome-whatsapp');
+const evidenceDir = fileURLToPath(new URL('../../../.brain/luna/incidents', import.meta.url));
 
 let shuttingDown = false;
 let lastInboundAt: Date | null = null;
@@ -171,6 +178,7 @@ async function main(): Promise<void> {
   // (sweep detectava e a ingest falhava em silêncio) até restart. A cada 45s
   // confere; se caiu, reload + re-anexa o observer de mutação.
   const healthTimer = setInterval(() => {
+    if (process.env.WHATSAPP_HEALTH_DISABLED === 'true') return; // modo configuração: QR estável pra scan
     transport.isPageHealthy().then((ok) => {
       if (!ok) {
         log.warn('health: página fora do estado saudável — recuperando');
@@ -223,13 +231,26 @@ async function main(): Promise<void> {
     if (!cdpCheck) {
       const chromePath = process.env.WHATSAPP_CHROME_PATH?.trim() || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
       try {
-        spawn(chromePath, [
+        const chromeVoiceProc = spawn(chromePath, [
           `--remote-debugging-port=9340`,
           `--user-data-dir=${voiceDir}`,
           '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
           '--use-fake-ui-for-media-stream',
+          // 2026-10-14: sem o flag de plataforma o Chrome morria no boot do VPS
+          // (wayland) e o pré-voo das chamadas esgotava — 9340 nunca subia.
+          ...(process.env.WHATSAPP_OZONE_PLATFORM ? [`--ozone-platform=${process.env.WHATSAPP_OZONE_PLATFORM}`] : []),
+          '--no-sandbox', '--disable-session-crashed-bubble', '--hide-crash-restore-bubble',
+          '--disable-restore-session-state', '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
+          '--remote-allow-origins=*',
           'https://chatgpt.com/',
-        ], { detached: true, stdio: 'ignore' }).unref();
+        ], { detached: true, stdio: 'ignore' });
+      // 2026-10-14: 'error' assíncrono do spawn (path inexistente) era unhandled
+      // e derrubava o processo no boot (353x ENOENT históricos 13/10). Agora loga e segue.
+      chromeVoiceProc.on('error', (err) =>
+        log.warn({ err: String(err).slice(0, 120) }, 'chrome-voice: spawn falhou (WHATSAPP_CHROME_PATH?) — boot segue, abre sob demanda'),
+      );
+      chromeVoiceProc.unref();
         log.info('chrome-voice: Operador (ChatGPT) abrindo no boot — aba pronta pra chamadas');
       } catch (err) {
         log.warn({ err: String(err).slice(0, 120) }, 'chrome-voice: falha ao abrir no boot (não bloqueia — abre sob demanda na chamada)');

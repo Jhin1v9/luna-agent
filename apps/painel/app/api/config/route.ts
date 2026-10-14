@@ -6,6 +6,17 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+// 2026-10-14: auth opcional por bearer. Se o painel subir com LUNA_API_KEY
+// no ambiente, escrita exige Authorization: Bearer <token>. Sem a env, mantém
+// o padrão atual (painel bindado em 127.0.0.1). A UI do painel consome GET
+// (previews mascarados) — GET continua aberto.
+function authorized(req: Request): boolean {
+  const expected = process.env.LUNA_API_KEY;
+  if (!expected) return true;
+  const h = req.headers.get('authorization') || '';
+  return h === `Bearer ${expected}`;
+}
+
 // GET → ProvidersConfig + keyStatus por provider (presença + preview mascarado)
 export async function GET() {
   try {
@@ -17,6 +28,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    if (!authorized(req)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
     const b = await req.json();
     const action = String(b?.action ?? '');
 

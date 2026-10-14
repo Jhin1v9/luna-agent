@@ -65,7 +65,17 @@ const envSchema = z.object({
   // está sem quota; 'kimiwork' = a Luna do Kimi Work assume o live brain
   // inteiro (ADR-040, decreto owner 2026-09-24). Troca = só .env, zero
   // código (mesma interface estável).
-  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork', 'kimi-web-local', 'fcc']).default('kimi'),
+  // 'roda' = live brain na MESMA roda de providers do FAST (API
+  // OpenAI-compatible, stateless — ADR-042): investigação volta mesmo sem
+  // kimi-cli/kimiwork no ar. Sem ferramentas — prompt adaptado pelo worker.
+  LIVE_BRAIN_PROVIDER: z.enum(['kimi', 'pi', 'kimiwork', 'kimi-web-local', 'fcc', 'roda']).default('kimi'),
+  // Roda do live brain (ADR-042): caminho do providers.json. Default = roda
+  // do kernel no VPS; em dev pode ser o config/providers.json do monorepo.
+  LIVE_BRAIN_RODA_CONFIG: z.string().default('/home/nexo/luna-kernel/roda/providers.json'),
+  // ADR-042 complemento (owner 14/10) — ferramentas do live brain roda,
+  // executadas pelo worker (path traversal bloqueado fora destas raízes):
+  LIVE_BRAIN_RODA_MAX_ROUNDS: z.coerce.number().int().positive().default(8),
+  LIVE_BRAIN_RODA_ROOTS: z.string().default('/home/nexo/luna-agent,/home/nexo/luna-kernel,/opt/nexo-brain'),
   // FCC (ADR-041) — gateway local Anthropic-style (rota LIVE).
   FCC_BASE_URL: z.string().default('http://127.0.0.1:8082'),
   FCC_MODEL: z.string().default('nvidia_nim/moonshotai/kimi-k3'),

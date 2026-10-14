@@ -7,7 +7,10 @@ import { join } from 'node:path';
  * antiga; tudo o que entra, entra por append.
  */
 
-export const BRAIN_ROOT = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain';
+// 2026-10-14: era caminho Windows absoluto; agora relativo ao modulo
+// (packages/brain/src/ → repo root = ../../..).
+import { fileURLToPath as _furl } from 'node:url';
+export const BRAIN_ROOT = _furl(new URL('../../../.brain', import.meta.url));
 
 export interface SynapseEntry {
   /** SHA curto do commit. */

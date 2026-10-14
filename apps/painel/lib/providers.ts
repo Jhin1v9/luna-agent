@@ -22,6 +22,10 @@ export interface ProviderEntry {
   enabled: boolean;
   priority: number;
   builtin: boolean;
+  /** 2026-10-14: uso preferencial na roda (conversa / coding / ambos). */
+  role?: 'conversa' | 'coding' | 'ambos';
+  /** 2026-10-14: motivo de estar desligado (circuit breaker da roda). */
+  disabledReason?: string;
 }
 
 export interface ProvidersConfig {
@@ -264,10 +268,12 @@ function strOrNull(v: unknown, campo: string): string | null {
 
 export function validateProviderEntry(raw: unknown): ProviderEntry {
   if (!isObj(raw)) throw new Error('provider deve ser um objeto');
+  // 2026-10-14: campos novos conhecidos (role/disabledReason vêm da roda);
+  // desconhecidos viram WARN (forward-compat) em vez de derrubar o painel
+  // inteiro — um campo novo no json não pode quebrar o GET /api/config.
+  const KNOWN = ['id', 'label', 'transport', 'baseUrl', 'apiKeyEnv', 'model', 'models', 'enabled', 'priority', 'builtin', 'role', 'disabledReason'];
   for (const k of Object.keys(raw)) {
-    if (!['id', 'label', 'transport', 'baseUrl', 'apiKeyEnv', 'model', 'models', 'enabled', 'priority', 'builtin'].includes(k)) {
-      throw new Error(`campo desconhecido no provider: ${k}`);
-    }
+    if (!KNOWN.includes(k)) console.warn(`[providers] campo desconhecido ignorado: ${k}`);
   }
   const id = str(raw.id, 'id');
   if (!SLUG_RE.test(id)) throw new Error(`id invalido (slug a-z 0-9 -): ${id}`);
@@ -281,10 +287,16 @@ export function validateProviderEntry(raw: unknown): ProviderEntry {
   if (apiKeyEnv && !/^[A-Z0-9_]+$/.test(apiKeyEnv)) throw new Error(`apiKeyEnv invalido: ${apiKeyEnv}`);
   const baseUrl = str(raw.baseUrl, 'baseUrl');
   if (!/^https?:\/\//.test(baseUrl)) throw new Error(`baseUrl invalida: ${baseUrl}`);
+  const role = raw.role === undefined ? undefined : str(raw.role, 'role') as 'conversa' | 'coding' | 'ambos';
+  if (role !== undefined && !['conversa', 'coding', 'ambos'].includes(role)) {
+    throw new Error(`role invalido (conversa|coding|ambos): ${role}`);
+  }
   return {
     id, label: str(raw.label, 'label'), transport: transport as Transport, baseUrl,
     apiKeyEnv, model: typeof raw.model === 'string' ? raw.model : '',
     models: raw.models as string[], enabled: raw.enabled, priority: raw.priority, builtin: raw.builtin,
+    ...(role !== undefined ? { role } : {}),
+    ...(typeof raw.disabledReason === 'string' && raw.disabledReason ? { disabledReason: raw.disabledReason } : {}),
   };
 }
 

@@ -107,7 +107,17 @@ async function main(): Promise<void> {
             model: config.FCC_MODEL,
             timeoutMs: liveTimeoutMs,
           })
-        : new (await import('@luna/agent')).KimiCliAdapter(
+        : config.LIVE_BRAIN_PROVIDER === 'roda'
+          ? // ADR-042 — live brain na RODA de providers (mesma API do FAST):
+            // investigação HANDOFF_LIVE volta mesmo sem kimi-cli/kimiwork no
+            // ar (bug ao vivo 14/10: kimiwork capado 12h → "vou olhar e não
+            // voltava"). Stateless, OpenAI-compatible, fallback entre
+            // providers grátis. SEM ferramentas — o investigate adapta o prompt.
+            new (await import('@luna/agent')).RodaAdapter(
+              { mode: 'roda' },
+              { configPath: config.LIVE_BRAIN_RODA_CONFIG },
+            )
+          : new (await import('@luna/agent')).KimiCliAdapter(
               { mode: 'kimi-cli' },
               {
                 timeoutMs: liveTimeoutMs,
@@ -120,7 +130,24 @@ async function main(): Promise<void> {
   const { createVoiceCallHandler } = await import('./jobs/voice-call.js');
   runner.register('voice.call', createVoiceCallHandler({ pool, log }));
   const investigationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
-  runner.register('investigate', createInvestigateHandler({ pool, live: liveAdapter, log, telegram: investigationTelegram }));
+  // ADR-042 complemento (owner 14/10): no modo roda o live brain GANHA braços
+  // — o worker executa as tools (fs/shell, raízes permitidas) num loop com o
+  // modelo. listTools sempre disponível pro modelo descobrir o catálogo.
+  const { createLiveToolRunner } = await import('./jobs/live-tools.js');
+  const liveToolRunner = config.LIVE_BRAIN_PROVIDER === 'roda'
+    ? createLiveToolRunner({ roots: config.LIVE_BRAIN_RODA_ROOTS.split(','), log, pool })
+    : undefined;
+  runner.register('investigate', createInvestigateHandler({
+    pool,
+    live: liveAdapter,
+    log,
+    telegram: investigationTelegram,
+    // ADR-042: live brain API (roda) não tem ferramentas embutidas — o prompt
+    // muda; com workerTools, o loop de tools roda no handler.
+    liveHasTools: config.LIVE_BRAIN_PROVIDER !== 'roda',
+    workerTools: liveToolRunner,
+    workerToolMaxRounds: config.LIVE_BRAIN_RODA_MAX_ROUNDS,
+  }));
   const { enqueueJob } = await import('@luna/database');
   // Brain watch (decreto owner 27/09): varredura de diffs do brain canônico
   // (VPS) — no boot e a cada 30 min. Cada commit novo vira sinapse local.

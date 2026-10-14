@@ -183,6 +183,9 @@ export default function Painel() {
   const [venusTab, setVenusTab] = useState<'log' | 'erros'>('log');
   const [chatSel, setChatSel] = useState('productions');
   const [chatManual, setChatManual] = useState('');
+  const [contacts, setContacts] = useState<Array<{ id: string; name: string; chat_id: string }>>([]);
+  const [ctNome, setCtNome] = useState('');
+  const [ctNumero, setCtNumero] = useState('');
   const [sender, setSender] = useState<'luna' | 'agent:venus'>('luna');
   const [text, setText] = useState('');
   const [guardMsg, setGuardMsg] = useState<string | null>(null);
@@ -242,6 +245,18 @@ export default function Painel() {
   const loadAtividade = useCallback(async () => {
     try { setAtividade(await getJSON<Msg[]>('/api/atividade')); } catch { /* noop */ }
   }, []);
+  const loadContacts = useCallback(async () => {
+    try { const r = await getJSON<{ contacts: Array<{ id: string; name: string; chat_id: string }> }>('/api/contacts'); setContacts(r.contacts || []); } catch { /* noop */ }
+  }, []);
+  const addContact = async () => {
+    const r = await postJSON<{ ok: boolean; error?: string }>('/api/contacts', { name: ctNome.trim(), chat_id: ctNumero.trim() });
+    if (r.ok) { setCtNome(''); setCtNumero(''); loadContacts(); toast.success('contato salvo'); }
+    else toast.error((r as { error?: string }).error || 'falha ao salvar contato');
+  };
+  const delContact = async (id: string) => {
+    await fetch('/api/contacts/' + id, { method: 'DELETE' });
+    loadContacts();
+  };
   const loadProviders = useCallback(async () => {
     const c = await getJSON<ProvidersConfig>('/api/config');
     setPconf(c);
@@ -278,7 +293,8 @@ export default function Painel() {
     loadProviders().catch(() => toast.error('falha ao ler providers'));
     loadFccModels();
     loadLunaWeb();
-  }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels, loadLunaWeb]);
+    loadContacts();
+  }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels, loadLunaWeb, loadContacts]);
 
   // auto-refresh 10s com countdown visível + refresh ao voltar pra aba
   useEffect(() => {
@@ -695,6 +711,33 @@ export default function Painel() {
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">Ou chat_id manual</label>
             <input className="input mono" placeholder="ex.: 5511999999999" value={chatManual} onChange={(e) => setChatManual(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">Contatos salvos</label>
+            <div className="flex gap-2">
+              <select className="input" value="" onChange={(e) => { if (e.target.value) setChatManual(e.target.value); }}>
+                <option value="">escolher contato...</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.chat_id}>{c.name} — {c.chat_id}</option>
+                ))}
+              </select>
+              <button className="btn btn-sm" onClick={loadContacts} title="recarregar contatos"><RefreshCw size={12} /></button>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input className="input" placeholder="Nome" value={ctNome} onChange={(e) => setCtNome(e.target.value)} />
+              <input className="input mono" placeholder="Numero c/ DDI" value={ctNumero} onChange={(e) => setCtNumero(e.target.value)} />
+              <button className="btn btn-sm" onClick={addContact} disabled={!ctNome.trim() || !ctNumero.trim()} title="adicionar contato"><Plus size={12} /></button>
+            </div>
+            {contacts.length > 0 && (
+              <div className="mt-2 max-h-36 space-y-1 overflow-y-auto">
+                {contacts.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded border border-line bg-bg/40 px-2 py-1 text-[12px]">
+                    <button className="text-fg hover:text-luna" onClick={() => setChatManual(c.chat_id)} title="usar este contato">{c.name} <span className="mono text-dim">{c.chat_id}</span></button>
+                    <button className="text-dim hover:text-fail" onClick={() => delContact(c.id)} title="remover contato"><Trash2 size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wider text-dim">Mensagem</label>

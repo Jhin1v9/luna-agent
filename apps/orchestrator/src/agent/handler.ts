@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Pool, PoolClient } from 'pg';
 import type { Logger } from 'pino';
 import type { EventEnvelope } from '@luna/events';
+import { fileURLToPath } from 'node:url';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordActivity, recordAudit, publishEvent, enqueueJob, type Sql } from '@luna/database';
@@ -42,6 +43,10 @@ interface HandlerPayload {
   author_name?: string | null;
   /** true se a mensagem veio de grupo (detecção de humano na escalção). */
   is_group?: boolean;
+  /** true = o texto menciona a Luna (calculado no whatsplay, watcher sweep). */
+  mentioned_luna?: boolean;
+  /** Autor da mensagem citada (reply) — citar a Luna conta como menção. */
+  quoted_author?: string | null;
   /** true = mensagem de canal real (WhatsPlay entrega); false = simulação. */
   deliver?: boolean;
 }
@@ -53,11 +58,15 @@ interface PricesFile {
   billable: { multiplier: number };
 }
 
+/** Escalada sem atividade humana expira após 45min (decreto owner 14/10):
+ *  melhor a Luna voltar a responder do que engolir mensagens pra sempre. */
+const ESCALATION_STALE_MS = 45 * 60_000;
+
 let pricesCache: PricesFile | null = null;
 function loadPrices(): PricesFile {
   if (pricesCache) return pricesCache;
   pricesCache = JSON.parse(
-    readFileSync('C:/Users/Abner/Documents/Luna cto/luna-agent/config/prices.json', 'utf8'),
+    readFileSync(fileURLToPath(new URL('../../../../config/prices.json', import.meta.url)), 'utf8'),
   ) as PricesFile;
   return pricesCache;
 }
@@ -106,6 +115,19 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       priority: input.priority,
     });
     // §8 cascata: ligação (F6, pendente) → mensagem viva ao grupo do time.
+    // 2026-10-14 (decreto owner): o Telegram do time nunca chegou pra
+    // ninguém — a criação da escalation alerta NA HORA no WhatsApp do owner.
+    try {
+      const { alertOwnerWhatsApp } = await import('@luna/database');
+      const escId = (await db.query<{ id: string }>(`SELECT id FROM escalations WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1`, [conversationId])).rows[0]?.id ?? 'unknown';
+      await alertOwnerWhatsApp(eventPool, [
+        `🙋 Escalation ${input.priority}: ${input.reason}`,
+        `Resumo: ${input.summary || '(ver painel)'}`,
+        `Me responde aqui com "ok" se vai pegar — se não responder no SLA eu insisto e te ligo.`,
+      ].join('\n'), { escalation_id: escId, priority: input.priority, stage: 'created' });
+    } catch (err) {
+      log.error({ err }, 'escalation: alerta WhatsApp de criação falhou (explícito)');
+    }
     if (deps.telegram?.botToken && deps.telegram.teamChatId) {
       try {
         await sendTeamMessage(
@@ -176,7 +198,35 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     // ADR-025: humano respondendo = transição consciente; humano EXTRA = status,
     // jamás re-escalação. Detecção: em GRUPO, autor != contato do cliente.
     const state = await getConversationState(db, conversationId);
-    if (state === 'HUMAN_HANDLING' || state === 'NEEDS_HUMAN' || state === 'HUMAN_NOTIFIED') {
+    // 2026-10-14 (bug ao vivo "lê e não responde", decreto owner): escalada
+    // aberta engolia TODA mensagem nova SEM resposta — e ficava presa pra
+    // sempre quando nenhum humano do time assumia (caso real: 07:22 → 12:12,
+    // 5h de DM do Abner engolidas). Agora: sem atividade humana por
+    // ESCALATION_STALE_MS, a escalada EXPIRA, a conversa volta pra IA e a
+    // mensagem corrente segue pelo fluxo normal (Luna responde de novo).
+    let humanGateActive = state === 'HUMAN_HANDLING' || state === 'NEEDS_HUMAN' || state === 'HUMAN_NOTIFIED';
+    if (humanGateActive) {
+      const openEsc = await db.query<{ id: string; last_activity: string | null }>(
+        `SELECT id, COALESCE(last_handled_at, notified_at, created_at) AS last_activity
+         FROM escalations
+         WHERE conversation_id = $1 AND status IN ('notified','handling')
+         ORDER BY created_at DESC LIMIT 1`,
+        [conversationId],
+      );
+      const escRow = openEsc.rows[0];
+      if (escRow && Date.now() - new Date(escRow.last_activity as string).getTime() > ESCALATION_STALE_MS) {
+        await db.query(`UPDATE escalations SET status = 'expired', updated_at = now() WHERE id = $1`, [escRow.id]);
+        await transitionConversation(db, conversationId, 'AI_HANDLING');
+        await recordAudit(db, {
+          actor: 'orchestrator', action: 'escalation.auto_expired', tool: 'message_handler',
+          client_id: event.client_id, correlation_id: event.correlation_id, result: 'success',
+          metadata: { escalation_id: escRow.id, stale_ms: ESCALATION_STALE_MS },
+        });
+        log.info({ escalation_id: escRow.id, conversation_id: conversationId }, 'escalation expirada por inatividade humana — Luna volta a responder');
+        humanGateActive = false;
+      }
+    }
+    if (humanGateActive) {
       const contactName = await db
         .query<{ name: string | null }>(
           `SELECT ct.name FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1`,
@@ -285,6 +335,9 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       }
     }
 
+    // 2026-10-14 (decreto owner "braços potentes"): em grupo a decisão de
+    // falar/ficar muda é DO MODELO (saída SILENCE do FAST), não um hardcode
+    // aqui. O gate duro de menção que existiu neste ponto foi removido.
     const runStartedAt = new Date();
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
@@ -338,6 +391,32 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         investigationTimeoutMs: route.investigationTimeoutMs,
       },
     );
+
+    // SILENCE (decreto owner 14/10): o modelo viu a mensagem e decidiu que
+    // não deve falar (grupo, conversa entre humanos, sem valor real). Nada
+    // de outbound — só trilha de audit pra gente saber que ela escolheu calar.
+    if (decision.output.type === 'SILENCE') {
+      log.info(
+        { event_id: event.event_id, author: payload.author_name, reason: (decision.output as { reason?: string }).reason },
+        'FAST decidiu SILENCE — Luna fica muda nesta mensagem',
+      );
+      await transitionConversation(db, conversationId, 'RESOLVED');
+      await recordAudit(db, {
+        actor: 'orchestrator',
+        action: 'agent.reply.silence',
+        tool: 'message_handler',
+        client_id: event.client_id,
+        correlation_id: event.correlation_id,
+        result: 'success',
+        metadata: {
+          event_id: event.event_id,
+          author: payload.author_name,
+          is_group: payload.is_group === true,
+          reason: (decision.output as { reason?: string }).reason ?? '',
+        },
+      });
+      return;
+    }
 
     // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
     const deliver = payload.deliver !== false;

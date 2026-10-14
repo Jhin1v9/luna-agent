@@ -19,8 +19,8 @@ loadDotEnv();
 const config = loadConfig();
 const log = createLogger({ name: 'whatsplay-readcheck' });
 
-const userDataDir = config.WHATSAPP_USER_DATA_DIR || 'C:/Users/Abner/.luna/chrome-whatsapp';
-const evidenceDir = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain/luna/incidents';
+const userDataDir = config.WHATSAPP_USER_DATA_DIR || '/home/nexo/.luna/chrome-whatsapp';
+const evidenceDir = '/home/nexo/luna-agent/.brain/luna/incidents';
 
 const BADGES_SCRIPT = `(sel) => {
   const seen = new Set();

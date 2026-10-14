@@ -21,7 +21,10 @@ export interface BrainToolsDeps {
   maxMatches?: number;
 }
 
-const DEFAULT_ROOT = 'C:/Users/Abner/Documents/Luna cto/luna-agent/.brain';
+// 2026-10-14: era caminho Windows absoluto; agora relativo ao modulo
+// (este arquivo fica em apps/orchestrator/src/agent/router/ → repo root = ../../../../).
+import { fileURLToPath as _furl } from 'node:url';
+const DEFAULT_ROOT = _furl(new URL('../../../../.brain', import.meta.url));
 
 const ok = (data: unknown): ToolResult => ({ ok: true, data });
 const fail = (error: string): ToolResult => ({ ok: false, data: null, error });

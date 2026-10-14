@@ -819,3 +819,174 @@ DUPLICATA do turno aa40876e — mesma conversa (slider do hero da onadance.com, 
 }
 ```
 
+## 2026-10-14 — Luna
+
+Conversa interna entre membros do time sobre acesso ao Hostinger e criação de workflow de manutenção do site do Matheus. Luna aplicou regra anti-iniciativa e não respondeu, comportamento adequado.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "site",
+  "product": "site do Matheus",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "Time discutiu acesso ao Hostinger e workflow de manutenção com GitHub; Luna corretamente ficou em silêncio por não haver pergunta direta.",
+  "quality_score": 5,
+  "summary": "Conversa interna entre membros do time sobre acesso ao Hostinger e criação de workflow de manutenção do site do Matheus. Luna aplicou regra anti-iniciativa e não respondeu, comportamento adequado.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Time discutiu acesso ao Hostinger do Matheus e criação de workflow de manutenção. Luna permaneceu em silêncio por regra anti-iniciativa, foi questionada por Abner e explicou o comportamento de forma transparente, sendo bem recebida.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Aguardar pedido concreto de acesso ao Hostinger do Matheus para prosseguir com manutenção do site.",
+  "quality_score": 4,
+  "summary": "Time discutiu acesso ao Hostinger do Matheus e criação de workflow de manutenção. Luna permaneceu em silêncio por regra anti-iniciativa, foi questionada por Abner e explicou o comportamento de forma transparente, sendo bem recebida.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa descontraída do time interno: Enoque/Abner discutiram acesso ao Hostinger do cliente Matheus e workflow de manutenção. Luna manteve silêncio correto em mensagem sem pergunta, mas vazou seu JSON de raciocínio interno no grupo e foi chamada à atenção; respondeu com bom humor explicando a regra de silêncio. Sem pedido concreto do cliente final.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "suporte_tecnico",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "Time discutiu acesso ao Hostinger do cliente Matheus para manutenção/workflow; se avançar, orientar sobre pedir acesso ou credenciais.",
+  "quality_score": 3,
+  "summary": "Conversa descontraída do time interno: Enoque/Abner discutiram acesso ao Hostinger do cliente Matheus e workflow de manutenção. Luna manteve silêncio correto em mensagem sem pergunta, mas vazou seu JSON de raciocínio interno no grupo e foi chamada à atenção; respondeu com bom humor explicando a regra de silêncio. Sem pedido concreto do cliente final.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa informal de time no grupo: Enoque e Abner conversando sobre acesso ao Hostinger do Matheus e workflow. A Luna silenciou corretamente (mensagem sem pergunta), mas vazou sua mensagem interna de raciocínio no grupo; Abner apontou com humor e a Luna respondeu bem, se desculpando com leveza. Sem pedido concreto do cliente.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "site do Matheus",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 4,
+  "summary": "Conversa informal de time no grupo: Enoque e Abner conversando sobre acesso ao Hostinger do Matheus e workflow. A Luna silenciou corretamente (mensagem sem pergunta), mas vazou sua mensagem interna de raciocínio no grupo; Abner apontou com humor e a Luna respondeu bem, se desculpando com leveza. Sem pedido concreto do cliente.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa de grupo entre Enoque e Abner sobre obter acesso ao Hostinger do cliente Matheus para manutenção do site. Luna vazou acidentalmente seu raciocínio interno (JSON SILENCE) no grupo, respondeu com humor e autoironia, e o time reagiu bem. Nenhum pedido concreto do cliente nesta conversa.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "dominio_hospedagem",
+  "product": "site do Matheus",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Time discutiu acesso ao Hostinger do Matheus para manutenção do site; Luna deve retomar com o texto proposto para solicitar acesso ao cliente.",
+  "quality_score": 4,
+  "summary": "Conversa de grupo entre Enoque e Abner sobre obter acesso ao Hostinger do cliente Matheus para manutenção do site. Luna vazou acidentalmente seu raciocínio interno (JSON SILENCE) no grupo, respondeu com humor e autoironia, e o time reagiu bem. Nenhum pedido concreto do cliente nesta conversa.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa informal em grupo de equipe: Enoque/Abner conversaram sobre acesso ao Hostinger do cliente Matheus e workflow com GitHub. Luna manteve silêncio por regra anti-iniciativa, vazou um log interno ao responder, mas lidou bem com a situação com humor. Sem pedido concreto ou problema de cliente.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "grupo 🏆Production - 2026🙏🏻",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 4,
+  "summary": "Conversa informal em grupo de equipe: Enoque/Abner conversaram sobre acesso ao Hostinger do cliente Matheus e workflow com GitHub. Luna manteve silêncio por regra anti-iniciativa, vazou um log interno ao responder, mas lidou bem com a situação com humor. Sem pedido concreto ou problema de cliente.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa informal do time em grupo sobre obter acesso ao Hostinger do cliente Matheus. Luna vazou duas vezes o JSON/diário interno como mensagem no grupo (SILENCE e pensamentos), gerando risada do Abner; comportamento em si foi bem-humorado, mas o vazamento interno é um problema técnico a corrigir.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "dominio_hospedagem",
+  "product": "site do Matheus",
+  "urgency": "baixa",
+  "follow_up_required": true,
+  "follow_up_note": "Time discutiu acesso ao Hostinger do cliente Matheus para manutenção; confirmar quem enviará a mensagem pedindo acesso/infos.",
+  "quality_score": 2,
+  "summary": "Conversa informal do time em grupo sobre obter acesso ao Hostinger do cliente Matheus. Luna vazou duas vezes o JSON/diário interno como mensagem no grupo (SILENCE e pensamentos), gerando risada do Abner; comportamento em si foi bem-humorado, mas o vazamento interno é um problema técnico a corrigir.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa de grupo sem pedido real: Enoque e Abner conversaram sobre acesso ao Hostinger do Matheus e workflow com GitHub, mas sem pergunta concreta para a Luna. A Luna respondeu corretamente com silêncio, explicou a regra e lidou bem com o vazamento do raciocínio interno, com humor. Sem sinal de negócio.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 4,
+  "summary": "Conversa de grupo sem pedido real: Enoque e Abner conversaram sobre acesso ao Hostinger do Matheus e workflow com GitHub, mas sem pergunta concreta para a Luna. A Luna respondeu corretamente com silêncio, explicou a regra e lidou bem com o vazamento do raciocínio interno, com humor. Sem sinal de negócio.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-14 — Luna
+
+Conversa de time em grupo: assunto sobre acesso ao Hostinger do Matheus e workflow de manutenção, mas o foco foi o episódio da Luna vazando sua razão interna de silêncio (SILENCE JSON), gerando brincadeira com o Abner. Sem pedido concreto aberto.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 4,
+  "summary": "Conversa de time em grupo: assunto sobre acesso ao Hostinger do Matheus e workflow de manutenção, mas o foco foi o episódio da Luna vazando sua razão interna de silêncio (SILENCE JSON), gerando brincadeira com o Abner. Sem pedido concreto aberto.",
+  "client_signal": "nenhum"
+}
+```
+
