@@ -41,6 +41,12 @@ export const STRUCTURED_INSTRUCTIONS = [
   '  entre humanos que não precisa de você → SILENCE. Fale pouco e certeiro;',
   '  jamais interrompa papo de cliente entre humanos sem valor real.',
   '- Privado = sempre responde (regra fixa).',
+  '- LISTTOOLS (decreto owner 14/10 — consciência dos braços): em DÚVIDA de',
+  '  qual tool usar, quais args, ou o que você pode fazer, chame TOOL_CALL',
+  '  listTools — o catálogo completo (cada tool + descrição + args) volta como',
+  '  resultado. WhatsApp especificamente: conversation.recent relê as mensagens',
+  '  do chat; voice.call_place LIGA pra contato registrado; brain.search acha',
+  '  qualquer info no brain (quem é fulano, número, projeto, histórico).',
 ].join('\n');
 
 const baseFields = { type: z.string(), _note: z.string().optional() };

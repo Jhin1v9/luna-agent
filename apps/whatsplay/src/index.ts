@@ -219,6 +219,40 @@ async function main(): Promise<void> {
     if (n.payload) callExecutor(n.payload).catch((err) => log.error({ err }, 'voice.call: executor falhou'));
   });
   log.info('ouvindo NOTIFY voice_call_requests (chamadas de voz)');
+  // call.respond (arquitetura owner 14/10): a sessão Luna Web (conductor da
+  // chamada) responde VIA TOOL → NOTIFY call_responses → o operador (ChatGPT)
+  // fala na chamada. Mesmo caminho do "📟 Luna → Operador" que já funciona.
+  {
+    const { OperatorSession } = await import('./voice/operator-session.js');
+    const callRespondOperator = new OperatorSession({ log });
+    const callRespondListen = await pool.connect();
+    await callRespondListen.query('LISTEN call_responses');
+    callRespondListen.on('notification', (n) => {
+      const rawPayload: string | undefined = n.payload;
+      if (!rawPayload) return;
+      void (async () => {
+        try {
+          const payload = JSON.parse(rawPayload) as { texto?: string; origem?: string };
+          const texto = String(payload.texto ?? '').trim();
+          if (!texto) return;
+          if (!(await callRespondOperator.connect())) {
+            log.warn('call.respond: chrome-voice fora do ar — resposta da Luna perdida (explícito)');
+            return;
+          }
+          const tab = await callRespondOperator.ensureChatGptTab();
+          if (!tab) {
+            log.warn('call.respond: aba do ChatGPT não achada — resposta perdida (explícito)');
+            return;
+          }
+          await callRespondOperator.sendText(tab, `📟 Luna → Operador: ${texto}`);
+          log.info({ texto: texto.slice(0, 100), origem: payload.origem }, 'call.respond: resposta da Luna entregue ao operador');
+        } catch (err) {
+          log.error({ err: String(err).slice(0, 200) }, 'call.respond: entrega falhou (best-effort, não derruba nada)');
+        }
+      })();
+    });
+    log.info('ouvindo NOTIFY call_responses (respostas da Luna p/ chamada ativa)');
+  }
   // ChatGPT (Operador) SEMPRE aberto (decreto owner 2026-09-25): o chrome-voice
   // sobe headed no boot com a aba do ChatGPT pronta — zero latência de abrir
   // na hora da chamada. Se já estiver no ar (CDP :9340), não faz nada.

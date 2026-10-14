@@ -137,7 +137,9 @@ export async function runFastRoute(deps: RouterDeps, input: {
       `Resultado da tool "${call.tool}" (rodada ${trace.toolRounds + 1}):`,
       JSON.stringify(result).slice(0, 1500),
       '',
-      'Com esse dado, responda com o JSON final (ANSWER / HANDOFF_LIVE / ESCALATE_HUMAN).',
+      'Com esse dado, responda com o JSON final (ANSWER / HANDOFF_LIVE / ESCALATE_HUMAN). Se ainda',
+      'faltar dado pra responder BEM, pode chamar OUTRA tool ({"type":"TOOL_CALL",...}) — encadeie',
+      'quantas precisar dentro do tope de rodadas.',
     ].join('\n');
     trace = await structuredTurn(deps, backToFast, sessionKey, trace.toolRounds + 1);
   }
