@@ -35,3 +35,5 @@ apps/whatsplay/tmp/
 .tmp-check/
 scripts/tmp-*.json
 .env.vps
+.membrane/
+apps/painel/tsconfig.tsbuildinfo
