@@ -457,3 +457,11 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
 - **VPS configurado:** `LIVE_BRAIN_PROVIDER=roda` + `OPENROUTER_API_KEY` no `.env` (faltava lá também — só existia no roda/.env).
 - **TESTE DE FOGO ✅:** job investigate manual → roda (gpt-4o) respondeu em ~2s → "O cérebro vivo da Luna voltou a funcionar, e este é o modelo GPT-4 respondendo." → entregue no WhatsApp do Abner (`send_state='sent'`). 9/9 testes do investigate, typecheck PC+VPS verde.
 - Limitação honesta do modo roda: sem ferramentas — pesquisa/raciocínio com o contexto que o FAST passa. Ação real (escrever arquivo, ligar, mexer no painel) volta a precisar de kimi-cli/pi/kimi-web-local quando houver quota.
+
+### Addendum 09:55 (14/10) — Live brain roda com BRAÇOS: loop de tools no worker
+- **Decreto owner 09:19:** "o live brain deve ver a lista de tools — ler arquivos, editar, criar, tudo igual a Luna".
+- **`apps/worker/src/jobs/live-tools.ts` (novo):** runner de tools executado pelo worker — `listTools` (catálogo completo com args, regra de ouro do prompt), `fs.read` (com contagem de linhas), `fs.write`, `fs.edit` (old_string exato), `fs.list`, `fs.grep` (regex recursivo), `shell.run` (timeout 30s, denylist de comandos catastróficos). Path traversal bloqueado fora de `LIVE_BRAIN_RODA_ROOTS` (default: luna-agent, luna-kernel, /opt/nexo-brain).
+- **`investigate.ts`:** modo `workerTools` — o modelo conversa em JSON (`{"action":"tool"|"final"}`), o worker executa e devolve o resultado, até 8 rodadas (`LIVE_BRAIN_RODA_MAX_ROUNDS`) + **rodada bônus final** (sem tools, resume com o que aprendeu — anti-escalada por esgotamento). Cada tool vira audit `live.tool.run`.
+- **Bug ao vivo na 1ª versão:** modelo gastou as 6 rodadas só lendo e nunca deu final → escalei. Fixes: fs.read agora devolve `lines`, prompt ganhou regra de economia de rodadas, rodada bônus, max 8.
+- **TESTE DE FOGO ✅:** "leia HANDOFF-luna.md e diga quantas linhas tem + crie arquivo X" → fs.read + fs.write em ~3s → "O arquivo HANDOFF-luna.md tem 460 linhas. O arquivo .luna-live-tools-test.md foi criado..." → **sent no WhatsApp do Abner**. 23/23 testes (14 novos do live-tools), typecheck PC+VPS.
+- Segurança honesta: shell roda como usuário nexo com denylist; não é sandbox de hardware — é guard contra desastre acidental. Toda chamada auditada.

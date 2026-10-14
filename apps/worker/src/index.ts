@@ -130,13 +130,23 @@ async function main(): Promise<void> {
   const { createVoiceCallHandler } = await import('./jobs/voice-call.js');
   runner.register('voice.call', createVoiceCallHandler({ pool, log }));
   const investigationTelegram = { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID };
+  // ADR-042 complemento (owner 14/10): no modo roda o live brain GANHA braços
+  // — o worker executa as tools (fs/shell, raízes permitidas) num loop com o
+  // modelo. listTools sempre disponível pro modelo descobrir o catálogo.
+  const { createLiveToolRunner } = await import('./jobs/live-tools.js');
+  const liveToolRunner = config.LIVE_BRAIN_PROVIDER === 'roda'
+    ? createLiveToolRunner({ roots: config.LIVE_BRAIN_RODA_ROOTS.split(','), log })
+    : undefined;
   runner.register('investigate', createInvestigateHandler({
     pool,
     live: liveAdapter,
     log,
     telegram: investigationTelegram,
-    // ADR-042: live brain API (roda) não tem ferramentas — o prompt muda.
+    // ADR-042: live brain API (roda) não tem ferramentas embutidas — o prompt
+    // muda; com workerTools, o loop de tools roda no handler.
     liveHasTools: config.LIVE_BRAIN_PROVIDER !== 'roda',
+    workerTools: liveToolRunner,
+    workerToolMaxRounds: config.LIVE_BRAIN_RODA_MAX_ROUNDS,
   }));
   const { enqueueJob } = await import('@luna/database');
   // Brain watch (decreto owner 27/09): varredura de diffs do brain canônico
