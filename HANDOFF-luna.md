@@ -420,3 +420,20 @@ Resultados em ~/luna-matrix-results.jsonl (VPS). Ranking:
   - Handler ganhou gate em profundidade: whatsapp + is_group + sem menção + sem citação da Luna → skip com audit `agent.reply.group_no_mention_skipped`.
   - **Incidente honesto:** antes do fix, 1 handoff-answer da FAST ("Deixa eu verificar isso direitinho — já te falo aqui mesmo", router_output HANDOFF_LIVE) foi entregue no grupo 🏆Production (evento "Ja ja faço o Bizum!"). Próximas mensagens de grupo sem menção ficam em silêncio.
 - Validação pendente com estado limpo: owner manda (1) msg nova no privado do +34 614 05 35 88 → resposta; (2) msg num grupo da allowlist SEM menção → silêncio; (3) msg no grupo MENCIONANDO a Luna → resposta.
+
+### Addendum 02:00 (madrugada 14/10) — BRAÇOS POTENTES: SILENCE no FAST + sweep adaptativo + roda testada
+- **Decreto owner 01:34 REVOGA o gate de grupo do addendum 00:45** ("quero que a Luna tenha braços potentes e possa responder quem quiser quando quiser, não só quando chamarem ela").
+- **SILENCE no FAST (deployado VPS ✅, typecheck PC+VPS verde):**
+  - `router/structured.ts`: saída `{"type":"SILENCE","reason":"..."}` no schema + instruções (grupo: ANSWER se pede participação / SILENCE se papo entre humanos; privado: sempre ANSWER).
+  - `agent/handler.ts`: gate duro de grupo removido; ramo SILENCE = log + conversation RESOLVED + audit `agent.reply.silence` (sem INSERT outbound).
+  - `whatsplay/src/ingest.ts`: skip duro `shouldRespond` removido — todo grupo allowlisted sobe pro FAST. Custo assumido: 1 chamada FAST por msg de grupo.
+- **Sweep adaptativo (`watcher.ts`):** corpo extraído pra `sweepOne(entry)`; catch de leitura agora espera 8s e retenta 1x (página em reload) em vez de esperar o ciclo de 60s. Badge/reconcile intocados (rede de segurança).
+- **Roda de providers (providers.json, backup .bak-luma-20261014-0149):** github-copilot(1) → pollinations(2) → gemini(3) → openrouter×11(4–14) → kimi-coding(15).
+  - **OPENROUTER_API_KEY estava FALTANTE no roda/.env** — gravada agora (sk-or-v1-8b23…). Sem ela os 11 providers openrouter falhavam em runtime.
+  - Testes ao vivo (curl VPS): github gpt-4o ✅ / pollinations ✅ / kimi ✅ / gemini 429 quota / openrouter 429 (reseta 08:00 UTC) / nvidia NIM timeout (mantido OFF).
+  - **FCC-server (8082): inútil pra roda** — /v1/chat/completions 404, /v1/messages trava. Processo `luna-fcc` fica instalado, fora da roda.
+  - Slots DESABILITADOS prontos p/ keys de amanhã: groq, mistral, cerebras, sambanova (onde pegar cada key no campo `note` do provider).
+- **Testes de fogo ✅:** chat web E2E (POST :3458/api/chat → "pronto" em ~8s via gpt-4o) e WhatsApp E2E ("pronto Abner 🌙" → send_state='sent' na conversa 86f47a7b).
+- **Crontasks/capacidade:** carga atual mínima (brain.watch ~horário, 0 ordens/24h, 2 agent_runs/24h). VPS folgada (ram 51%, cpu <10%). Gargalo futuro = rate-limit dos providers grátis com braços potentes, não a Luna.
+- **Brain:** sync completo já validado antes (239 comuns hash-idênticos, VPS com 1.857 arquivos). Changelog do brain gravado em `/opt/nexo-brain/changelog/entries/2026-10-14-luna-bracos-potentes.md`.
+- **PENDENTE pro owner:** (1) mandar msg de GRUPO da allowlist sem menção → a Luna decide (SILENCE ou ANSWER); (2) pegar keys groq/mistral/cerebras/sambanova amanhã e avisar p/ ativar; (3) se gemini não recuperar a quota sozinha, trocar a key.

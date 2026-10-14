@@ -290,33 +290,9 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       }
     }
 
-    // 2026-10-14 (bug ao vivo): GRUPO só recebe resposta com menção ou
-    // citação da Luna — o mentioned_luna já vinha calculado do whatsplay
-    // (watcher sweep), mas ninguém conferia aqui, e o FAST responderia toda
-    // mensagem das allowlists de grupo (spam certo nas integrações).
-    // Privado continua "sempre responde" (decreto owner 03/10).
-    if (
-      event.event_type === 'whatsapp.message.received' &&
-      payload.is_group === true &&
-      payload.mentioned_luna !== true &&
-      !/luna/i.test(String(payload.quoted_author ?? ''))
-    ) {
-      log.info(
-        { event_id: event.event_id, author: payload.author_name },
-        'grupo sem menção à Luna — sem resposta automática (§5 grupo)',
-      );
-      await recordAudit(db, {
-        actor: 'orchestrator',
-        action: 'agent.reply.group_no_mention_skipped',
-        tool: 'message_handler',
-        client_id: event.client_id,
-        correlation_id: event.correlation_id,
-        result: 'success',
-        metadata: { event_id: event.event_id, author: payload.author_name },
-      });
-      return;
-    }
-
+    // 2026-10-14 (decreto owner "braços potentes"): em grupo a decisão de
+    // falar/ficar muda é DO MODELO (saída SILENCE do FAST), não um hardcode
+    // aqui. O gate duro de menção que existiu neste ponto foi removido.
     const runStartedAt = new Date();
     await transitionConversation(db, conversationId, 'AI_HANDLING');
 
@@ -370,6 +346,32 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         investigationTimeoutMs: route.investigationTimeoutMs,
       },
     );
+
+    // SILENCE (decreto owner 14/10): o modelo viu a mensagem e decidiu que
+    // não deve falar (grupo, conversa entre humanos, sem valor real). Nada
+    // de outbound — só trilha de audit pra gente saber que ela escolheu calar.
+    if (decision.output.type === 'SILENCE') {
+      log.info(
+        { event_id: event.event_id, author: payload.author_name, reason: (decision.output as { reason?: string }).reason },
+        'FAST decidiu SILENCE — Luna fica muda nesta mensagem',
+      );
+      await transitionConversation(db, conversationId, 'RESOLVED');
+      await recordAudit(db, {
+        actor: 'orchestrator',
+        action: 'agent.reply.silence',
+        tool: 'message_handler',
+        client_id: event.client_id,
+        correlation_id: event.correlation_id,
+        result: 'success',
+        metadata: {
+          event_id: event.event_id,
+          author: payload.author_name,
+          is_group: payload.is_group === true,
+          reason: (decision.output as { reason?: string }).reason ?? '',
+        },
+      });
+      return;
+    }
 
     // Resposta persistida. deliver=false (simulação) não entra na fila de envio.
     const deliver = payload.deliver !== false;

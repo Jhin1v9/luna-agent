@@ -255,7 +255,24 @@ export class IngestWatcher {
       // jid (decreto: número do owner, ex. 34685093192@s.whatsapp.net):
       // o browser busca pelo número — sweep suporta; nome segue igual.
       try {
-        const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
+        await this.sweepOne(entry);
+      } catch (err) {
+        // 2026-10-14: era silencioso — inbound morria aqui sem rastro.
+        this.deps.log.warn({ entry, err: String(err).slice(0, 200) }, 'watcher(sweep): leitura falhou — retry em 8s');
+        // Sweep adaptativo (decreto owner "badge é frágil"): em vez de esperar
+        // o ciclo inteiro (60s), espera a página sair do reload e tenta 1x mais.
+        await new Promise((r) => setTimeout(r, 8000));
+        await this.sweepOne(entry).catch((err2) =>
+          this.deps.log.warn({ entry, err: String(err2).slice(0, 200) }, 'watcher(sweep): retry falhou — próximo ciclo'),
+        );
+      }
+    }
+  }
+
+  /** Lê um chat allowlisted e dispara ingest quando a última mensagem MUDA. */
+  private async sweepOne(entry: string): Promise<void> {
+    {
+      const msgs = (await this.deps.transport.readConversation(entry, 3)).filter((m) => m.text);
         // 2026-10-14 (bug ao vivo): olhar SO a ultima mensagem do painel
         // engolia pedido respondido — quando a Luna responde, o painel termina
         // com outbound DELA e o sweep pulava o cliente pra sempre (mensagem do
@@ -268,13 +285,13 @@ export class IngestWatcher {
         }
         const pendente = msgs.slice(lastOutIdx + 1);
         const last = pendente[pendente.length - 1];
-        if (!last) continue;
+        if (!last) return;
         const key = `${last.direction}:${last.text}`;
         const prev = this.lastSeenMsg.get(entry);
         this.lastSeenMsg.set(entry, key);
         const isSelfTest = last.direction === 'outbound' && extractMention(last.text);
-        if (last.direction === 'outbound' && !isSelfTest) continue; // resposta da própria Luna
-        if (prev === key) continue; // mesma mensagem da última varredura
+        if (last.direction === 'outbound' && !isSelfTest) return; // resposta da própria Luna
+        if (prev === key) return; // mesma mensagem da última varredura
         // Primeira vista (prev undefined): dispara SE acionável (inbound ou
         // self-test do owner); dedupe fino de repetição fica no unique
         // (channel, external_id) de messages.
@@ -325,10 +342,6 @@ export class IngestWatcher {
             );
           },
         );
-      } catch (err) {
-        // 2026-10-14: era silencioso — inbound morria aqui sem rastro.
-        this.deps.log.warn({ entry, err: String(err).slice(0, 200) }, 'watcher(sweep): leitura falhou — tenta no próximo ciclo');
-      }
     }
   }
 
