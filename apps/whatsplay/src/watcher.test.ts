@@ -87,8 +87,8 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
     await watcher.tick(); // seed (+ reconcile do boot, decreto owner 03/10)
     await watcher.tick(); // diff
     await new Promise((r) => setTimeout(r, 30)); // debounce flush
-    expect(readCalls).toContain('c1'); // badge-path/reconcile abre o allowlisted
-    expect(ingested).toContain('c1'); // SEMPRE ingere (reconcile do boot cobre o badge cego)
+    expect(readCalls).toContain('Pai'); // decreto owner 14/10 (bug ao vivo 19:48): abre pelo TÍTULO visível — JID não indexa na busca do WA
+    expect(ingested).toContain('c1'); // ingest SEMPRE pelo chat_id real (§7.6)
     // O mock muda o preview entre coletas, então reconcile e diff-path podem
     // disparar juntos — na produção a idempotency de messages (§7.6) dedupa.
   });
@@ -116,7 +116,7 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
     await watcher.tick();
     await watcher.tick();
     await new Promise((r) => setTimeout(r, 30));
-    expect(readCalls).toContain('c2');
+    expect(readCalls).toContain('Fora Do Escopo'); // abertura pelo título (decreto 14/10)
     expect(ingested).toContain('c2');
   });
 });
