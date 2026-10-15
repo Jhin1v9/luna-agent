@@ -3,6 +3,7 @@ import { resolveIngressIdentity, insertInboundMessage, publishEvent, recordAudit
 import type { Logger } from 'pino';
 import type { UnreadMessage, WhatsAppTransport } from './transport.js';
 import { detectSelfEcho } from './self-echo.js';
+import { handleContactApprovalCommand } from './contact-approval.js';
 
 /**
  * Ingestão (§13 event-driven): mensagem nova capturada por mutação de DOM →
@@ -21,6 +22,11 @@ export function createIngest(deps: IngestDeps) {
 
   /** Uma mensagem inbound (já pós-debounce). */
   async function ingestOne(msg: UnreadMessage): Promise<'published' | 'skipped'> {
+    if (await handleContactApprovalCommand(pool, msg.chat_id, msg.text) ||
+        (msg.chat_name !== msg.chat_id && await handleContactApprovalCommand(pool, msg.chat_name, msg.text))) {
+      log.info({ chat: msg.chat_name }, 'comando numerado de aprovação de contato processado');
+      return 'skipped';
+    }
     const identity = await resolveIngressIdentity(pool, {
       client_name: msg.chat_name,
       contact_name: msg.chat_name,

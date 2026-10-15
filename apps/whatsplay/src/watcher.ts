@@ -5,6 +5,8 @@ import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 import { extractMention } from './rules.js';
+import { registryCheck } from '@luna/database';
+import { requestContactApproval } from './contact-approval.js';
 
 /**
  * Watcher de ingress (modo F1.4 — registrado em ADR).
@@ -97,11 +99,15 @@ const BADGES_PREVIEW_SCRIPT = `(sel) => {
       // estrutural real. 'nome com :' era heurística errada: no teste vivo o
       // grupo "🏆Production - 2026" foi tratado como privado e respondeu sem
       // menção (violação §5 corrigida aqui).
-      is_group: chatId.includes('@g.us') || /grupo/i.test(preview),
+      is_group: chatId.includes('@g.us') || /grupo/i.test(preview) || /^\s*~?[^:]{1,80}:\s/.test(preview),
     });
   }
   return out;
 }`;
+
+export function looksLikeGroupPreview(chatId: string, preview: string): boolean {
+  return chatId.includes('@g.us') || /grupo/i.test(preview) || /^\s*~?[^:]{1,80}:\s/.test(preview);
+}
 
 export interface WatcherDeps {
   pool: Pool;
@@ -168,6 +174,18 @@ export class IngestWatcher {
     return Array.isArray(raw) ? raw : [];
   }
 
+  /** Cadastro (chat_registry) é a autoridade. A allowlist de env só restringe ainda mais. */
+  private async isAllowed(b: ChatBadge): Promise<boolean> {
+    if (!this.enforceIngest) return true;
+    const byId = await registryCheck(this.deps.pool, b.chat_id, 'ler mensagens');
+    const decision = byId.ok ? byId : await registryCheck(this.deps.pool, b.chat_name, 'ler mensagens');
+    if (!decision.ok) return false;
+    return this.ingestAllowlist.length === 0 ||
+      matchesAllowlist(this.ingestAllowlist, b.chat_name) ||
+      matchesAllowlist(this.ingestAllowlist, b.chat_id) ||
+      matchesAllowlist(this.ingestAllowlist, decision.entry.canonicalName);
+  }
+
   /** Um ciclo: coleta, seed/diff, extrai e ingere novidades. */
   private ticking = false;
 
@@ -218,8 +236,8 @@ export class IngestWatcher {
       this.baseline.set(b.chat_id, b.preview);
       // ESCOPO DE INGESTÃO: fora da lista → ignora SEM abrir o chat (não
       // marca como lida), SEM Context Builder, SEM LLM — zero tokens.
-      if (this.enforceIngest && !matchesAllowlist(this.ingestAllowlist, b.chat_name) && !matchesAllowlist(this.ingestAllowlist, b.chat_id)) {
-        this.deps.log.debug({ chat: b.chat_name }, 'watcher: fora do escopo de ingestão — ignorado (zero tokens)');
+      if (!(await this.isAllowed(b))) {
+        await this.requestUnknownApproval(b).catch((err) => this.deps.log.error({ err, chat: b.chat_name }, 'watcher: solicitação de contato falhou'));
         continue;
       }
       if (this.enforceIngest && this.sweepEnabled) {
@@ -368,12 +386,12 @@ export class IngestWatcher {
       for (const b of badges) {
         try {
           if (b.unread <= 0) continue;
-          if (
-            this.enforceIngest &&
-            !matchesAllowlist(this.ingestAllowlist, b.chat_name) &&
-            !matchesAllowlist(this.ingestAllowlist, b.chat_id)
-          ) {
-            continue; // fora da allowlist: não abre, não marca lida (§5)
+          if (!(await this.isAllowed(b))) {
+            if (this.lastReconciled.get(b.chat_id) !== b.preview) {
+              const requested = await this.requestUnknownApproval(b);
+              if (requested) this.lastReconciled.set(b.chat_id, b.preview);
+            }
+            continue; // fora do escopo: não abre, não marca lida (§5)
           }
           if (this.enforceIngest && this.sweepEnabled) {
             // Com sweep ligado, allowlisted é responsabilidade dele — o mesmo
@@ -468,6 +486,26 @@ export class IngestWatcher {
       },
     );
     return 'ingested';
+  }
+
+  /** Contato desconhecido: lê só a mensagem necessária para pedir autorização
+   *  ao owner. Não publica evento, não chama LLM e não responde ao contato. */
+  private async requestUnknownApproval(badge: ChatBadge): Promise<boolean> {
+    if (badge.is_group) return false;
+    const messages = await this.deps.transport.readConversation(badge.chat_name?.trim() || badge.chat_id, 5);
+    const inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
+    const last = inbound[inbound.length - 1];
+    if (!last) return false;
+    const context = inbound.slice(-3).map((m) => `${m.author ?? badge.chat_name}: ${m.text}`).join('\n');
+    const request = await requestContactApproval(this.deps.pool, {
+      chat_id: badge.chat_id,
+      chat_name: badge.chat_name,
+      text: context,
+      external_id: `wa:${badge.chat_id}:${Buffer.from(`${last.author ?? ''}|${last.text}`).toString('base64')}`,
+      author_name: last.author ?? badge.chat_name,
+    });
+    this.deps.log.info({ chat: badge.chat_name, request_id: request.id, created: request.created }, 'watcher: contato desconhecido enviado para aprovação do owner');
+    return true;
   }
 
   start(): void {
