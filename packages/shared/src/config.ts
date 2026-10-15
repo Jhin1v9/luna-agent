@@ -112,6 +112,14 @@ const envSchema = z.object({
   NEXO_API_USERNAME: z.string().optional(),
   NEXO_API_PASSWORD: z.string().optional(),
 
+  // ── Ponte Luna Web (decreto owner 15/10): a Luna do WhatsApp lista e
+  // executa o MESMO catálogo de tools da Luna Web (kernel :3458) — editar
+  // projetos, criar logins, providers, tudo. Auth: Bearer com o
+  // INTERNAL_API_TOKEN do kernel (env LUNA_KERNEL_TOKEN no .env do agent —
+  // os dois installs geram tokens diferentes, por isso env própria).
+  LUNA_KERNEL_URL: z.string().url().default('http://127.0.0.1:3458'),
+  LUNA_KERNEL_TOKEN: z.string().optional(),
+
   // ── F7/BLOCO 4 — auto-heal com diagnóstico por IA (ADR-031). OFF por
   // default: com ON, serviço próprio DOWN sem plano → FAST diagnostica e
   // propõe patch → executa dentro do runHeal (gate de testes + LKG + rollback).

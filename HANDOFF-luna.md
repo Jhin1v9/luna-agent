@@ -969,6 +969,7 @@ conta própria" sem um gatilho; se o owner quer rodadas proativas periódicas,
 - Teste de fogo do call.respond: a próxima chamada real (a sessão conductor precisa existir — hoje o KimiWebLocalAdapter antigo segue como conductor até o adaptador novo).
 
 
+
 ---
 
 ## 2026-10-14 — v14.1: fim da amnésia da Luna Web (reidratação stateless)
@@ -1017,3 +1018,31 @@ conta própria" sem um gatilho; se o owner quer rodadas proativas periódicas,
 - WhatsApp da Luna: Kimi Code consertou o whatsplay (DOM novo do WA Web) — msgs outbound OK; inbound é o teste de fogo restante.
 
 **Estado:** PC == VPS == origin kernel b1342cb. luna-web no ar na 3458 com a roda completa.
+
+
+---
+
+## 2026-10-15 — Bug ao vivo: Luna calada no WhatsApp por ~11h + busca do brain impecável
+
+**Bug do "lê e não responde" (owner: "mandei várias e ela nada"):** desde 20:33 de 14/10 toda mensagem do Abner caía em
+`HUMAN_HANDLING ativo — mensagem anexada à escalación, sem resposta automática`. Causa raiz: a auto-expiração de
+escalada (45 min, Kimi Code) marcava a escalation como `expired`, mas a CONVERSA ficava em `HUMAN_NOTIFIED` pra
+sempre — o gate só olhava escalations ABERTAS (notified/handling), não achava nenhuma, e engolia todo inbound.
+**Fix (agent 5a90228, handler.ts):** gate ativo SEM escalada aberta = estado preso → transição pra `AI_HANDLING` +
+audit `escalation.stale_gate_recovered`; a mensagem corrente segue o fluxo normal. As 2 conversas presas foram
+destravadas manualmente no DB.
+
+**Busca do brain impecável (decreto owner, principal-brain 6989247 + 70586e9 + afe334c):**
+- `searchAtlas`: match por INÍCIO DE PALAVRA (regex `(^|[^a-z0-9])token`) — elimina falso-positivo clássico
+  "thor" casando dentro de "au-thor" (era o motivo da busca do Thor ranquear errado); substring crua vira fallback
+  fraco (8 pts). Corpo inteiro de cada nota pesquisado a fundo (antes: só título/resumo). Insensível a acentos
+  (NFD). Excerpt cortado em volta do match real. Bônus de frase inteira.
+- **Reindexação imediata:** os 3 endpoints de escrita (`/api/learning/outcomes`, `/api/memory/notes`,
+  `/api/synapses/record`) agora rodam `regenerate()` inline (~0,3s) — nota nova pesquisável NA HORA, sem esperar
+  o ciclo do synapse (antes: só no dia seguinte). Compose ganhou mount vivo do `server.mjs` (mesmo padrão do `atlas/lib`).
+- Teste de fogo: save "código 724" → search "724" na hora → nota no topo ✅ | search "Thor" → as 2 notas do Thor no
+  topo com excerpt ✅ | "author" não polui mais o "Thor" ✅
+
+**Pendências:** sweep do whatsplay com retry ruidoso num chat fantasma ("34999999999") — não bloqueia (deeplink
+fallback funciona) mas polui log; inbound de fogo pós-fix depende de nova msg do owner. Lado agent (live/fast brain
+consumindo a roda) segue zona Kimi Code — `live-tools.ts` com WIP dela (stash preservado no VPS).

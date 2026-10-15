@@ -42,6 +42,8 @@ export const TOOL_CATALOG: Record<string, { desc: string; args?: string }> = {
   'nexo.system.status': { desc: 'Status do sistema no painel Nexo.' },
   'nexo.ops.overview': { desc: 'Visão geral de operações do painel Nexo.' },
   'nexo.notifications.list': { desc: 'Notificações do painel Nexo.' },
+  'lunaWeb.catalog': { desc: 'Catálogo completo da LUNA WEB (mesmas tools do painel web — índice inteiro).' },
+  'lunaWeb.exec': { desc: 'Executa qualquer tool da Luna Web pelo nome: {"tool":"dashboardCreateTask","params":{...}}.' },
   'listTools': { desc: 'Lista TODAS as suas tools e o que cada uma faz (esta lista).' },
 };
 
@@ -53,11 +55,23 @@ export const FAST_TOOLS: Record<string, FastTool> = {
       name,
       ...(TOOL_CATALOG[name] ?? { desc: 'tool registrada (sem descrição no catálogo)' }),
     }));
+    // v15 (decreto owner 15/10): MESCLA o catálogo da Luna Web — o índice
+    // idêntico ao do chat web (editar projetos, logins, providers, tudo).
+    let lunaWeb: string | null = null;
+    try {
+      lunaWeb = (await lunaWebCatalogProvider?.()) ?? null;
+    } catch {
+      lunaWeb = null; // kernel fora: listTools nativo continua servindo
+    }
     return {
       ok: true,
       data: {
         tools,
         hint: 'Chame qualquer uma via {"type":"TOOL_CALL","tool":"nome","args":{...}}. Se uma tool falhar por arg faltando, leia o erro e tente de novo com o arg certo.',
+        lunaWebCatalog: lunaWeb,
+        lunaWebNote: lunaWeb
+          ? '↑ MESMO catálogo da Luna Web. As tools de lá (dashboard*/workspace*/whatsapp*/brain*) rodam PELO MESMO NOME aqui. Docs de qualquer uma: lunaWeb.catalog'
+          : 'catálogo da Luna Web indisponível agora (kernel :3458 fora?). Disponível: lunaWeb.catalog / lunaWeb.exec',
       },
     };
   },
@@ -118,4 +132,14 @@ export function registerFastTools(extra: Record<string, FastTool>): void {
   for (const [name, fn] of Object.entries(extra)) {
     if (!(name in FAST_TOOLS)) FAST_TOOLS[name] = fn;
   }
+}
+
+/**
+ * Provider do catálogo Luna Web (decreto owner 15/10): injetado no boot por
+ * tools-luna-web.js; listTools mescla o índice no output. Kernel fora →
+ * provider ausente/quebrado e o listTools nativo segue funcionando.
+ */
+let lunaWebCatalogProvider: (() => Promise<string | null>) | null = null;
+export function setLunaWebCatalogProvider(fn: () => Promise<string | null>): void {
+  lunaWebCatalogProvider = fn;
 }
