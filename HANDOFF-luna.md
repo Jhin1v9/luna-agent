@@ -967,3 +967,82 @@ conta própria" sem um gatilho; se o owner quer rodadas proativas periódicas,
 ### Estado
 - PC == VPS == origin: kernel 2122215, agent a9fc28a. whatsplay + luna-web + orchestrator reiniciados e online.
 - Teste de fogo do call.respond: a próxima chamada real (a sessão conductor precisa existir — hoje o KimiWebLocalAdapter antigo segue como conductor até o adaptador novo).
+
+
+
+---
+
+## 2026-10-14 — v14.1: fim da amnésia da Luna Web (reidratação stateless)
+
+**Dor do owner:** a Luna Web esquecia TUDO entre mensagens (mandou o nº da namorada e na msg seguinte ela não sabia), e `brainWrite` caía em "Ferramenta desconhecida".
+
+**Root cause (2 achados):**
+1. A roda de APIs (gemini/openrouter/nvidia/github-models...) é STATELESS — a ApiBridge manda `messages:[{user: prompt}]` puro, sem thread. O follow-up/tool-loop do `_buildContext` mandava só 10 linhas de histórico e NENHUM system prompt → amnésia estrutural.
+2. `systemPrompt` do loopContext nem é enviado pela bridge — só `prompt` vai no `messages[]`. Qualquer fix tem que entrar DENTRO do prompt.
+
+**Corrigido (kernel a39c177, deploy no VPS + restart luna-web):**
+- `_buildContext`: quando `options.provider !== 'kimi'` (roda), o follow-up reidrata o system COMPLETO (persona + memórias + brain + TOOL INDEX + master prompt) e carrega 30 eventos de histórico; o tool-loop leva header leve (persona + TOOL INDEX + instrução de continuar) + 12 eventos recentes.
+- `tool-alias-resolver.cjs`: `brainWrite`, `escreverNoBrain`, `salvarNoBrain`, `gravarNoBrain`, `notarNoBrain`, `anotarNoBrain`, `memorizarNoBrain`, `addBrain`, `brainSave` → `brainSaveOutcome`; `lerBrain`/`brainRead` → `brainRead`; `buscarNoBrain`/`brainSearch` → `brainSearch`.
+- Erro de tool desconhecida agora ensina: "Execute listTools {} ou toolInfo {name}".
+- `buildToolIndex()`: categorias viram H1 nítido (`# BRAIN`, `# WHATSAPP — DIRETÓRIO & ENVIO`, `# SHELL`, `# WORKSPACE NEXO — SOLICITAÇÕES`...) — owner pediu seções BRAIN // WHATSAPP // BASH // POWERSHELL.
+
+**Teste de fogo (passou):** POST 3458 sessão `web-teste-memoria` — msg 1: "minha namorada é Ana Paula, +34 633 34 48 34" → ela chamou `brainSaveOutcome` SOZINHA e confirmou. Msg 2 (sem nenhuma dica): "qual o nome da minha namorada e o telefone?" → **"Sua namorada é Ana Paula e o telefone dela é +34 633 34 48 34. ❤️📞"** ✅
+
+**Estado:** PC == VPS == origin kernel a39c177. Roda com 15 providers, head `roda:github-models (gpt-4o)`.
+
+**Próximo passo (decreto owner pendente):** desacoplar kimi hardcoded — live/fast brain/operador/Kimi Code/Kimi CLI devem participar da RODA como providers (já existe `roda:kimi-coding` na fila; falta o default do sistema deixar de ser 'kimi' e bridge-factory resolver tudo via roda). Envolver `bridge-factory.cjs` + default de `options.provider` nas rotas do dashboard.
+
+
+---
+
+## 2026-10-14 (noite) — v14.2: a RODA virou a via principal (decreto owner)
+
+**Contexto:** owner decretou "TIRA ISSO O LIVE BRAIN, O FAST BRAIN, O OPERADOR. nada deve depender mais de uma só api. kimi code, kimi cli. NÃO! eles devem participar todos da roda de api com prompt". O `providers.json` da roda já tinha `kimi-coding` (api.kimi.com/coding/v1, openai-transport) como provider e as chaves `fastBrain: "kimi-coding"` / `liveBrain: "roda-vps"` (lidas por `packages/agent/src/roda.ts`).
+
+**O que mudou (kernel b1342cb, deployado no VPS):**
+1. **Default dinâmico** — `defaultProvider()` no luna-soul: `'roda'` quando `resolveApiRoda()` resolve ≥1 provider, `'kimi'` (CDP) só quando NENHUMA roda existe na instalação. Override: `LUNA_DEFAULT_PROVIDER`. Substitui os 9 fallbacks `options.provider || 'kimi'`. Nas rotas web, `DEFAULT_WEB_PROVIDER` ('roda') pra sessões novas e reads.
+2. **Detecção stateless por ground truth** — o label da sessão podia ser 'kimi' enquanto a ponte real era RodaApiBridge. Agora `isStatelessApi` olha `bridge.canSteer() === false` (RodaApiBridge) em vez de confiar só no label. Log: `[LUNA-PROMPT] stateless-rehydrate ON kind=followUp headerBytes=20734` ✅
+3. **Fixes de runtime achados no caminho:**
+   - `luna_chat_sessions` NÃO existia no PG do VPS → error loop a cada save. DDL salvo em `packages/kernel/001_luna_chat_sessions.sql` e tabela criada no banco.
+   - `RodaApiBridge.setPersistent()` noop — o heartbeat do painel chamava e estourava a cada ciclo.
+4. **Aliases brain ampliados** (a39c177): brainWrite/escreverNoBrain/salvarNoBrain/gravarNoBrain/anotarNoBrain/memorizarNoBrain/addBrain/brainsave → brainSaveOutcome; lerBrain/brainRead → brainRead; buscarNoBrain/brainSearch → brainSearch. Erro de tool desconhecida agora ensina listTools/toolInfo.
+
+**Testes de fogo (todos passaram):**
+- Memória: msg1 "namorada Ana Paula +34..." → brainSaveOutcome sozinha; msg2 sem dica → respondeu certo.
+- Cross-session: Thor salvo na sessão A; sessão B perguntou "quem é o Thor?" → ela respondeu "cachorro, mascote do Abner" (via BRAIN CONTEXT reidratado + brainSearch encadeado sozinha).
+- Sessão nova nasce com provider 'roda', roda 15 providers, head github-models (gpt-4o).
+
+**Pendências conhecidas:**
+- **Busca do brain com relevância fraca** pra notas recém-gravadas (save funciona, search não ranqueia a nota nova no topo — o nexo-brain é zona da Kimi Code).
+- Lado agent (`@luna/agent`): live/fast brain/operador — as chaves fastBrain/liveBrain já existem no providers.json; falta o agent consumir a roda em vez do KimiAdapter direto quando configurado. Zona Kimi Code.
+- WhatsApp da Luna: Kimi Code consertou o whatsplay (DOM novo do WA Web) — msgs outbound OK; inbound é o teste de fogo restante.
+
+**Estado:** PC == VPS == origin kernel b1342cb. luna-web no ar na 3458 com a roda completa.
+
+
+---
+
+## 2026-10-15 — Bug ao vivo: Luna calada no WhatsApp por ~11h + busca do brain impecável
+
+**Bug do "lê e não responde" (owner: "mandei várias e ela nada"):** desde 20:33 de 14/10 toda mensagem do Abner caía em
+`HUMAN_HANDLING ativo — mensagem anexada à escalación, sem resposta automática`. Causa raiz: a auto-expiração de
+escalada (45 min, Kimi Code) marcava a escalation como `expired`, mas a CONVERSA ficava em `HUMAN_NOTIFIED` pra
+sempre — o gate só olhava escalations ABERTAS (notified/handling), não achava nenhuma, e engolia todo inbound.
+**Fix (agent 5a90228, handler.ts):** gate ativo SEM escalada aberta = estado preso → transição pra `AI_HANDLING` +
+audit `escalation.stale_gate_recovered`; a mensagem corrente segue o fluxo normal. As 2 conversas presas foram
+destravadas manualmente no DB.
+
+**Busca do brain impecável (decreto owner, principal-brain 6989247 + 70586e9 + afe334c):**
+- `searchAtlas`: match por INÍCIO DE PALAVRA (regex `(^|[^a-z0-9])token`) — elimina falso-positivo clássico
+  "thor" casando dentro de "au-thor" (era o motivo da busca do Thor ranquear errado); substring crua vira fallback
+  fraco (8 pts). Corpo inteiro de cada nota pesquisado a fundo (antes: só título/resumo). Insensível a acentos
+  (NFD). Excerpt cortado em volta do match real. Bônus de frase inteira.
+- **Reindexação imediata:** os 3 endpoints de escrita (`/api/learning/outcomes`, `/api/memory/notes`,
+  `/api/synapses/record`) agora rodam `regenerate()` inline (~0,3s) — nota nova pesquisável NA HORA, sem esperar
+  o ciclo do synapse (antes: só no dia seguinte). Compose ganhou mount vivo do `server.mjs` (mesmo padrão do `atlas/lib`).
+- Teste de fogo: save "código 724" → search "724" na hora → nota no topo ✅ | search "Thor" → as 2 notas do Thor no
+  topo com excerpt ✅ | "author" não polui mais o "Thor" ✅
+
+**Pendências:** sweep do whatsplay com retry ruidoso num chat fantasma ("34999999999") — não bloqueia (deeplink
+fallback funciona) mas polui log; inbound de fogo pós-fix depende de nova msg do owner. Lado agent (live/fast brain
+consumindo a roda) segue zona Kimi Code — `live-tools.ts` com WIP dela (stash preservado no VPS).
