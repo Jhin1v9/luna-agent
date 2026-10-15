@@ -1046,3 +1046,67 @@ destravadas manualmente no DB.
 **Pendências:** sweep do whatsplay com retry ruidoso num chat fantasma ("34999999999") — não bloqueia (deeplink
 fallback funciona) mas polui log; inbound de fogo pós-fix depende de nova msg do owner. Lado agent (live/fast brain
 consumindo a roda) segue zona Kimi Code — `live-tools.ts` com WIP dela (stash preservado no VPS).
+
+## 2026-10-15 (tarde) — v14.3 do luna-kernel: README profissional + install anywhere
+
+**Contexto:** owner vai baixar o luna-kernel no PC Linux do pai — precisava estar perfeito.
+
+**Commits (local, já pushado pro GitHub `Jhin1v9/luna-kernel` main):**
+- `06e3400` — v14.3:
+  - **README.md reescrito do zero** (605 linhas): banner, arquitetura ASCII, instalação Linux one-liner /
+    Windows / manual, **todas as 161 tools documentadas em tabelas** (geradas programaticamente do
+    `tool-catalog.cjs` — fonte de verdade), presets gratuitos da roda, variáveis de ambiente, troubleshooting
+    (incl. `pm2: command not found` do PATH do node24), estrutura do repo.
+  - **db.js: auto-migração no boot** — `ensureChatTables()` com `CREATE TABLE IF NOT EXISTS luna_chat_sessions`
+    fire-and-forget logo após a criação do pool. Instalação do zero nunca mais morre com
+    "relation luna_chat_sessions does not exist" (era o gap do install-anywhere).
+  - **install.cjs: wizard completo** — pergunta `BRAIN_INTERNAL_URL` (default :4321) + `BRAIN_API_TOKEN`,
+    gera `config/providers.json` com 5 presets gratuitos (gemini prio 10, github-gpt4o 20, openrouter 30,
+    nvidia-nemotron 40, **pollinations sem key** prio 90 enabled — funciona sem nenhuma key), escreve
+    `LUNA_RODA_CONFIG` nos .env e adiciona `OPENROUTER_API_KEY`/`NVIDIA_API_KEY`/`GITHUB_TOKEN` comentadas.
+
+**Decisão:** VPS NÃO foi tocado (decreto owner: "a do vps deixa lá funcionando"). O v14.3 é pra instalações
+novas (PC do pai). Se quiser a auto-migração na VPS: `cd ~/luna-kernel && git pull && pm2 restart luna-server`.
+
+**Tool index regerado via:** `node tmp-dump-tools.cjs` → `buildToolIndex()` do tool-catalog (retorna string
+formatada, não array — `collectAllTools` não é exportado).
+
+**Pendências seguem:** sweep whatsplay chat fantasma; lado agent (roda no @luna/agent) zona Kimi Code.
+
+**Envio manual no grupo (decreto owner):** anúncio do instalador v14.3 + README entregue no grupo
+"🏆Production - 2026🙏🏻" (`send_state='sent'` às 06:59 UTC). Mecânica usada: insert direto na tabela
+`messages` do Postgres da VPS (conv `e88e2095…`, metadata.chat_id `120363424730639134@g.us`) +
+`pg_notify('luna_outbound', id)` — o whatsplay entregou em ~24s (human-delay + navegação). Grupo já
+estava na `WHATSAPP_OUTBOUND_ALLOWLIST` exata, então passou no guardrail de dev.
+
+## 2026-10-15 (tarde 2) — v14.4 kernel + v15 agent: ponte Luna Web no FAST
+
+**Decreto owner:** "coloca no catalogo de skills da luna pra quando ela precisar listar as tools
+mostrar o msm catalogo da luna web — editar projetos, criar logins, tudo mais".
+
+**Kernel (`730c3a7`, deployado na VPS):**
+- `GET /api/luna-web-catalog` — TOOL INDEX idêntico ao do prompt da Luna Web + lista de executáveis
+- `POST /api/luna-web-catalog/execute` — {tool, params} roda a MESMA função do loop da soul
+- Guardrail: allowlist business-only (dashboard*/workspace*/whatsapp*/brain*/callRespond).
+  Shell/arquivos/git NUNCA por HTTP. Auth: requireSystemAuth. Timeout 45s/tool.
+
+**Agent (`808fac5`, mergeado na VPS como `751e068`):**
+- `tools-luna-web.ts`: bridge HTTP pro kernel — `lunaWeb.catalog`, `lunaWeb.exec`, e
+  `registerLunaWebCatalogProxies` (um proxy por tool executável, MESMOS NOMES da web)
+- `listTools` do FAST agora MESCLA o índice do kernel no output
+- Env: `LUNA_KERNEL_URL` (default :3458) + `LUNA_KERNEL_TOKEN` (gravado no .env da VPS =
+  INTERNAL_API_TOKEN recém-criado no .env do kernel)
+- Recuperados da VPS 2 arquivos WIP que o commit `608d922` referenciava sem incluir:
+  `escalation-alert.ts` + `live-tools.ts` (com `pool`). typecheck 14/14, orchestrator 27/27.
+
+**Teste de fogo na VPS (14:16 UTC):** GET catalog ok (110 executáveis, índice 10.794 chars) |
+dashboardListProjects → 2 projetos ✅ | whatsappListGroups → 5 grupos ✅ | executeShell → 403 ✅ |
+sem token → 401 ✅ | log: "proxies do catálogo Luna Web registrados no FAST" ✅
+
+**⚠️ Divergência git:** a VPS tem commits locais da Kimi Code fora do origin
+(`dcb500e handoff: sync`, `453d70a`, `a9fc28a`, `02b56bc`, `e7cd65b`...). O merge de hoje
+(751e068) uniu origin/main no local. Próximo sync: **push da VPS ou rebase cuidadoso** —
+decisão da Kimi Code. Não force nada.
+
+**Pendências:** whatsplay ainda com 1 teste falhando no PC (`browser-reply` OperatorSession —
+pré-existente, zona whatsplay); PC do pai ainda não testou o instalador v14.3.
