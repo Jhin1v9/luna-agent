@@ -77,11 +77,13 @@ function fakePage(state: FakeState) {
     locator: (sel: string) => fakeLocator(state, log),
     async click() {},
     async reload() {},
+    async goto() {},
     async waitForSelector() {},
     async waitForTimeout() {},
     async screenshot() {},
     async evaluate(script: string) {
-      if (script.includes('noscript')) return true; // página saudável
+      if (script.includes('pane-side')) return true; // página saudável (#pane-side é o sinal)
+      if (script.includes('noscript')) return true;
       if (script.includes("el.textContent = ''")) {
         state.composeText = '';
         return undefined;

@@ -65,6 +65,7 @@ export interface IncomingCallEvent {
  *  até achar; placeholders {{caller}} e {{contexto}}). */
 let callerPromptCache: { mtime: number; content: string } | null = null;
 function callerPromptOverride(): string | null {
+  if (process.env.LUNA_CALLER_PROMPT === 'off') return null; // kill-switch p/ testes
   try {
     let dir = process.cwd();
     for (;;) {
