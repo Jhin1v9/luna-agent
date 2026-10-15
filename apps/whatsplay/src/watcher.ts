@@ -491,22 +491,27 @@ export class IngestWatcher {
   /** Contato desconhecido: lê só a mensagem necessária para pedir autorização
    *  ao owner. Não publica evento, não chama LLM e não responde ao contato. */
   private async requestUnknownApproval(badge: ChatBadge): Promise<boolean> {
-    if (badge.is_group) return false;
     const messages = await this.deps.transport.readConversation(badge.chat_name?.trim() || badge.chat_id, 5);
     const inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
     const last = inbound[inbound.length - 1];
     if (!last) return false;
-    // REFORÇO ANTI-GRUPO (v15.4.1, bug ao vivo 15/10): badge de grupo pode vir
-    // com is_group=false quando o preview não expõe autor — um grupo gerou
-    // solicitação #0 pro owner. Se qualquer fala inbound carrega autor que não
-    // é o próprio interlocutor, é grupo — grupos NUNCA passam por approval.
-    const groupAuthor = inbound.find(
+    // DETECÇÃO DE GRUPO: badge pode vir com is_group=false quando o preview não
+    // expõe autor — se qualquer fala inbound carrega autor que não é o próprio
+    // interlocutor, é grupo.
+    const isGroup = badge.is_group || Boolean(inbound.find(
       (m) => (m as { author?: string | null }).author != null &&
         !/^(tú|você|voce|you|tu)$/i.test(String((m as { author?: string | null }).author)),
-    );
-    if (groupAuthor) {
-      this.deps.log.warn({ chat: badge.chat_name }, 'watcher: solicitação de GRUPO bloqueada (padrão de autor nas mensagens)');
-      return false;
+    ));
+    if (isGroup) {
+      // GATE DE MENÇÃO (decreto owner 15/10): grupo desconhecido só vira
+      // solicitação quando alguém MENCIONA a Luna — senão todo grupo novo
+      // spammaria o owner. Sem menção: a Luna fica calada e segue a vida.
+      const mentioned = inbound.some((m) => extractMention(m.text));
+      if (!mentioned) {
+        this.deps.log.info({ chat: badge.chat_name }, 'watcher: grupo desconhecido SEM menção à Luna — ignorado (sem solicitação)');
+        return false;
+      }
+      this.deps.log.info({ chat: badge.chat_name }, 'watcher: grupo desconhecido MENCIONOU a Luna — enviando para aprovação do owner');
     }
     const context = inbound.slice(-3).map((m) => `${m.author ?? badge.chat_name}: ${m.text}`).join('\n');
     const request = await requestContactApproval(this.deps.pool, {
@@ -515,8 +520,9 @@ export class IngestWatcher {
       text: context,
       external_id: `wa:${badge.chat_id}:${Buffer.from(`${last.author ?? ''}|${last.text}`).toString('base64')}`,
       author_name: last.author ?? badge.chat_name,
+      is_group: isGroup,
     });
-    this.deps.log.info({ chat: badge.chat_name, request_id: request.id, created: request.created }, 'watcher: contato desconhecido enviado para aprovação do owner');
+    this.deps.log.info({ chat: badge.chat_name, request_id: request.id, created: request.created, is_group: isGroup }, 'watcher: contato desconhecido enviado para aprovação do owner');
     return true;
   }
 

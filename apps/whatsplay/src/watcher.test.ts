@@ -42,37 +42,38 @@ describe('diffBadges — novidade só quando o preview muda (seed anti-disparo)'
 
 });
 
-describe('contato novo — grupos nunca viram solicitação de autorização', () => {
+describe('contato novo — grupos viram solicitação SÓ quando mencionam a Luna (decreto owner 15/10)', () => {
   it('detecta JID e preview com autor típico de grupo', () => {
     expect(looksLikeGroupPreview('120@g.us', 'oi')).toBe(true);
     expect(looksLikeGroupPreview('Brasileiros', '~Silvia: Muito bom')).toBe(true);
     expect(looksLikeGroupPreview('Cliente', 'Olá, preciso limpar meu sofá')).toBe(false);
   });
 
-  it('v15.4.1: badge is_group=false mas mensagens COM autor (grupo sem JID no preview) NÃO gera solicitação', async () => {
+  function makeWatcher(pool: { query: (sql: string, params?: unknown[]) => Promise<unknown> }, inboundMessages: Array<Record<string, unknown>>, badge: Partial<ChatBadge> = {}) {
     const queries: string[] = [];
-    const pool = {
-      query: async (sql: string) => {
+    const wrapped = {
+      query: async (sql: string, params?: unknown[]) => {
         queries.push(sql);
-        if (/FROM chat_registry/.test(sql)) return { rows: [] }; // desconhecido
-        if (/INSERT INTO contact_approval_requests/.test(sql)) return { rows: [{ id: '9' }], rowCount: 1 };
-        return { rows: [] };
+        const r = (await pool.query(sql, params)) as { rows?: unknown[]; rowCount?: number };
+        return r;
       },
     };
-    const transport = {
-      readConversation: async () => [
-        { sender: 'x', direction: 'inbound' as const, text: 'alguém falou alguma coisa', author: 'Fulana' },
-      ],
-    };
+    const transport = { readConversation: async () => inboundMessages };
+    let evaluateCalls = 0;
     const watcher = new IngestWatcher(
       {
-        pool: pool as never,
+        pool: wrapped as never,
         transport: transport as never,
         log: { info: () => {}, debug: () => {}, warn: () => {}, error: () => {} } as never,
         page: {
-          evaluate: async () => [
-            { chat_id: 'g1', chat_name: 'Grupo X', unread: 2, preview: 'msg nova', is_group: false },
-          ],
+          evaluate: async () => {
+            evaluateCalls++;
+            // 1ª chamada = seed do baseline (preview antigo); 2ª = diff dispara
+            // com preview NOVO — senão o segundo tick não vê novidade.
+            return evaluateCalls === 1
+              ? [{ chat_id: 'g1', chat_name: 'Grupo X', unread: 1, preview: 'preview antigo', is_group: false }]
+              : [{ chat_id: 'g1', chat_name: 'Grupo X', unread: 2, preview: 'msg nova', is_group: false, ...badge }];
+          },
         },
         selectors: {},
         debounceMs: 5,
@@ -82,9 +83,67 @@ describe('contato novo — grupos nunca viram solicitação de autorização', (
       },
       { intervalMs: 60_000, sweepEnabled: false },
     );
+    return { watcher, queries };
+  }
+
+  it('grupo SEM menção à Luna NÃO gera solicitação (fica calada, não spamma o owner)', async () => {
+    const pool = {
+      query: async (sql: string) => {
+        if (/FROM chat_registry/.test(sql)) return { rows: [] }; // desconhecido
+        if (/INSERT INTO contact_approval_requests/.test(sql)) return { rows: [{ id: '9' }], rowCount: 1 };
+        if (/INSERT INTO messages/.test(sql)) return { rows: [{ id: 'm1' }], rowCount: 1 };
+        return { rows: [] };
+      },
+    };
+    const { watcher, queries } = makeWatcher(pool, [
+      { sender: 'x', direction: 'inbound' as const, text: 'alguém falou alguma coisa', author: 'Fulana' },
+    ]);
     await watcher.tick(); // seed (+ reconcile do boot)
     await watcher.tick(); // diff — cai no requestUnknownApproval
     expect(queries.some((q) => q.includes('INSERT INTO contact_approval_requests'))).toBe(false);
+  });
+
+  it('grupo COM menção à Luna GERA solicitação (com is_group no payload)', async () => {
+    let approvalPayload: Record<string, unknown> | null = null;
+    const pool = {
+      query: async (sql: string, params?: unknown[]) => {
+        if (/FROM chat_registry/.test(sql)) return { rows: [] }; // desconhecido
+        if (/INSERT INTO contact_approval_requests/.test(sql)) {
+          approvalPayload = JSON.parse(String(params?.[3])) as Record<string, unknown>;
+          return { rows: [{ id: '10' }], rowCount: 1 };
+        }
+        if (/INSERT INTO messages/.test(sql)) return { rows: [{ id: 'm1' }], rowCount: 1 };
+        return { rows: [] };
+      },
+    };
+    const { watcher, queries } = makeWatcher(pool, [
+      { sender: 'x', direction: 'inbound' as const, text: '@luna me ajuda aqui', author: 'Fulana' },
+    ]);
+    await watcher.tick(); // seed
+    await watcher.tick(); // diff
+    expect(queries.some((q) => q.includes('INSERT INTO contact_approval_requests'))).toBe(true);
+    expect((approvalPayload as Record<string, unknown> | null)?.is_group).toBe(true);
+  });
+
+  it('privado desconhecido continua gerando solicitação com qualquer mensagem', async () => {
+    const pool = {
+      query: async (sql: string, params?: unknown[]) => {
+        if (/FROM chat_registry/.test(sql)) return { rows: [] };
+        if (/INSERT INTO contact_approval_requests/.test(sql)) {
+          const payload = JSON.parse(String(params?.[3])) as Record<string, unknown>;
+          expect(payload.is_group).toBeFalsy();
+          return { rows: [{ id: '11' }], rowCount: 1 };
+        }
+        if (/INSERT INTO messages/.test(sql)) return { rows: [{ id: 'm1' }], rowCount: 1 };
+        return { rows: [] };
+      },
+    };
+    const { watcher, queries } = makeWatcher(pool, [
+      { sender: 'x', direction: 'inbound' as const, text: 'oi, sou cliente novo' },
+    ], { chat_id: 'c9', chat_name: 'Cliente Novo' });
+    await watcher.tick();
+    await watcher.tick();
+    expect(queries.some((q) => q.includes('INSERT INTO contact_approval_requests'))).toBe(true);
   });
 });
 
