@@ -1263,3 +1263,33 @@ enquanto fast brain executa; API só "dorme" quando o goal fecha.
   explícita das camadas, como o owner desenhou).
 - Expor o progresso do goal em evento dedicado ('goal_start'/'goal_progress')
   em vez de 'system', com renderização própria no frontend.
+
+---
+
+## 15/10 (noite) — Sincronização completa + separação de infos (decreto owner)
+
+**Migrações no PC local:** aplicadas 016 (wa_directory), 020 (registry owner),
+021 (contact_approvals) via `pnpm migrate` — banco local pronto pro fluxo de
+aprovação de contatos.
+
+**Sincronização main → branches superclim (decreto owner: "não misture infos
+pessoais dos repos — cada uma com as suas"):**
+- luna-agent: merge `fb75ba6` em `luna-agent-superclim`. Como tudo que o main
+  ganhou hoje veio da própria superclim (cherry-picks), o merge trouxe só o
+  ajuste fino. Typecheck 13/13 verde.
+- luna-kernel: merge `3679a99` em `luna-kernel-superclim` — /ajuda mantido com
+  identidade Superclim + modo GOAL entrando limpo.
+
+**Separação aplicada (o que NÃO vaza):**
+- superclim NÃO recebe: default 'Abner' (escalation-alert/tick ficam sem default
+  pessoal — sem env, falha fechado), defaults 'Nexo Digital/nexo/lx' no store
+  (viraram 'Superclim/superclim/sc'), CHAT_LABELS 'Nexo Productions'
+  (esvaziado com nota pra white-label preencher), HANDOFF interno do main
+  (restaurado o dela), prompt do classificador GOAL ("Nexo Digital" → "Superclim").
+- main NÃO recebe (ficou de fora do port): persona/identidade Superclim,
+  outbound sem deeplink, remoção do .brain, colibri-local.
+- Detalhe: nomes em testes unitários (Jess/Pai/Abner) já eram herança histórica
+  da base da superclim — não é mistura nova, mantidos como estavam.
+
+**Pendente VPS:** deploy do port (pull + `pnpm migrate` 016/020/021 + restart)
+quando o owner der o sinal — a VPS tem commits locais fora do origin.
