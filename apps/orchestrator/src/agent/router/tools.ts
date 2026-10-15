@@ -27,7 +27,7 @@ export type FastTool = (db: Sql, ctx: ToolContext, args: Record<string, unknown>
 export const TOOL_CATALOG: Record<string, { desc: string; args?: string }> = {
   'conversation.recent': { desc: 'Últimas 10 mensagens DESTA conversa (além do contexto que já veio no prompt).' },
   'client.summary': { desc: 'Resumo do cliente: contatos, plano, projetos, conversas abertas.' },
-  'contact.register': { desc: 'Confirma/atualiza o cadastro do contato da conversa atual após ele se apresentar.', args: 'name (obrigatório), need (opcional)' },
+  'contact.register': { desc: 'Confirma/atualiza o cadastro autorizado do contato da conversa atual após ele se apresentar.', args: 'name (obrigatório), phone com DDI (obrigatório em autorização temporária), need (opcional)' },
   'brain.search': { desc: 'Busca texto no brain da Superclim (memória duradoura).', args: 'q (mín. 2 chars)' },
   'brain.client_ficha': { desc: 'Ficha completa do cliente no brain (FICHA.md + MEMORY.md + OPINIONES recentes).' },
   'voice.call_place': { desc: 'Faz uma LIGAÇÃO DE VOZ pelo WhatsApp pra contato registrado (Chat Registry, deny-first).', args: 'contato (obrigatório), motivo/objetivo (opcional)' },
@@ -111,6 +111,7 @@ export const FAST_TOOLS: Record<string, FastTool> = {
   /** Cadastro assistido do próprio interlocutor; nunca aceita chat arbitrário. */
   'contact.register': async (db, ctx, args) => {
     const name = String(args.name ?? '').trim();
+    const phoneDigits = String(args.phone ?? '').replace(/\D/g, '');
     const need = String(args.need ?? '').trim();
     if (name.length < 2) return { ok: false, data: null, error: 'name é obrigatório' };
     const current = await db.query<{ contact_id: string | null; address: string | null; channel: string }>(
@@ -126,10 +127,18 @@ export const FAST_TOOLS: Record<string, FastTool> = {
     if (row.address.includes('@g.us')) {
       return { ok: false, data: null, error: 'contact.register não cadastra grupos automaticamente' };
     }
-    const digits = row.address.replace(/\D/g, '');
+    const currentRegistry = await db.query<{ note: string | null; phone_e164: string | null }>(
+      `SELECT note, phone_e164 FROM chat_registry WHERE kind='individual' AND chat_key=$1 LIMIT 1`, [row.address],
+    );
+    const temporary = currentRegistry.rows[0]?.phone_e164 == null && currentRegistry.rows[0]?.note?.startsWith('Autorização temporária');
+    if (temporary && (phoneDigits.length < 8 || phoneDigits.length > 15)) {
+      return { ok: false, data: null, error: 'phone com DDI é obrigatório para concluir este cadastro autorizado' };
+    }
+    const digits = phoneDigits || row.address.replace(/\D/g, '');
+    const finalChatKey = digits || row.address;
     const { registryUpsert } = await import('@luna/database');
     await registryUpsert(db, {
-      chatKey: row.address,
+      chatKey: finalChatKey,
       kind: 'individual',
       canonicalName: name,
       displayHint: name,
@@ -141,11 +150,19 @@ export const FAST_TOOLS: Record<string, FastTool> = {
     });
     if (row.contact_id) {
       await db.query(
-        `UPDATE contacts SET name = $2, metadata = metadata || $3::jsonb, updated_at = now() WHERE id = $1`,
-        [row.contact_id, name, JSON.stringify({ role: 'cliente', need: need || null, registered_by: 'luna_onboarding' })],
+        `UPDATE contacts SET name = $2, address=$4, metadata = metadata || $3::jsonb, updated_at = now() WHERE id = $1`,
+        [row.contact_id, name, JSON.stringify({ role: 'cliente', phone: digits ? `+${digits}` : null, need: need || null, registered_by: 'luna_onboarding' }), finalChatKey],
       );
     }
-    return { ok: true, data: { registered: true, name, chat_key: row.address, need: need || null } };
+    if (temporary && finalChatKey !== row.address) {
+      await db.query(
+        `UPDATE chat_registry SET canonical_name=$2, display_hint=$2, phone_e164=$3, notify_channel=$4,
+         note='Alias do título WhatsApp mantido para resolução; identidade numérica verificada no cadastro.', updated_at=now()
+         WHERE kind='individual' AND chat_key=$1`,
+        [row.address, name, `+${digits}`, `whatsapp:+${digits}`],
+      );
+    }
+    return { ok: true, data: { registered: true, name, chat_key: finalChatKey, need: need || null } };
   },
 };
 

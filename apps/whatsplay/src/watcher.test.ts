@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { diffBadges, IngestWatcher, type ChatBadge } from './watcher.js';
+import { diffBadges, IngestWatcher, looksLikeGroupPreview, type ChatBadge } from './watcher.js';
 
 const chat = (id: string, unread: number, preview: string): ChatBadge => ({
   chat_id: id,
@@ -40,6 +40,14 @@ describe('diffBadges — novidade só quando o preview muda (seed anti-disparo)'
     expect(diffBadges(prev, curr)).toEqual([]);
   });
 
+});
+
+describe('contato novo — grupos nunca viram solicitação de autorização', () => {
+  it('detecta JID e preview com autor típico de grupo', () => {
+    expect(looksLikeGroupPreview('120@g.us', 'oi')).toBe(true);
+    expect(looksLikeGroupPreview('Brasileiros', '~Silvia: Muito bom')).toBe(true);
+    expect(looksLikeGroupPreview('Cliente', 'Olá, preciso limpar meu sofá')).toBe(false);
+  });
 });
 
 describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-020)', () => {

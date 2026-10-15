@@ -267,3 +267,27 @@ Arquivos adicionados/alterados nesta etapa:
 - `packages/database/src/registry.ts`
 
 Validação: build de produção do painel passou; typecheck do Orchestrator e WhatsPlay passou; a migração foi aplicada. A suíte de registry mantém uma falha antiga de texto esperado (`Chat Registry`) versus texto atual (`cadastro Superclim`), sem relação com a mudança de owner.
+
+## Aprovação numerada de contatos novos (15/10/2026)
+
+Contatos desconhecidos continuam bloqueados, mas agora o WhatsPlay pode ler somente o contexto mínimo da mensagem para criar uma solicitação persistente em `contact_approval_requests`. A sequência começa em `0` e cada decisão exige o ID exato:
+
+- `sim <id>` aprova somente aquele contato;
+- `não <id>` nega somente aquele contato;
+- somente um registro `owner` pode decidir;
+- respostas sem ID, de não-owner ou para solicitação já decidida não autorizam ninguém;
+- grupos são excluídos do fluxo e nunca podem ser autorizados dessa forma.
+
+Quando aprovado, o contato recebe uma autorização temporária e a Luna pergunta nome e telefone com DDI. `contact.register` exige o telefone durante esse onboarding, cria a identidade numérica definitiva e mantém um alias controlado do título do WhatsApp para o transporte concluir a conversa atual.
+
+Arquivos desta etapa:
+
+- `packages/database/migrations/021_contact_approvals.sql`
+- `apps/whatsplay/src/contact-approval.ts`
+- `apps/whatsplay/src/watcher.ts`
+- `apps/whatsplay/src/watcher.test.ts`
+- `apps/whatsplay/src/ingest.ts`
+- `apps/orchestrator/src/agent/context.ts`
+- `apps/orchestrator/src/agent/router/tools.ts`
+
+Validação: migração aplicada; typecheck de WhatsPlay e Orchestrator passou; teste específico de bloqueio de grupos passou. Durante o primeiro teste vivo, o pedido `#0` foi gerado para um grupo por ausência de JID no DOM; ele foi negado automaticamente, o owner recebeu uma correção explícita e a detecção foi reforçada pelo padrão de autor do preview. As solicitações privadas `#2` e `#3` foram entregues ao owner e permanecem pendentes até resposta numerada.
