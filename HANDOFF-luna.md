@@ -1224,3 +1224,42 @@ user_signal: "owner pediu explicitamente 'copia tudo que tem de diff os extras' 
 repeat_when: "houver branch paralela white-label ou experimental com commits à frente do main e pedido de port"
 do_more_of: "sempre que portar, procurar resíduos de marca com grep antes do commit final; comparar suíte de testes pré/pós via worktree pra separar regressão de falha pré-existente; documentar mudança de semântica de decreto (ADR-020) no HANDOFF"
 ```
+
+---
+
+## 15/10 (fim da tarde) — Modo GOAL (decreto owner: "API stateless executa e morre")
+
+Idea do owner: classificar o GOAL de cada mensagem; live brain segura a missão
+enquanto fast brain executa; API só "dorme" quando o goal fecha.
+
+**Implementado no kernel (`e3ba552`, pushed):**
+- `apps/dashboard/luna-goal.js` — orquestrador do LADO DE FORA do soul (Vênus
+  segue livre no luna-soul.cjs). Fluxo:
+  1. **Classificador** (1 chamada barata, provider 'roda'): devolve JSON
+     {goal, type: responder|agir, done_criteria, resumo}. Falhou → goal
+     genérico (não trava o usuário).
+  2. **Goal trivial** (responder): 1 turno normal e acabou.
+  3. **Loop de missão** (até `LUNA_GOAL_MAX_TURNS`, default 8): cada turno é um
+     turno normal de processMessageStream com `skipUserEventStorage` — o prompt
+     da missão carrega JÁ FEITO/AINDA FALTA embarcado (é assim que a API
+     stateless "lembra": o contexto viaja em cada chamada; as respostas de cada
+     turno entram no histórico persistido). Conclusão = marcador `<goal_done/>`
+     na resposta (mesmo padrão do `<luna_done/>` que a Vênus está colocando no
+     soul). Turno que falha (API caiu) vira progresso e o loop reenvia com o
+     erro no contexto — é o "live brain re-prompta a API parada".
+  4. **Teto atingido**: turno de síntese final (traz o que conseguiu/faltou).
+- `luna-chat-routes.js`: `mode: 'goal'` aceito na API + comando local
+  `/goal <pedido>`. O soul recebe 'thinking' (goal é modo de orquestração, não
+  de soul). Cancelamento entre turnos respeita myStreamMeta.
+- Estado do goal fica em `session.goal` (diagnóstico, sobrevive no
+  sessions.json). Smoke test cobrindo: parse do comando, classificação
+  tolerante, loop completo com goal_done no turno 2, timeout no teto com
+  síntese, goal trivial.
+
+**Próximos passos naturais (v2, quando o whatsplay estabilizar):**
+- Gatilho automático: toda msg do WhatsApp/grupo passa pelo classificador; se
+  type=agir → encaminha pro modo goal sem o usuário precisar do /goal.
+- Classificador no provider liveBrain e executor no fastBrain (distinção
+  explícita das camadas, como o owner desenhou).
+- Expor o progresso do goal em evento dedicado ('goal_start'/'goal_progress')
+  em vez de 'system', com renderização própria no frontend.
