@@ -116,4 +116,33 @@ describe('PanelGuard — nunca mais de 1 chat aberto (decreto owner)', () => {
     expect(state.open).toBeNull();
     expect(warns).toEqual([]); // sweep não tratou o painel legítimo como "fora de ciclo"
   });
+
+  it('REGRESSÃO: dois ciclos iniciados no mesmo tick preservam a intenção ativa', async () => {
+    const state: { open: string | null; closeWorks: boolean } = { open: null, closeWorks: true };
+    const g = makeGuard(state);
+    const ordem: string[] = [];
+    let liberarEnvio!: () => void;
+    const envioPodeTerminar = new Promise<void>((resolve) => { liberarEnvio = resolve; });
+
+    const envio = (async () => {
+      await g.beginCycle('sendMessage');
+      state.open = 'Elias';
+      ordem.push('envio:entrou');
+      await envioPodeTerminar;
+      ordem.push('envio:confirmado');
+      await g.endCycle('sendMessage');
+    })();
+    const sweep = (async () => {
+      await g.beginCycle('sweep');
+      ordem.push('sweep:entrou');
+      await g.endCycle('sweep');
+    })();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(ordem).toEqual(['envio:entrou']);
+    expect(state.open).toBe('Elias');
+    liberarEnvio();
+    await Promise.all([envio, sweep]);
+    expect(ordem).toEqual(['envio:entrou', 'envio:confirmado', 'sweep:entrou']);
+  });
 });

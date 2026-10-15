@@ -27,7 +27,8 @@ export type FastTool = (db: Sql, ctx: ToolContext, args: Record<string, unknown>
 export const TOOL_CATALOG: Record<string, { desc: string; args?: string }> = {
   'conversation.recent': { desc: 'Últimas 10 mensagens DESTA conversa (além do contexto que já veio no prompt).' },
   'client.summary': { desc: 'Resumo do cliente: contatos, plano, projetos, conversas abertas.' },
-  'brain.search': { desc: 'Busca texto no brain da Nexo (memória duradoura).', args: 'q (mín. 2 chars)' },
+  'contact.register': { desc: 'Confirma/atualiza o cadastro do contato da conversa atual após ele se apresentar.', args: 'name (obrigatório), need (opcional)' },
+  'brain.search': { desc: 'Busca texto no brain da Superclim (memória duradoura).', args: 'q (mín. 2 chars)' },
   'brain.client_ficha': { desc: 'Ficha completa do cliente no brain (FICHA.md + MEMORY.md + OPINIONES recentes).' },
   'voice.call_place': { desc: 'Faz uma LIGAÇÃO DE VOZ pelo WhatsApp pra contato registrado (Chat Registry, deny-first).', args: 'contato (obrigatório), motivo/objetivo (opcional)' },
   'nexo.finance.summary': { desc: 'Resumo financeiro do painel Nexo.' },
@@ -105,6 +106,46 @@ export const FAST_TOOLS: Record<string, FastTool> = {
       ok: true,
       data: { client: client.rows[0] ?? null, contacts: contacts.rows, projects: projects.rows },
     };
+  },
+
+  /** Cadastro assistido do próprio interlocutor; nunca aceita chat arbitrário. */
+  'contact.register': async (db, ctx, args) => {
+    const name = String(args.name ?? '').trim();
+    const need = String(args.need ?? '').trim();
+    if (name.length < 2) return { ok: false, data: null, error: 'name é obrigatório' };
+    const current = await db.query<{ contact_id: string | null; address: string | null; channel: string }>(
+      `SELECT cv.contact_id, ct.address, cv.channel
+       FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id
+       WHERE cv.id = $1 LIMIT 1`,
+      [ctx.conversationId],
+    );
+    const row = current.rows[0];
+    if (!row || row.channel !== 'whatsapp' || !row.address) {
+      return { ok: false, data: null, error: 'conversa WhatsApp atual não resolvida' };
+    }
+    if (row.address.includes('@g.us')) {
+      return { ok: false, data: null, error: 'contact.register não cadastra grupos automaticamente' };
+    }
+    const digits = row.address.replace(/\D/g, '');
+    const { registryUpsert } = await import('@luna/database');
+    await registryUpsert(db, {
+      chatKey: row.address,
+      kind: 'individual',
+      canonicalName: name,
+      displayHint: name,
+      role: 'allowed',
+      notifyChannel: digits ? `whatsapp:+${digits}` : null,
+      phoneE164: digits ? `+${digits}` : null,
+      resolvedBy: 'luna_onboarding',
+      note: need ? `Cliente se apresentou. Necessidade inicial: ${need.slice(0, 300)}` : 'Cliente se apresentou à Luna.',
+    });
+    if (row.contact_id) {
+      await db.query(
+        `UPDATE contacts SET name = $2, metadata = metadata || $3::jsonb, updated_at = now() WHERE id = $1`,
+        [row.contact_id, name, JSON.stringify({ role: 'cliente', need: need || null, registered_by: 'luna_onboarding' })],
+      );
+    }
+    return { ok: true, data: { registered: true, name, chat_key: row.address, need: need || null } };
   },
 };
 

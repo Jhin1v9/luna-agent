@@ -1,5 +1,8 @@
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WhatsAppWebTransport } from './browser.js';
 
 /**
@@ -16,8 +19,8 @@ const config = loadConfig();
 const log = createLogger({ name: 'whatsplay-discover' });
 
 const userDataDir =
-  config.WHATSAPP_USER_DATA_DIR || '/home/nexo/.luna/chrome-whatsapp';
-const evidenceDir = '/home/nexo/luna-agent/.brain/luna/incidents';
+  config.WHATSAPP_USER_DATA_DIR || join(homedir(), '.luna/chrome-whatsapp');
+const evidenceDir = fileURLToPath(new URL('../../../.brain/luna/incidents', import.meta.url));
 const loginMode = process.argv.includes('--login');
 
 async function main(): Promise<void> {

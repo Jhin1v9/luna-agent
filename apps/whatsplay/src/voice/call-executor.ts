@@ -1,7 +1,7 @@
 import type { Logger } from 'pino';
 import type { Pool } from 'pg';
 import type { WhatsAppTransport } from '../transport.js';
-import { FallbackAdapter, KimiWorkAdapter } from '@luna/agent';
+import { FallbackAdapter, KimiWorkAdapter, RodaAdapter } from '@luna/agent';
 import type { KimiLiveAdapter } from '@luna/agent';
 import { OperatorSession } from './operator-session.js';
 import { preflightOperator } from './operator-preflight.js';
@@ -37,7 +37,12 @@ export interface CallExecutorDeps {
  * Exportado pra reuso no fast path de chamadas RECEBIDAS (incoming-fastpath).
  */
 export function createVoiceLiveAdapter(pool: Pool, log: Logger): KimiLiveAdapter {
-  return process.env.KIMI_ADAPTER_MODE === 'kimiwork'
+  return process.env.KIMI_ADAPTER_MODE === 'roda'
+    ? new RodaAdapter(
+        { mode: 'roda' },
+        { configPath: process.env.LIVE_BRAIN_RODA_CONFIG ?? './config/providers.json' },
+      )
+    : process.env.KIMI_ADAPTER_MODE === 'kimiwork'
     ? new KimiWorkAdapter(
         { mode: 'kimiwork' },
         {

@@ -1,13 +1,14 @@
 import type { Pool } from 'pg';
 import { resolveIngressIdentity } from './ingress.js';
 import { recordAudit } from './audit.js';
+import { registryCheck } from './registry.js';
 
 /**
  * ALERTA DE ESCALAÇÃO NO WHATSAPP DO OWNER (decreto owner 2026-10-14):
  * o canal Telegram do time NUNCA foi configurado em produção — ninguém
  * recebia escalation nenhuma ("é só clicar um botão" não, tem que CHEGAR).
- * Todo alerta de escalation agora vai também como DM da Luna pro Abner,
- * gravado em messages (fica registrado) + audit_log.
+ * O destino é configurado por SUPERCLIM_ESCALATION_CONTACT e precisa existir
+ * no Chat Registry. Sem ambos, falha fechado e não cria mensagem.
  */
 export async function alertOwnerWhatsApp(
   pool: Pool,
@@ -15,11 +16,15 @@ export async function alertOwnerWhatsApp(
   meta: { escalation_id: string; priority?: string; stage?: string },
 ): Promise<{ ok: boolean; message_id?: string; error?: string }> {
   try {
+    const target = process.env.SUPERCLIM_ESCALATION_CONTACT?.trim();
+    if (!target) return { ok: false, error: 'SUPERCLIM_ESCALATION_CONTACT não configurado' };
+    const allowed = await registryCheck(pool, target, 'receber alerta');
+    if (!allowed.ok) return { ok: false, error: allowed.reason };
     const identity = await resolveIngressIdentity(pool, {
-      client_name: 'Abner',
-      contact_name: 'Abner',
+      client_name: allowed.entry.canonicalName,
+      contact_name: allowed.entry.canonicalName,
       channel: 'whatsapp',
-      address: 'Abner',
+      address: allowed.entry.chatKey,
     });
     const inserted = await pool.query<{ id: string }>(
       `INSERT INTO messages (conversation_id, direction, channel, sender, body, author_name, metadata, send_state)

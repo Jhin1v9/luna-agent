@@ -46,6 +46,8 @@ export interface IncomingFastpathDeps {
   endPollMs?: number;
   /** Poll da conductora (default 2.5s; testes usam menos). */
   conductorPollMs?: number;
+  /** Entrega o registro capturado ao owner quando a chamada termina. */
+  onCallEnded?: (input: { caller: string; transcript: string }) => Promise<void>;
   /** Decreto owner 2026-09-24 09:08: ATENDER TODAS as chamadas — não recusar
    *  ninguém. true pula o gate da allowlist (quem liga fora da lista também
    *  é atendido no fast path). */
@@ -61,7 +63,7 @@ export interface IncomingCallEvent {
 /** Prompt de atendimento: regras duras + contexto real. Instante — zero LLM. */
 export const INBOUND_OPERATOR_PROMPT = (caller: string, contexto: string | null): string =>
   [
-    `ATENDIMENTO ATIVO AGORA: você é a VOZ DA LUNA (NEXO DIGITAL) numa chamada de voz WhatsApp com ${caller}.`,
+    `ATENDIMENTO ATIVO AGORA: você é a VOZ DA LUNA (SUPERCLIM) numa chamada de voz WhatsApp com ${caller}.`,
     '',
     'REGRAS DE OURO:',
     '- Fale EXATAMENTE como a Luna falaria: parceira, direta, natural, PT-BR.',
@@ -75,7 +77,7 @@ export const INBOUND_OPERATOR_PROMPT = (caller: string, contexto: string | null)
     'CONTEXTO DE QUEM ESTÁ NA LINHA (buildado pelo meu sistema antes de atender):',
     contexto?.trim() ? contexto.trim() : '(sem contexto prévio — se apresente e pergunte o motivo da ligação)',
     '',
-    'A chamada JÁ ESTÁ ROLANDO. Comece AGORA: "Alô? Aqui é a Luna, da Nexo Digital."',
+    'A chamada JÁ ESTÁ ROLANDO. Comece AGORA: "Alô? Aqui é a Luna, da Superclim."',
   ].join('\n');
 
 export async function fastAnswerIncoming(
@@ -140,6 +142,8 @@ export async function fastAnswerIncoming(
 
     // 4) Conductora: lê captions do voice mode ATIVAMENTE e dita as dicas
     //    pro ChatGPT (que a Luna executa tudo).
+    const transcriptLines: string[] = [];
+    const seenTranscript = new Set<string>();
     const conductor = new CallConductor({
       operator,
       live: deps.live,
@@ -148,6 +152,13 @@ export async function fastAnswerIncoming(
       pollMs: deps.conductorPollMs ?? 2_500,
       readVoiceTurns: async (t) => {
         const caps = await operator.readVoiceCaptions(t).catch(() => [] as Array<{ source: string; text: string }>);
+        for (const cap of caps) {
+          const line = `${cap.source}: ${cap.text}`.trim();
+          if (cap.text.trim() && !seenTranscript.has(line)) {
+            seenTranscript.add(line);
+            transcriptLines.push(line);
+          }
+        }
         return caps.map((c) => ({ speaker: 'participante (voz)', text: c.text }));
       },
       executeAction: async (name, detail) => {
@@ -174,6 +185,12 @@ export async function fastAnswerIncoming(
       if (st.state !== 'chamada') break;
     }
     handle.stop();
+    if (deps.onCallEnded) {
+      const transcript = transcriptLines.join('\n').slice(0, 3500);
+      await deps.onCallEnded({ caller: ev.caller, transcript }).catch((err) =>
+        log.error({ err: String(err).slice(0, 180), caller: ev.caller }, 'fastpath: repasse da chamada ao owner falhou'),
+      );
+    }
     log.info({ caller: ev.caller }, 'fastpath: chamada encerrada — conductora parada');
     return 'answered';
   } finally {

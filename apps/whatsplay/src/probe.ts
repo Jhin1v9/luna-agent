@@ -1,6 +1,9 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { loadDotEnv, loadConfig } from '@luna/shared';
 import { createLogger } from '@luna/logging';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 /**
@@ -15,7 +18,7 @@ loadDotEnv();
 const config = loadConfig();
 const log = createLogger({ name: 'whatsplay-probe' });
 
-const userDataDir = config.WHATSAPP_USER_DATA_DIR || '/home/nexo/.luna/chrome-whatsapp';
+const userDataDir = config.WHATSAPP_USER_DATA_DIR || join(homedir(), '.luna/chrome-whatsapp');
 
 // Marcadores candidatos — cobertura EN/PT/ES e estruturais (id/class).
 const PROBE_SCRIPT = `(() => {
@@ -72,7 +75,7 @@ async function main(): Promise<void> {
     if (s.probes && s.probes.paneSide) break; // app renderizou
   }
 
-  const evidenceDir = '/home/nexo/luna-agent/.brain/luna/incidents';
+  const evidenceDir = fileURLToPath(new URL('../../../.brain/luna/incidents', import.meta.url));
   mkdirSync(evidenceDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const reportPath = `${evidenceDir}/probe-${stamp}.json`;

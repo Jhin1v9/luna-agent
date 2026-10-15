@@ -186,7 +186,11 @@ export async function runEscalationTick(deps: EscalationTickDeps): Promise<{
        AND created_at > now() - interval '1 hour'`,
     [VOICE_CALL_AFTER_FOLLOWUP_MINUTES],
   );
-  for (const esc of callDue.rows) {
+  const escalationContact = process.env.SUPERCLIM_ESCALATION_CONTACT?.trim();
+  if (!escalationContact) {
+    if (callDue.rowCount) deps.log.warn({ pendentes: callDue.rowCount }, 'escalação sem contato administrativo cadastrado; chamada automática não criada');
+  }
+  for (const esc of escalationContact ? callDue.rows : []) {
     // Contexto do prompt: últimas falas do cliente na conversa da escalation.
     const recent = await pool.query<{ body: string; author_name: string | null }>(
       `SELECT body, author_name FROM messages
@@ -199,11 +203,11 @@ export async function runEscalationTick(deps: EscalationTickDeps): Promise<{
       .map((m) => `${m.author_name ?? 'cliente'}: ${m.body.slice(0, 220)}`)
       .join(' | ');
     const brief = {
-      destinatario: 'Abner',
-      autorizador: 'Luna (insistência automática de escalation, decreto owner)',
+      destinatario: escalationContact,
+      autorizador: 'política Superclim (contato administrativo configurado)',
       motivo: `Escalation ${esc.priority} sem atendimento: ${esc.reason}`.slice(0, 300),
       objetivo:
-        `Você está ligando pro Abner (dono). Uma escalation ${esc.priority} ficou sem atendimento: ${esc.reason}. ` +
+        `Você está ligando para o contato administrativo cadastrado. Uma escalation ${esc.priority} ficou sem atendimento: ${esc.reason}. ` +
         `Contexto recente do cliente: ${falas || '(sem falas recentes)'.slice(0, 400)}. ` +
         `Peça uma decisão rápida ou que ele responda no chat. Se ele atender, resume o caso e pergunta pra quem ele delega.`,
     };
@@ -224,7 +228,7 @@ export async function runEscalationTick(deps: EscalationTickDeps): Promise<{
       tool: 'escalation_tick',
       client_id: esc.client_id,
       result: 'success',
-      metadata: { escalation_id: esc.id, priority: esc.priority, to: 'Abner' },
+      metadata: { escalation_id: esc.id, priority: esc.priority, to: escalationContact },
     });
     await alert(
       deps,

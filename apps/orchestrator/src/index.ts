@@ -213,18 +213,9 @@ async function main(): Promise<void> {
     log,
     telegram: { botToken: config.TELEGRAM_BOT_TOKEN, teamChatId: config.TELEGRAM_TEAM_CHAT_ID ?? config.TELEGRAM_CHAT_ID },
   });
-  // Tools da VPS Nexo (leitura, catálogo docs/tools/nexo-api-catalog.md) —
-  // ligadas "igual um neurônio" no TOOL_CALL do Model Router. Sem
-  // credencial: tool falha explicitamente (fail-closed), sem derrubar nada.
+  // Esta instância é isolada para a Superclim: integrações de outra empresa
+  // não são registradas, mesmo que existam defaults legados no monorepo.
   const { registerFastTools, setLunaWebCatalogProvider } = await import('./agent/router/tools.js');
-  const { createNexoTools } = await import('./agent/router/tools-nexo.js');
-  registerFastTools(
-    createNexoTools({
-      baseUrl: config.NEXO_API_BASE_URL,
-      username: config.NEXO_API_USERNAME,
-      password: config.NEXO_API_PASSWORD,
-    }),
-  );
   // P4 — tools do Brain pra FAST: memória duradoura consultável no turno
   // (brain.search + brain.client_ficha, leitura só).
   const { createBrainTools } = await import('./agent/router/tools-brain.js');
@@ -244,7 +235,7 @@ async function main(): Promise<void> {
   registerLunaWebCatalogProxies(lunaWebCfg, registerFastTools)
     .then((n) => log.info({ count: n }, 'proxies do catálogo Luna Web registrados no FAST'))
     .catch((err) => log.warn({ err: String(err) }, 'catálogo Luna Web indisponível no boot — só lunaWeb.* ativas'));
-  log.info('tools Nexo + Brain registradas no FAST (leitura; ações = restritas)');
+  log.info('tools Brain Superclim registradas no FAST (leitura; ações = restritas)');
 
   bus.on('client.message.received', messageHandler);
   bus.on('whatsapp.message.received', messageHandler);

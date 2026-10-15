@@ -132,7 +132,7 @@ export function createNotificationHandler(deps: NotificationDeps) {
     const payload = event.payload as RequestedPayload;
     const clientId = payload.client_id ?? event.client_id;
     if (!clientId) throw new Error('notification.requested sem client_id');
-    const title = payload.title ?? 'Nexo Digital';
+    const title = payload.title ?? 'Superclim';
     const body = payload.body ?? '';
     const baseKey = payload.idempotency_key ?? event.event_id;
 

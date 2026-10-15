@@ -60,7 +60,7 @@ const COMPOSE_PROMPT = (brief: CallBrief): string =>
     `Motivo da chamada: ${brief.motivo}`,
     `O que o Operador deve fazer: ${brief.objetivo}`,
     '',
-    'Regras do prompt final: o Operador é a voz da Luna (NEXO DIGITAL); nunca inventa fatos/preços/prazos;',
+    'Regras do prompt final: o Operador é a voz da Luna (SUPERCLIM); nunca inventa fatos/preços/prazos;',
     'mantém a conversa viva (marca de espera padrão quando processando); trata a Luna como colega;',
     'PAPÉIS (explícitos): o Operador é SÓ A VOZ — nunca decide nada, segue o que aparecer no chat;',
     'a Kimi (Live) é a conductora que vê tudo e intervem; e SEMPRE se despede curto e simpático ao encerrar.',

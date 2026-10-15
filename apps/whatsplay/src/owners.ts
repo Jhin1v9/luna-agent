@@ -1,5 +1,5 @@
 /**
- * DONOS — registro canônico dos sócios da Nexo (decreto owner 2026-09-23).
+ * Compatibilidade temporária com a antiga resolução de aliases.
  *
  * Uma pessoa, um registro canônico, muitos apelidos. O cérebro fala "pai",
  * "noke", "superclim" — o sistema resolve pro contato certo, sempre. Sem
@@ -10,8 +10,9 @@
  * → canônico e marca o papel (role: 'dono'). Os dois se combinam: skills.ts
  * normaliza o nome ANTES de chamar o resolver.
  *
- * ⚠️ Nunca inventar contato: quem entra aqui é porque o OWNER falou
- * explicitamente ("já guarda eles. somos os DONOS da nexo ok").
+ * A instância Superclim não mantém pessoas ou números hardcoded. A fonte de
+ * verdade é `chat_registry`, no PostgreSQL isolado. Aliases novos também devem
+ * ser cadastrados como dados, nunca adicionados ao código.
  */
 
 export interface DonoEntry {
@@ -26,29 +27,7 @@ export interface DonoEntry {
   role: 'dono';
 }
 
-export const DONOS: readonly DonoEntry[] = [
-  {
-    canonical: 'Abner Mendes',
-    phone: '+34 685 09 31 92',
-    chatTitle: 'Abner',
-    aliases: ['abner', 'abner mendes', 'eu', 'meu numero', 'meu número'],
-    role: 'dono',
-  },
-  {
-    canonical: 'Elias Israel Mendes',
-    phone: '+34 672 95 30 62',
-    chatTitle: 'Superclim Servicios',
-    aliases: ['pai', 'elias', 'elias israel mendes', 'superclim', 'superclim servicios', 'superclim serviços'],
-    role: 'dono',
-  },
-  {
-    canonical: 'Enoque Santos',
-    phone: '+34 689 13 51 59',
-    chatTitle: 'Nonoke',
-    aliases: ['noke', 'nonoke', 'enoque', 'enoque santos'],
-    role: 'dono',
-  },
-] as const;
+export const DONOS: readonly DonoEntry[] = [];
 
 /** Normaliza grafia: minúsculas, trim, colapsa espaços. */
 export function normalizeSpelling(name: string): string {

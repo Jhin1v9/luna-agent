@@ -155,7 +155,7 @@ async function main(): Promise<void> {
       // ESCOPO DE INGESTÃO (decreto do owner, ADR-020): só estas conversas
       // gastam tokens. Fora da lista = ignorado sem abrir chat, sem LLM.
       ingestAllowlist: parseAllowlist(config.WHATSAPP_INGEST_ALLOWLIST),
-      enforceIngestAllowlist: config.NODE_ENV !== 'production',
+      enforceIngestAllowlist: true,
     },
     {
       intervalMs: 4_000,
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
     // GUARDRAIL DE CÓDIGO (decreto do owner, ADR-020): fora de produção,
     // só a allowlist recebe mensagem. Lista vazia em dev = recusa tudo.
     allowlist: config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim()),
-    enforceAllowlist: config.NODE_ENV !== 'production',
+    enforceAllowlist: true,
   });
   const listenClient = await outbound.start();
 
@@ -314,7 +314,6 @@ async function main(): Promise<void> {
   const { fastAnswerIncoming } = await import('./voice/incoming-fastpath.js');
   const { createVoiceLiveAdapter } = await import('./voice/call-executor.js');
   const voiceLive = createVoiceLiveAdapter(pool, log);
-  const callAllowlist = config.WHATSAPP_OUTBOUND_ALLOWLIST.split(',').map((s) => s.trim());
   let fastpathBusy = false;
   let diagCounter = 0;
   let lastDiagKey = "";
@@ -342,6 +341,18 @@ async function main(): Promise<void> {
       const now = Date.now();
       if (now - lastIncomingRingAt < 15_000) return; // não spama a caixa enquanto toca
       lastIncomingRingAt = now;
+      const { registryCheck } = await import('@luna/database');
+      const incomingDecision = await registryCheck(pool, incoming.caller, 'atender chamada');
+      if (!incomingDecision.ok) {
+        log.warn({ caller: incoming.caller }, 'fastpath: chamada fora da allowlist atual — não atendida');
+        return;
+      }
+      const callAllowlist = [
+        incomingDecision.entry.canonicalName,
+        incomingDecision.entry.chatKey,
+        incomingDecision.entry.displayHint ?? '',
+        incomingDecision.entry.phoneE164 ?? '',
+      ].filter(Boolean);
       // Contexto de quem liga (decreto owner): identidade + última conversa +
       // histórico — o prompt do Operador já nasce com a pessoa contextualizada.
       let contexto: string | null = null;
@@ -377,7 +388,19 @@ async function main(): Promise<void> {
             observePanel: () => (transport as never as { observePanel: () => Promise<{ state: string }> }).observePanel(),
             isBusy: () => fastpathBusy,
             markBusy: (b) => { fastpathBusy = b; },
-            answerAll: true,
+            answerAll: false,
+            onCallEnded: async ({ caller, transcript }) => {
+              const { alertOwnerWhatsApp } = await import('@luna/database');
+              const body = transcript.trim()
+                ? `📞 Recado de chamada recebida de ${caller}:\n\n${transcript}`
+                : `📞 Chamada recebida de ${caller} encerrada. Não consegui capturar fala suficiente para formar o recado.`;
+              const delivered = await alertOwnerWhatsApp(pool, body, {
+                escalation_id: `incoming-call-${Date.now()}`,
+                priority: 'NORMAL',
+                stage: 'incoming_call_relay',
+              });
+              if (!delivered.ok) throw new Error(delivered.error ?? 'repasse não entregue');
+            },
           },
           callAllowlist,
           { caller: incoming.caller, contexto },

@@ -5,6 +5,7 @@ import { Debouncer } from './debounce.js';
 import { createIngest } from './ingest.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 import { extractMention } from './rules.js';
+import { registryCheck } from '@luna/database';
 
 /**
  * Watcher de ingress (modo F1.4 — registrado em ADR).
@@ -168,6 +169,18 @@ export class IngestWatcher {
     return Array.isArray(raw) ? raw : [];
   }
 
+  /** Cadastro é a autoridade. A allowlist de env só restringe ainda mais. */
+  private async isAllowed(b: ChatBadge): Promise<boolean> {
+    if (!this.enforceIngest) return true;
+    const byId = await registryCheck(this.deps.pool, b.chat_id, 'ler mensagens');
+    const decision = byId.ok ? byId : await registryCheck(this.deps.pool, b.chat_name, 'ler mensagens');
+    if (!decision.ok) return false;
+    return this.ingestAllowlist.length === 0 ||
+      matchesAllowlist(this.ingestAllowlist, b.chat_name) ||
+      matchesAllowlist(this.ingestAllowlist, b.chat_id) ||
+      matchesAllowlist(this.ingestAllowlist, decision.entry.canonicalName);
+  }
+
   /** Um ciclo: coleta, seed/diff, extrai e ingere novidades. */
   private ticking = false;
 
@@ -218,7 +231,7 @@ export class IngestWatcher {
       this.baseline.set(b.chat_id, b.preview);
       // ESCOPO DE INGESTÃO: fora da lista → ignora SEM abrir o chat (não
       // marca como lida), SEM Context Builder, SEM LLM — zero tokens.
-      if (this.enforceIngest && !matchesAllowlist(this.ingestAllowlist, b.chat_name) && !matchesAllowlist(this.ingestAllowlist, b.chat_id)) {
+      if (!(await this.isAllowed(b))) {
         this.deps.log.debug({ chat: b.chat_name }, 'watcher: fora do escopo de ingestão — ignorado (zero tokens)');
         continue;
       }
@@ -368,11 +381,7 @@ export class IngestWatcher {
       for (const b of badges) {
         try {
           if (b.unread <= 0) continue;
-          if (
-            this.enforceIngest &&
-            !matchesAllowlist(this.ingestAllowlist, b.chat_name) &&
-            !matchesAllowlist(this.ingestAllowlist, b.chat_id)
-          ) {
+          if (!(await this.isAllowed(b))) {
             continue; // fora da allowlist: não abre, não marca lida (§5)
           }
           if (this.enforceIngest && this.sweepEnabled) {

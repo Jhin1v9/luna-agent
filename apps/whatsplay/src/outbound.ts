@@ -66,13 +66,14 @@ export function createOutboundListener(deps: OutboundDeps) {
   const allowlist = parseAllowlist(deps.allowlist?.join(','));
   const enforce = deps.enforceAllowlist ?? false;
 
-  /** GUARDRAIL: fora de produção, destino precisa estar na allowlist. */
-  function refusedByAllowlist(target: string): string | null {
-    if (!enforce) return null;
-    if (matchesAllowlist(allowlist, target)) return null;
-    return allowlist.length === 0
-      ? 'allowlist vazia em modo teste/dev — envio recusado (fail-closed, decreto do owner)'
-      : `destinatário fora da allowlist de teste [${allowlist.join(', ')}]`;
+  /** GUARDRAIL Superclim: cadastro dinâmico é obrigatório em qualquer ambiente.
+   * A allowlist de env, quando preenchida, funciona como restrição adicional. */
+  async function refusedByAllowlist(target: string): Promise<string | null> {
+    const { registryCheck } = await import('@luna/database');
+    const decision = await registryCheck(pool, target.replace(/^whatsapp:/, ''), 'mandar mensagem');
+    if (!decision.ok) return decision.reason;
+    if (!enforce || allowlist.length === 0 || matchesAllowlist(allowlist, target) || matchesAllowlist(allowlist, decision.entry.canonicalName)) return null;
+    return `destinatário cadastrado, mas fora da allowlist adicional [${allowlist.join(', ')}]`;
   }
 
   /** Exceção de NOTIFICAÇÕES A CLIENTES (decreto owner 2026-09-25): envio
@@ -240,7 +241,11 @@ export function createOutboundListener(deps: OutboundDeps) {
       /@g\.us$/.test(row.address ?? '') ||
       /@g\.us$/.test(row.conversation_chat_id ?? '') ||
       /^120363\d{9,}$/.test(row.conversation_chat_id ?? '');
-    let sendTarget = target;
+    // Contato individual numérico deve ir pelo JID/deeplink. Passar dígitos
+    // puros aciona a busca lateral do WhatsApp Web, que pode abrir o resultado
+    // e sair antes da composição. O JID leva direto ao chat e ainda é validado
+    // pela allowlist através dos mesmos dígitos.
+    let sendTarget = /^\d{8,15}$/.test(target) ? `${target}@s.whatsapp.net` : target;
     if (isGroupJid) {
       const jidDigits = (row.conversation_chat_id ?? row.address ?? '').replace(/\D/g, '');
       let groupName: string | null = row.contact_name ?? null;
@@ -282,8 +287,9 @@ export function createOutboundListener(deps: OutboundDeps) {
     // e o jid @g.us nunca casa com entrada de nome. Individual: inalterado
     // (sendTarget === target).
     const allowTarget = isGroupJid ? sendTarget : target;
-    const refusal = (await refusedByAllowlist(allowTarget)) && !(await notifySendExempt(messageId, target))
-      ? refusedByAllowlist(allowTarget)
+    const registryRefusal = await refusedByAllowlist(allowTarget);
+    const refusal = registryRefusal && !(await notifySendExempt(messageId, target))
+      ? registryRefusal
       : null;
     if (refusal) {
       // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.

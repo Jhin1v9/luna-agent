@@ -227,7 +227,7 @@ export function createLiveToolRunner(deps: {
     tools['voice.call'] = {
       desc: 'Faz uma LIGAÇÃO DE VOZ pelo WhatsApp para um contato registrado. Use quando o usuário pedir para ligar/telefonar/chamar alguém. A Luna reporta o resultado da ligação de volta neste chat automaticamente.',
       args: {
-        destinatario: 'nome do contato (registrado no chat_registry, ex.: Abner, Enoque)',
+        destinatario: 'nome do contato registrado no chat_registry da Superclim',
         objetivo: 'o que falar/pedir na ligação, em PT-BR direto',
       },
       run: async (args) => {
