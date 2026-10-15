@@ -1293,3 +1293,48 @@ pessoais dos repos — cada uma com as suas"):**
 
 **Pendente VPS:** deploy do port (pull + `pnpm migrate` 016/020/021 + restart)
 quando o owner der o sinal — a VPS tem commits locais fora do origin.
+
+---
+
+## 2026-10-15 — v15.5/v15.5.1: aprovação de GRUPOS por menção + consciência de membros (main, deployado na VPS)
+
+**Pedido (owner 20:43):** quem já está permitido continua; mecânica de aceitar GRUPOS também, com consciência de quem tá dentro.
+
+**O que entrou (commits `ba9c4c6` + `1ce3341`, pushados e deployados na VPS):**
+
+1. **Watcher — gate de menção pra grupo desconhecido** (`apps/whatsplay/src/watcher.ts`):
+   grupo fora do registry só vira `contact_approval_requests` quando alguém
+   menciona `@luna` (antes: grupos nunca viravam solicitação — e no código
+   anterior a isso, TODO grupo novo spammava o owner). Sem menção a Luna fica
+   calada. Privado desconhecido continua gerando com qualquer mensagem.
+   Solicitação de grupo nasce com `is_group: true` no source_payload e alerta
+   ao owner diferenciado ("Solicitação de GRUPO #N — autorizar o grupo inteiro?").
+
+2. **Approval — `sim N` em grupo autoriza o grupo inteiro**
+   (`apps/whatsplay/src/contact-approval.ts`): registryUpsert `kind='group'`,
+   Luna se apresenta no grupo (msg de intro), sem onboarding de telefone.
+   Privado segue com onboarding nome+telefone. Proteção: se o chat_key da
+   solicitação é NOME (sem JID — badge veio sem JID), resolve o JID via
+   `registryLookup` antes de gravar; sem JID, avisa o owner e mantém pendente
+   (nunca grava registry quebrado).
+
+3. **Consciência de quem tá no grupo** (`apps/orchestrator/src/agent/context.ts`):
+   o pack da conversa ganha `group` (jid, nome, total de membros + lista até 30
+   com ⭐ admin / 🛡️ criador) lida de `wa_group_members` (diretório colhido do
+   model-storage da sessão WA pelo harvest diário). O prompt lista "QUEM ESTÁ
+   NO GRUPO" pra Luna tratar cada um pelo nome.
+
+4. **Bug raiz encontrado ao vivo: matching de emoji no registry**
+   (`packages/database/src/registry.ts`): a solicitação fantasma #0 do grupo
+   OnaDance nasceu porque o badge veio com chat_id = nome + emoji `👯` e o
+   registry tem o MESMO grupo com emoji `👩🏼‍🐰‍👩🏽` — `normalize` não removia
+   emoji, o match falhava e um grupo ALLOWED foi tratado como desconhecido.
+   Fix: normalize agora remove tudo que não é letra/número/espaço; menção só
+   de emoji nunca casa (proteção contra `includes('')`). A solicitação #0 foi
+   encerrada como denied (decided_by=system) — o grupo já era allowed via JID.
+
+**Testes:** watcher 20/20; database 8/8 (2 novos: emoji-diferente casa, só-emoji não); typecheck 13/13 verde. Falha pré-existente e fora do escopo: `voice/operator-session.test.ts` (`readLatestReply` devolve null) — falha antes e depois das mudanças, zona da Kimi Code/voz.
+
+**VPS:** pull em `1ce3341`, `pnpm install`, restart luna-orchestrator/whatsplay/worker; `/ready` ok, whatsplay capturando. Sem migração nova (reusa 016 wa_group_members + 021 approvals).
+
+**Como usar:** grupo novo menciona @luna → owner recebe "Solicitação de GRUPO #N" → responde `sim N` → Luna entra no grupo e passa a ver os membros no contexto. Quem já era allowed (registry) continua igual.
