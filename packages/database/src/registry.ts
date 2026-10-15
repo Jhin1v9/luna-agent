@@ -28,14 +28,20 @@ export type RegistryDecision =
   | { ok: true; entry: RegistryEntry }
   | { ok: false; reason: string };
 
-/** Normaliza uma menção do owner ('meu pai', 'Pai', 'produção') pra lookup. */
+/** Normaliza uma menção do owner ('meu pai', 'Pai', 'produção') pra lookup.
+ *  Remove acentos E emojis/símbolos — bug ao vivo 15/10: badge do grupo
+ *  'Proyecto Nexo - OnaDance 👯 - 26' não casava com o registry
+ *  '…👩🏼‍🐰‍👩🏽- 26' (mesmo grupo, emoji renderizado diferente) e o grupo
+ *  allowed virou solicitação de contato fantasma pro owner. */
 function normalize(name: string): string {
   return name
     .trim()
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/[^\p{L}\p{N} ]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export async function registryLookup(db: Sql, mention: string): Promise<RegistryEntry | null> {
@@ -45,6 +51,7 @@ export async function registryLookup(db: Sql, mention: string): Promise<Registry
     [],
   );
   const target = normalize(mention).replace(/^meu |^minha |^o |^a /, '');
+  if (!target) return null; // menção sem conteúdo textual (só emoji/símbolo) — nunca casa
   const targetDigits = mention.replace(/\D/g, '');
   for (const r of rows.rows as Array<Record<string, unknown>>) {
     const canon = normalize(String(r.canonical_name));

@@ -43,6 +43,30 @@ describe('Chat Registry (migração 012, deny-first)', () => {
     expect((await registryLookup(db, 'producao'))?.canonicalName).toBe('Produção 2026');
   });
 
+  it('bug ao vivo 15/10: grupo allowed casa mesmo com emoji diferente no badge', async () => {
+    // Badge veio com '👯' mas o registry foi colhido com '👩🏼‍🐰‍👩🏽' — mesmo grupo.
+    // Antes do fix de normalize, isso gerava solicitação de contato fantasma.
+    const ONADANCE = {
+      chat_key: '120363429694321376@g.us',
+      kind: 'group',
+      canonical_name: 'Proyecto Nexo - OnaDance 👩🏼‍🐰‍👩🏽- 26',
+      display_hint: null,
+      role: 'allowed',
+      notify_channel: null,
+      phone_e164: null,
+    };
+    const db = dbWith([ONADANCE]);
+    const hit = await registryLookup(db, 'Proyecto Nexo - OnaDance 👯 - 26');
+    expect(hit?.chatKey).toBe('120363429694321376@g.us');
+    expect(hit?.kind).toBe('group');
+  });
+
+  it('menção só de emoji/símbolo NUNCA casa (proteção contra includes de vazio)', async () => {
+    const db = dbWith([PAI, NAMORADA]);
+    expect(await registryLookup(db, '👯')).toBeNull();
+    expect(await registryLookup(db, '🌙💖')).toBeNull();
+  });
+
   it('allowed → ok com a entrada inteira (chat_key = identidade)', async () => {
     const d = await registryCheck(dbWith([PAI]), 'Pai', 'ligar');
     expect(d.ok).toBe(true);

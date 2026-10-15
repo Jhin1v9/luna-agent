@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { alertOwnerWhatsApp, registryCheck, registryUpsert, resolveIngressIdentity } from '@luna/database';
+import { alertOwnerWhatsApp, registryCheck, registryLookup, registryUpsert, resolveIngressIdentity } from '@luna/database';
 
 export interface UnknownContactMessage {
   chat_id: string;
@@ -73,8 +73,21 @@ export async function handleContactApprovalCommand(pool: Pool, sender: string, t
   try { payloadIsGroup = Boolean(JSON.parse(payloadRow?.source_payload ?? '{}')?.is_group); } catch { /* payload opaco — segue pelo chat_key */ }
   const isGroup = payloadIsGroup || req.chat_key.endsWith('@g.us');
   if (isGroup) {
-    await registryUpsert(pool, { chatKey: req.chat_key, kind: 'group', canonicalName: req.chat_name, displayHint: req.chat_name, role: 'allowed', notifyChannel: null, phoneE164: null, resolvedBy: authority.entry.canonicalName, note: `Grupo autorizado pela solicitação #${id}.` });
-    await queueMessage(pool, req.chat_key, req.chat_name, 'Olá a todos! 👋 Aqui é a Luna, assistente da Nexo Digital. Este grupo foi autorizado e eu passo a acompanhar as mensagens por aqui. Me chamem quando precisarem.', { kind: 'group_intro', request_id: id });
+    // RESOLUÇÃO DE JID (bug ao vivo 15/10): solicitações antigas podem ter
+    // chat_key = NOME do grupo (badge veio sem JID). Outbound precisa do JID —
+    // então resolve pelo registry (matching tolerante a emoji) antes de gravar.
+    let groupKey = req.chat_key;
+    if (!groupKey.includes('@')) {
+      const resolved = await registryLookup(pool, req.chat_name);
+      if (resolved?.kind === 'group') {
+        groupKey = resolved.chatKey;
+      } else {
+        await queueMessage(pool, authority.entry.chatKey, authority.entry.canonicalName, `Solicitação #${id}: é um grupo, mas não achei o JID de “${req.chat_name}” no registry — não consigo autorizar sem o endereço do grupo. Verifique o nome e tente de novo.`, { kind: 'contact_approval_result', request_id: id });
+        return true;
+      }
+    }
+    await registryUpsert(pool, { chatKey: groupKey, kind: 'group', canonicalName: req.chat_name, displayHint: req.chat_name, role: 'allowed', notifyChannel: null, phoneE164: null, resolvedBy: authority.entry.canonicalName, note: `Grupo autorizado pela solicitação #${id}.` });
+    await queueMessage(pool, groupKey, req.chat_name, 'Olá a todos! 👋 Aqui é a Luna, assistente da Nexo Digital. Este grupo foi autorizado e eu passo a acompanhar as mensagens por aqui. Me chamem quando precisarem.', { kind: 'group_intro', request_id: id });
     await queueMessage(pool, authority.entry.chatKey, authority.entry.canonicalName, `Solicitação #${id} aprovada ✅ Grupo “${req.chat_name}” autorizado — já me apresentei lá. Os membros vão sendo colhidos para o diretório (wa_group_members).`, { kind: 'contact_approval_result', request_id: id });
     return true;
   }
