@@ -224,6 +224,23 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
         });
         log.info({ escalation_id: escRow.id, conversation_id: conversationId }, 'escalation expirada por inatividade humana — Luna volta a responder');
         humanGateActive = false;
+      } else if (!escRow) {
+        // 2026-10-15 (bug ao vivo, owner: "mandei várias e ela nada"): gate
+        // ativo SEM escalada aberta = estado preso. Acontece quando a
+        // escalada expirou/foi resolvida por outro caminho e ninguém girou a
+        // conversa de volta pra IA — a conversa ficava em HUMAN_NOTIFIED pra
+        // sempre e TODO inbound era engolido "anexado à escalación" (caso
+        // real: 20:33 → 07:11+, ~11h de DM do Abner sem resposta). Sem gate
+        // aberto não há humano assumindo: recupera pra AI_HANDLING e a
+        // mensagem corrente segue o fluxo normal.
+        await transitionConversation(db, conversationId, 'AI_HANDLING');
+        await recordAudit(db, {
+          actor: 'orchestrator', action: 'escalation.stale_gate_recovered', tool: 'message_handler',
+          client_id: event.client_id, correlation_id: event.correlation_id, result: 'success',
+          metadata: { prev_state: state },
+        });
+        log.info({ conversation_id: conversationId, prev_state: state }, 'gate humano sem escalada aberta — conversa recuperada pra AI_HANDLING');
+        humanGateActive = false;
       }
     }
     if (humanGateActive) {
