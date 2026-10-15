@@ -162,6 +162,8 @@ As duas mensagens da fila foram confirmadas como `sent`:
 - `Oi! Esta é uma mensagem de teste da Luna para confirmar que o envio pelo painel está funcionando.` — `sent_at=2026-10-15 11:29:31.339954+00`.
 - `iae teste` — `sent_at=2026-10-15 11:29:43.02653+00`.
 
+Além da confirmação técnica no banco, Elias confirmou que as mensagens chegaram corretamente ao WhatsApp de destino. Portanto, o fluxo completo foi validado: Painel/API → fila PostgreSQL → WhatsPlay → abertura do contato por número → composição → confirmação de envio → recebimento no aparelho.
+
 Limitação de testes encontrada:
 
 - `panel-guard.test.ts`: 8/8 passaram.
