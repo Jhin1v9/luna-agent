@@ -115,8 +115,8 @@ export async function saveContact(input: { name: string; chat_id: string }): Pro
 
   const env = envAll();
   if (!env.DATABASE_URL) return { ok: false, error: 'DATABASE_URL ausente no .env' };
-  // v15 (port superclim): org e prefixo configuráveis — default Nexo; o
-  // deploy Superclim sobrescreve via .env (LUNA_PANEL_ORG / _ORG_SLUG / _CLIENT_PREFIX).
+  // v15: org e prefixo configuráveis via .env — default Nexo Digital
+  // (LUNA_PANEL_ORG / LUNA_PANEL_ORG_SLUG / LUNA_PANEL_CLIENT_PREFIX).
   const orgName = process.env.LUNA_PANEL_ORG?.trim() || 'Nexo Digital';
   const orgSlug = process.env.LUNA_PANEL_ORG_SLUG?.trim() || 'nexo';
   const clientPrefix = process.env.LUNA_PANEL_CLIENT_PREFIX?.trim() || 'lx';
