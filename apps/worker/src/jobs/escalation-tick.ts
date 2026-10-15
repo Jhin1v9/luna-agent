@@ -186,7 +186,13 @@ export async function runEscalationTick(deps: EscalationTickDeps): Promise<{
        AND created_at > now() - interval '1 hour'`,
     [VOICE_CALL_AFTER_FOLLOWUP_MINUTES],
   );
-  const escalationContact = process.env.SUPERCLIM_ESCALATION_CONTACT?.trim();
+  // v15: contato administrativo configurável por env (LUNA_ESCALATION_CONTACT,
+  // fallback legado SUPERCLIM_*). Sem default pessoal (decreto owner 15/10:
+  // infos internas ficam em cada repo) — sem env, falha fechado.
+  const escalationContact =
+    process.env.LUNA_ESCALATION_CONTACT?.trim() ||
+    process.env.SUPERCLIM_ESCALATION_CONTACT?.trim() ||
+    '';
   if (!escalationContact) {
     if (callDue.rowCount) deps.log.warn({ pendentes: callDue.rowCount }, 'escalação sem contato administrativo cadastrado; chamada automática não criada');
   }

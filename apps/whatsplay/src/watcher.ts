@@ -174,7 +174,7 @@ export class IngestWatcher {
     return Array.isArray(raw) ? raw : [];
   }
 
-  /** Cadastro é a autoridade. A allowlist de env só restringe ainda mais. */
+  /** Cadastro (chat_registry) é a autoridade. A allowlist de env só restringe ainda mais. */
   private async isAllowed(b: ChatBadge): Promise<boolean> {
     if (!this.enforceIngest) return true;
     const byId = await registryCheck(this.deps.pool, b.chat_id, 'ler mensagens');
@@ -391,7 +391,7 @@ export class IngestWatcher {
               const requested = await this.requestUnknownApproval(b);
               if (requested) this.lastReconciled.set(b.chat_id, b.preview);
             }
-            continue;
+            continue; // fora do escopo: não abre, não marca lida (§5)
           }
           if (this.enforceIngest && this.sweepEnabled) {
             // Com sweep ligado, allowlisted é responsabilidade dele — o mesmo

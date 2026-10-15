@@ -151,7 +151,9 @@ async function main(): Promise<void> {
   const { enqueueJob } = await import('@luna/database');
   // Brain watch (decreto owner 27/09): varredura de diffs do brain canônico
   // (VPS) — no boot e a cada 30 min. Cada commit novo vira sinapse local.
-  if (process.env.BRAIN_WATCH_ENABLED === 'true') {
+  // v15 (port superclim): flag-gated, mas ON por default no main (decreto);
+  // white-labels desligam com BRAIN_WATCH_ENABLED=false no .env.
+  if (process.env.BRAIN_WATCH_ENABLED !== 'false') {
     const { createBrainWatchHandler } = await import('./jobs/brain-watch.js');
     runner.register('brain.watch', createBrainWatchHandler({ pool, log }));
     const brainWatchTick = async (idem: string) => {
@@ -164,7 +166,7 @@ async function main(): Promise<void> {
     }, 30 * 60_000);
     brainWatchTimer.unref();
   } else {
-    log.info('brain.watch desativado (ative explicitamente com BRAIN_WATCH_ENABLED=true)');
+    log.info('brain.watch desativado (BRAIN_WATCH_ENABLED=false)');
   }
   // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
   const day = new Date().toISOString().slice(0, 10);

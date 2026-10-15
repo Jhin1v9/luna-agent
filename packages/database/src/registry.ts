@@ -77,7 +77,9 @@ export async function registryCheck(db: Sql, mention: string, acao: string): Pro
   if (!entry) {
     return {
       ok: false,
-      reason: `'${mention}' NÃO está no cadastro Superclim — não vou ${acao} sem identidade verificada. Registre nome + número primeiro.`,
+
+      reason: `'${mention}' NÃO está no cadastro (chat_registry) — não vou ${acao} sem identidade verificada. Registre nome + número primeiro.`,
+
     };
   }
   if (entry.role === 'blocked') {

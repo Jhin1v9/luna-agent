@@ -62,7 +62,7 @@ describe('Chat Registry (migração 012, deny-first)', () => {
     const d = await registryCheck(dbWith([PAI]), 'Jess', 'mandar mensagem');
     expect(d.ok).toBe(false);
     if (!d.ok) {
-      expect(d.reason).toMatch(/NÃO está no Chat Registry/);
+      expect(d.reason).toMatch(/NÃO está no cadastro \(chat_registry\)/);
       expect(d.reason).toMatch(/mandar mensagem/);
     }
   });

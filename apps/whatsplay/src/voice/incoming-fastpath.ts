@@ -62,9 +62,12 @@ export interface IncomingCallEvent {
   contexto: string | null;
 }
 
-/** Prompt de atendimento: regras duras + contexto real. Instante — zero LLM. */
+/** Prompt de atendimento: regras duras + contexto real. Instante — zero LLM.
+ *  Override opcional via `.luna-config/caller-prompt.md` (sobe pelos diretórios
+ *  até achar; placeholders {{caller}} e {{contexto}}). */
 let callerPromptCache: { mtime: number; content: string } | null = null;
 function callerPromptOverride(): string | null {
+  if (process.env.LUNA_CALLER_PROMPT === 'off') return null; // kill-switch p/ testes
   try {
     let dir = process.cwd();
     for (;;) {

@@ -7,17 +7,31 @@ import { registryCheck } from './registry.js';
  * ALERTA DE ESCALAÇÃO NO WHATSAPP DO OWNER (decreto owner 2026-10-14):
  * o canal Telegram do time NUNCA foi configurado em produção — ninguém
  * recebia escalation nenhuma ("é só clicar um botão" não, tem que CHEGAR).
- * O destino é configurado por SUPERCLIM_ESCALATION_CONTACT e precisa existir
- * no Chat Registry. Sem ambos, falha fechado e não cria mensagem.
+
+ * O destino é configurado por LUNA_ESCALATION_CONTACT (fallback legado:
+ * SUPERCLIM_ESCALATION_CONTACT) e precisa existir no Chat Registry.
+ * Sem default pessoal (decreto owner 15/10: infos internas ficam em cada
+ * repo) — cada deploy configura sua env; sem ela, falha fechado.
+
  */
+function escalationContact(): string {
+  return (
+    process.env.LUNA_ESCALATION_CONTACT?.trim() ||
+    process.env.SUPERCLIM_ESCALATION_CONTACT?.trim() ||
+    ''
+  );
+}
+
 export async function alertOwnerWhatsApp(
   pool: Pool,
   text: string,
   meta: { escalation_id: string; priority?: string; stage?: string },
 ): Promise<{ ok: boolean; message_id?: string; error?: string }> {
   try {
-    const target = process.env.SUPERCLIM_ESCALATION_CONTACT?.trim();
-    if (!target) return { ok: false, error: 'SUPERCLIM_ESCALATION_CONTACT não configurado' };
+
+    const target = escalationContact();
+    if (!target) return { ok: false, error: 'LUNA_ESCALATION_CONTACT não configurado' };
+
     const allowed = await registryCheck(pool, target, 'receber alerta');
     if (!allowed.ok) return { ok: false, error: allowed.reason };
     const identity = await resolveIngressIdentity(pool, {

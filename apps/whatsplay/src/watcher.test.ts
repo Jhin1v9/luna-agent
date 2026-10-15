@@ -50,7 +50,7 @@ describe('contato novo — grupos nunca viram solicitação de autorização', (
   });
 });
 
-describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-020)', () => {
+describe('ESCOPO DE INGESTÃO — registry é autoridade + allowlist como restrição extra (v15.4)', () => {
   function makeWatcher(allowlist: string[], enforce: boolean, sweepEnabled = false) {
     const readCalls: string[] = [];
     const ingested: string[] = [];
@@ -70,9 +70,18 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
         return [{ sender: 'x', direction: 'inbound' as const, text: 'texto de ' + chatId }];
       },
     };
+    // v15.4: isAllowed consulta o chat_registry (autoridade). Pool fake emula
+    // 'Pai' registrado como allowed; 'Fora Do Escopo' não está no cadastro.
+    const registryRows = [
+      { chat_key: 'c1', kind: 'individual', canonical_name: 'Pai', display_hint: null, role: 'allowed', notify_channel: null, phone_e164: null },
+    ];
+    const pool = {
+      query: async (sql: string) =>
+        /FROM chat_registry/.test(sql) ? { rows: registryRows } : { rows: [] as unknown[] },
+    };
     const watcher = new IngestWatcher(
       {
-        pool: {} as never,
+        pool: pool as never,
         transport: transport as never,
         log: { info: () => {}, debug: () => {}, error: () => {} } as never,
         page,
@@ -101,22 +110,29 @@ describe('ESCOPO DE INGESTÃO — allowlist fail-closed (decreto do owner, ADR-0
     // disparar juntos — na produção a idempotency de messages (§7.6) dedupa.
   });
 
-  it('sweep LIGADO: badge-path ignora chats allowlisted (sweep é o dono — sem corrida)', async () => {
+  it('sweep LIGADO: badge-path ignora chats allowlisted (sweep é o dono — sem corrida); desconhecido só é lido pra approval', async () => {
     const { watcher, readCalls, ingested } = makeWatcher(['Pai'], true, true);
     await watcher.tick(); // seed
     await watcher.tick(); // diff
     await new Promise((r) => setTimeout(r, 30)); // debounce flush
-    expect(readCalls).toEqual([]); // sweep cuida; badge-path não abre
+    expect(readCalls).not.toContain('Pai'); // sweep cuida; badge-path não abre allowlisted
     expect(ingested).toEqual([]);
+    // v15.4: 'Fora Do Escopo' não está no registry — o badge-path o abre APENAS
+    // para montar a solicitação de aprovação (leitura mínima, sem ingest/LLM).
+    expect(readCalls.filter((c) => c === 'Fora Do Escopo').length).toBeGreaterThan(0);
   });
 
-  it('lista VAZIA em dev: NADA é processado (fail-closed)', async () => {
+  it('lista VAZIA em dev (v15.4): registry é a autoridade — registrado passa, desconhecido vai pra approval do owner', async () => {
+    // Semântica nova (port superclim 46be779): allowlist vazia não bloqueia
+    // quem está no chat_registry — o cadastro é a autoridade. Desconhecido
+    // continua fail-closed e vira solicitação de aprovação pro owner.
     const { watcher, readCalls, ingested } = makeWatcher([], true);
     await watcher.tick();
     await watcher.tick();
     await new Promise((r) => setTimeout(r, 30));
-    expect(readCalls).toEqual([]);
-    expect(ingested).toEqual([]);
+    expect(readCalls).toContain('Pai');
+    expect(ingested).toContain('c1');
+    expect(ingested).not.toContain('c2'); // 'Fora Do Escopo' não está no registry
   });
 
   it('produção (enforce=false): badge-path processa tudo normalmente', async () => {

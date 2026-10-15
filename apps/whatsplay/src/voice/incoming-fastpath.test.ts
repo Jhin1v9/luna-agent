@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import pino from 'pino';
 import { fastAnswerIncoming, INBOUND_OPERATOR_PROMPT } from './incoming-fastpath.js';
 
 const log = pino({ level: 'silent' });
+
+// O override .luna-config/caller-prompt.md (v15.3) venceria o prompt embutido
+// nos testes — desligamos via kill-switch pra testar o prompt padrão.
+beforeAll(() => { process.env.LUNA_CALLER_PROMPT = 'off'; });
+afterAll(() => { delete process.env.LUNA_CALLER_PROMPT; });
 
 function makeDeps(over: Record<string, unknown> = {}) {
   const accepted: number[] = [];

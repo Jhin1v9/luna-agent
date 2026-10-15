@@ -88,7 +88,7 @@ describe('voice.call_place (contenção P0 + Chat Registry)', () => {
     const tool = createVoiceCallTool(db as never);
     const r = await tool(db as never, { conversationId: 'c', clientId: null }, { contato: 'Jess' });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Chat Registry/);
+    expect(r.error).toMatch(/cadastro \(chat_registry\)/);
     expect(queries.filter((q) => q.sql.startsWith('INSERT INTO jobs'))).toHaveLength(0);
   });
 

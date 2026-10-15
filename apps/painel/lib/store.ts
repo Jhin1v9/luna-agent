@@ -115,17 +115,27 @@ export async function saveContact(input: { name: string; chat_id: string }): Pro
 
   const env = envAll();
   if (!env.DATABASE_URL) return { ok: false, error: 'DATABASE_URL ausente no .env' };
+
+  // v15: org e prefixo configuráveis via .env — default da PROPRIA identidade
+  // (decreto owner 15/10: infos internas ficam em cada repo).
+  const orgName = process.env.LUNA_PANEL_ORG?.trim() || 'Superclim';
+  const orgSlug = process.env.LUNA_PANEL_ORG_SLUG?.trim() || 'superclim';
+  const clientPrefix = process.env.LUNA_PANEL_CLIENT_PREFIX?.trim() || 'sc';
+
   const c = new pg.Client({ connectionString: env.DATABASE_URL });
   await c.connect();
   try {
     await c.query('BEGIN');
     const org = await c.query<{ id: string }>(
       `INSERT INTO organizations (name, slug)
-       VALUES ('Superclim', 'superclim')
+
+       VALUES ($1, $2)
        ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, updated_at=now()
        RETURNING id`,
+      [orgName, orgSlug],
     );
-    const code = `sc-${digits}`;
+    const code = `${clientPrefix}-${digits}`;
+
     const client = await c.query<{ id: string }>(
       `INSERT INTO clients (organization_id, name, code, status, metadata)
        VALUES ($1, $2, $3, 'active', $4::jsonb)
@@ -250,7 +260,7 @@ export async function getValidacao(): Promise<Check[]> {
 // ---------------------------------------------------------------------------
 // MENSAGENS / CHATS — tabela `messages`; envio = INSERT queued + pg_notify
 // ---------------------------------------------------------------------------
-const CHAT_LABELS: Record<string, string> = { productions: 'Nexo Productions (grupo)' };
+const CHAT_LABELS: Record<string, string> = {}; // white-label: preencher com os proprios grupos
 
 export async function getChats(): Promise<Chat[]> {
   const rows = await db<{ chat_id: string; count: number; last_used: string }>(
