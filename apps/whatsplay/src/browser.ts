@@ -284,21 +284,24 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
   async isPageHealthy(): Promise<boolean> {
     if (!this.page || this.page.isClosed()) return false;
     const ok = await this.page
-      .evaluate(
-        `!document.querySelector('meta[http-equiv="refresh"][content*="noscript"]') && !!document.querySelector('#pane-side')`,
-      )
+      // O HTML normal do WhatsApp mantém uma tag meta de fallback noscript
+      // mesmo quando o app está totalmente carregado. A presença da lista
+      // real de chats é o sinal operacional confiável.
+      .evaluate(`!!document.querySelector('#pane-side')`)
       .catch(() => false);
     return ok === true;
   }
 
-  /** Recupera a página do fallback noscript: reload + espera renderizar +
+  /** Recupera a página do fallback noscript: volta à URL base + espera renderizar +
    *  re-anexa o observer. Retorna true se saudável no fim. */
   async ensurePageHealthy(): Promise<boolean> {
     if (await this.isPageHealthy()) return true;
     const page = this.page;
     if (!page || page.isClosed()) return false;
-    this.config.log?.warn({}, 'página caiu pro fallback noscript/splash — recuperando (reload)');
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
+    this.config.log?.warn({}, 'página caiu pro fallback noscript/splash — recuperando pela URL base');
+    // reload() preservava `?_fb_noscript=1` e mantinha a automação presa no
+    // fallback. Navegar para WA_URL remove o parâmetro e inicializa o app real.
+    await page.goto(WA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
     await page.waitForSelector('#pane-side', { timeout: 60_000 }).catch(() => null);
     const ok = await this.isPageHealthy();
     if (ok) await this.injectObserverScript();
@@ -869,13 +872,14 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
     const isJid = nameOrId.includes('@');
     const searchKey = isJid ? nameOrId.split('@')[0] : nameOrId;
+    const isDirectNumber = /^\d{8,15}$/.test(searchKey);
     const key = nameOrId.replace(/"/g, '\\"');
     await this.ensureMainChatList();
 
     const matches = async (): Promise<boolean> => {
       const title = await this.currentOpenChatTitle();
       if (title === null) return false;
-      if (isJid) {
+      if (isJid || isDirectNumber) {
         // NUNCA aceitar qualquer painel aberto (risco de msg pro chat errado):
         // confere os DÍGITOS do número no header do contato (o WA formata
         // "346 850 931 92" — compara só os números). Diagnóstico ao vivo
@@ -1026,7 +1030,7 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
         await page.keyboard.press('Escape').catch(() => {});
         return false;
       }
-      if (isJid) {
+      if (isJid || isDirectNumber) {
         // WA 2026-09: os resultados da busca renderizam FORA do #pane-side
         // (evidência 22:57: clique na row caía num elemento oculto da lista
         // normal e o painel ficava no intro). Enter com o campo de busca

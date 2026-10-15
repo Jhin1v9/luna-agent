@@ -241,11 +241,11 @@ export function createOutboundListener(deps: OutboundDeps) {
       /@g\.us$/.test(row.address ?? '') ||
       /@g\.us$/.test(row.conversation_chat_id ?? '') ||
       /^120363\d{9,}$/.test(row.conversation_chat_id ?? '');
-    // Contato individual numérico deve ir pelo JID/deeplink. Passar dígitos
-    // puros aciona a busca lateral do WhatsApp Web, que pode abrir o resultado
-    // e sair antes da composição. O JID leva direto ao chat e ainda é validado
-    // pela allowlist através dos mesmos dígitos.
-    let sendTarget = /^\d{8,15}$/.test(target) ? `${target}@s.whatsapp.net` : target;
+    // Nesta instalação, navegar pelo deeplink /send faz o WhatsApp cair no
+    // fallback `_fb_noscript=1`. Para contatos individuais cadastrados,
+    // mantemos os dígitos puros e usamos a busca lateral. O PanelGuard segura
+    // a intenção inteira para o sweep não fechar o resultado antes do envio.
+    let sendTarget = target;
     if (isGroupJid) {
       const jidDigits = (row.conversation_chat_id ?? row.address ?? '').replace(/\D/g, '');
       let groupName: string | null = row.contact_name ?? null;

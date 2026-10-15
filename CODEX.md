@@ -147,16 +147,20 @@ Essa alteração não faz parte do commit do `luna-agent`; precisa de commit pr�
 - Nenhum grupo autorizado.
 - Todos os seis serviços foram salvos no PM2.
 
-## Teste real de mensagem e pendências conhecidas
+## Teste real de mensagem
 
-Foi solicitada uma mensagem real para `Elias Superclim Privado`. A API criou corretamente a mensagem e retornou `queued`, mas a primeira tentativa ainda não tinha confirmação `sent` durante a inspeção. A investigação encontrou que números puros estavam entrando pela busca lateral; a conversão para JID direto foi implementada depois disso.
+Foi solicitada uma mensagem real para `Elias Superclim Privado`. A investigação e o acompanhamento até a confirmação encontraram e corrigiram três problemas adicionais em `apps/whatsplay/src/browser.ts`:
 
-Existiam duas mensagens na fila para esse contato:
+- A recuperação do fallback usava `reload()` e preservava a URL quebrada; agora navega para a URL base do WhatsApp.
+- O detector considerava a tag estática de fallback `noscript` como falha mesmo com `#pane-side` carregado; agora a lista real de chats é o sinal de saúde.
+- A busca por telefone abria corretamente o contato salvo, mas comparava o título textual do chat com o número e rejeitava o resultado; telefone puro agora é validado como identidade numérica e chat individual.
 
-- `iae teste`, criada anteriormente pelo painel.
-- `Oi! Esta é uma mensagem de teste da Luna para confirmar que o envio pelo painel está funcionando.`, criada durante a validação.
+O envio por JID/deeplink foi descartado nesta instalação porque levava o WhatsApp Web ao fallback `_fb_noscript=1`. O fluxo final usa a busca por número protegida pelo `PanelGuard`.
 
-Não registrar como entrega concluída até o banco apresentar `send_state='sent'` e `sent_at`.
+As duas mensagens da fila foram confirmadas como `sent`:
+
+- `Oi! Esta é uma mensagem de teste da Luna para confirmar que o envio pelo painel está funcionando.` — `sent_at=2026-10-15 11:29:31.339954+00`.
+- `iae teste` — `sent_at=2026-10-15 11:29:43.02653+00`.
 
 Limitação de testes encontrada:
 
@@ -179,6 +183,7 @@ Limitação de testes encontrada:
 - `apps/painel/app/api/contacts/route.ts`
 - `apps/painel/app/api/contacts/[id]/route.ts`
 - `apps/whatsplay/src/discover.ts`
+- `apps/whatsplay/src/browser.ts`
 - `apps/whatsplay/src/index.ts`
 - `apps/whatsplay/src/outbound.ts`
 - `apps/whatsplay/src/owners.ts`
