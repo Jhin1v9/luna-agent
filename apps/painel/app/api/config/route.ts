@@ -20,7 +20,7 @@ function authorized(req: Request): boolean {
 // GET → ProvidersConfig + keyStatus por provider (presença + preview mascarado)
 export async function GET() {
   try {
-    return NextResponse.json(getProvidersWithStatus());
+    return NextResponse.json(await getProvidersWithStatus());
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message.slice(0, 200) }, { status: 500 });
   }
