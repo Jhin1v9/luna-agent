@@ -1157,3 +1157,70 @@ LUNA WEB (mesmo núcleo das outras pontas): adaptador KimiLiveAdapter falando o
 contrato /api/chat da 3500, sessão "conductor" primada com o decreto, tool
 `call.respond` no catálogo web → pg_notify('call_responses') → whatsplay
 LISTEN → chat do operador. Substitui o FallbackAdapter cego na conductora.
+
+---
+
+## 15/10 (tarde) — Port completo da branch superclim pro main (agent + kernel)
+
+Pedido do owner: "ve a branch nova do principal brain, luna kernel e luna
+agent, branch superclim, copia tudo que tem de diff, os extras. Lê o codex.md
+e traz as mudanças positivas."
+
+### Resultado
+
+**luna-agent** (7 commits novos, `ea077e0..3a47b4f`):
+- `d61f711` v15.1 — leva 1: contatos no painel (GET/POST/DELETE + chat_registry),
+  panel-guard (mutex sweep vs envio), portabilidade (homedir/fileURLToPath em
+  discover/probe/readcheck/selector-memory/voice/bridge/operator-preflight),
+  apiChainAdapter preguiçoso + brain.watch no worker, escalation-tick +
+  escalation-alert configurável via `LUNA_ESCALATION_CONTACT` (default Abner),
+  ecosystem.superclim.config.cjs.
+- `2702a9c` v15.2 — delivery fixes: health da página por `#pane-side` (meta
+  noscript existe no HTML saudável também), recover por `goto(WA_URL)` em vez
+  de `reload()` (reload preservava `?_fb_noscript=1` e travava no fallback),
+  número direto 8-15 dígitos resolve sem JID.
+- `d773e34` v15.2b — providers.ts com `RuntimeStatus`: probe local por
+  provider (fcc-local→/admin/api/models, kernel→:3458/health, timeout 1.5s,
+  só 127.0.0.1/localhost); card "instalado e online / local indisponível"
+  no painel. Catálogo de 29 providers do main mantido (--ours).
+- `2f635a8` v15.3 — painel avançado (aba "Configs avançadas da Luna",
+  token = LUNA_API_KEY no sessionStorage): edição dos 3 prompts
+  (whatsapp/web/caller), gestão de owner/allowlist/blocked, catálogo de tools
+  por camada. Caller prompt lido do arquivo `.luna-config/caller-prompt.md`
+  (sobe diretórios, cache por mtime, placeholders {{caller}}/{{contexto}}).
+- `7ada13d` v15.4 — aprovação de contatos novos pelo owner: desconhecido
+  gera solicitação em `contact_approval_requests`; owner responde
+  `sim <id>` / `não <id>`; aprovado entra com autorização temporária e a Luna
+  pede nome+telefone (tool `contact.register` exige phone com DDI nesse caso).
+  **MUDANÇA DE SEMÂNTICA DO DECRETO ADR-020:** o chat_registry virou a
+  autoridade de ingestão (watcher.isAllowed) — allowlist vazia NÃO bloqueia
+  mais quem está registrado; ela só restringe adicionalmente. Desconhecido
+  continua fail-closed e vira approval. Migrações 020 (registry owner) e 021
+  (approvals) — RODAR `pnpm migrate` NA VPS E NO PC.
+- `3a47b4f` — suíte de testes alinhada (registry fake no watcher, kill-switch
+  `LUNA_CALLER_PROMPT=off`, mocks pane-side/goto). typecheck 14/14, unitários
+  verdes exceto `operator-session > readLatestReply` (falha pré-existente,
+  confirmada no commit anterior — não é regressão).
+
+**luna-kernel** (`93eb358`): comando local `/ajuda` no /api/chat — lista os
+acessos da instalação (Luna Web, Painel, Atlas, health/ready) sem chamar
+provider. Neutralizado (sem "Superclim").
+
+**Ficou de fora de propósito:** persona/identidade Superclim, remoção do
+`.brain`, política registry-only do whatsapp outbound sem deeplink (na máquina
+deles deeplink quebra com `_fb_noscript=1`; no VPS funciona — fix da Kimi
+Code mantido), remoção do colibri-local (main tem 29 providers mais rico).
+
+**Atenção VPS:** o luna-agent da VPS tem commits locais fora do origin (não
+force-push, não puxe ainda). O deploy do port na VPS fica pra quando o owner
+quiser — envolve `git pull` + resolver divergência + `pnpm migrate` (020/021).
+
+### LEARNING_POSITIVE
+
+```yaml
+action: "Porte de branch paralela (superclim) via cherry-pick -n + resolução por união, com neutralização de marca (Superclim→Nexo) e verificação de regressão por worktree no commit pré-porte"
+observed_gain: "6 commits de features maduras (aprovação de contatos, painel avançado, runtime status, health fixes do WA Web) integrados em ~1h sem quebrar o main; regressões de teste isoladas e corrigidas com mocks mínimos"
+user_signal: "owner pediu explicitamente 'copia tudo que tem de diff os extras' e 'traz as mudanças positivas' — a branch white-label provou ser laboratório de features que valem pro produto principal"
+repeat_when: "houver branch paralela white-label ou experimental com commits à frente do main e pedido de port"
+do_more_of: "sempre que portar, procurar resíduos de marca com grep antes do commit final; comparar suíte de testes pré/pós via worktree pra separar regressão de falha pré-existente; documentar mudança de semântica de decreto (ADR-020) no HANDOFF"
+```
