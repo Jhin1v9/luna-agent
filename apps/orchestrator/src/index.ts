@@ -216,7 +216,7 @@ async function main(): Promise<void> {
   // Tools da VPS Nexo (leitura, catálogo docs/tools/nexo-api-catalog.md) —
   // ligadas "igual um neurônio" no TOOL_CALL do Model Router. Sem
   // credencial: tool falha explicitamente (fail-closed), sem derrubar nada.
-  const { registerFastTools } = await import('./agent/router/tools.js');
+  const { registerFastTools, setLunaWebCatalogProvider } = await import('./agent/router/tools.js');
   const { createNexoTools } = await import('./agent/router/tools-nexo.js');
   registerFastTools(
     createNexoTools({
@@ -232,6 +232,18 @@ async function main(): Promise<void> {
   const { createVoiceCallTool } = await import('./agent/router/tools-voice-call.js');
   registerFastTools({ 'voice.call_place': createVoiceCallTool(pool) });
   registerFastTools(createBrainTools());
+  // v15 (decreto owner 15/10): ponte Luna Web — MESMO catálogo/tools do chat
+  // web disponíveis pro FAST (editar projetos, logins, providers...). Registro
+  // dos proxies é assíncrono e nunca derruba o boot (kernel fora = só as
+  // tools fixas lunaWeb.*).
+  const { createLunaWebTools, createLunaWebCatalogProvider, registerLunaWebCatalogProxies } =
+    await import('./agent/router/tools-luna-web.js');
+  const lunaWebCfg = { baseUrl: config.LUNA_KERNEL_URL, token: config.LUNA_KERNEL_TOKEN };
+  registerFastTools(createLunaWebTools(lunaWebCfg));
+  setLunaWebCatalogProvider(createLunaWebCatalogProvider(lunaWebCfg));
+  registerLunaWebCatalogProxies(lunaWebCfg, registerFastTools)
+    .then((n) => log.info({ count: n }, 'proxies do catálogo Luna Web registrados no FAST'))
+    .catch((err) => log.warn({ err: String(err) }, 'catálogo Luna Web indisponível no boot — só lunaWeb.* ativas'));
   log.info('tools Nexo + Brain registradas no FAST (leitura; ações = restritas)');
 
   bus.on('client.message.received', messageHandler);

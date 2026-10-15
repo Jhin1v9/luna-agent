@@ -41,7 +41,12 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.next', '__pycache__
 const SHELL_DENY =
   /(rm\s+(-[a-zA-Z]*\s+)?\/(\s|$)|rm\s+-rf?\s+(\/|~|\$HOME|\.{0,2}\/?$)|mkfs|dd\s+if=|:\(\)\s*\{|shutdown|poweroff|reboot|halt\b|docker\s+system\s+(prune|df)|git\s+push\b.*(--force|-f)\b|curl[^|]*\|\s*(ba)?sh|wget[^|]*\|\s*(ba)?sh)/i;
 
-export function createLiveToolRunner(deps: { roots: string[]; log: { warn: (o: unknown, m: string) => void } }) {
+export function createLiveToolRunner(deps: {
+  roots: string[];
+  log: { warn: (o: unknown, m: string) => void };
+  /** Pool pra tools que tocam o banco (voice.call enfileira a ligação). */
+  pool?: { query: (sql: string, params?: unknown[]) => Promise<unknown> };
+}) {
   const roots = deps.roots.map((r) => resolve(r.trim())).filter(Boolean);
   if (roots.length === 0) roots.push(resolve('.'));
 
@@ -214,6 +219,41 @@ export function createLiveToolRunner(deps: { roots: string[]; log: { warn: (o: u
       },
     },
   };
+
+  // voice.call (REGRA OWNER 14/10): pedido no chat ("Luna, liga pro fulano e
+  // fala X") vira LIGAÇÃO DE VOZ real. O report-back automático cai de volta
+  // no chat de origem quando a chamada termina (call-executor).
+  if (deps.pool) {
+    tools['voice.call'] = {
+      desc: 'Faz uma LIGAÇÃO DE VOZ pelo WhatsApp para um contato registrado. Use quando o usuário pedir para ligar/telefonar/chamar alguém. A Luna reporta o resultado da ligação de volta neste chat automaticamente.',
+      args: {
+        destinatario: 'nome do contato (registrado no chat_registry, ex.: Abner, Enoque)',
+        objetivo: 'o que falar/pedir na ligação, em PT-BR direto',
+      },
+      run: async (args) => {
+        const destinatario = String(args.destinatario ?? '').trim();
+        const objetivo = String(args.objetivo ?? '').trim();
+        if (!destinatario || !objetivo) return fail('args.destinatario e args.objetivo são obrigatórios');
+        const { enqueueJob } = await import('@luna/database');
+        const job = await enqueueJob(deps.pool as never, {
+          job_type: 'voice.call',
+          payload: {
+            brief: {
+              destinatario,
+              objetivo,
+              autorizador: 'live brain (pedido via chat)',
+              motivo: `Pedido no chat: ${objetivo}`.slice(0, 250),
+              origem_conversation_id: args.origem_conversation_id ?? null,
+            },
+          },
+          priority: 8,
+          max_attempts: 1,
+          idempotency_key: `voice_call_tool:${Date.now()}`,
+        });
+        return ok({ disparada: true, job_id: (job as { job?: { id?: string } }).job?.id ?? null, destinatario, nota: 'report-back automático cai neste chat quando a chamada terminar' });
+      },
+    };
+  }
 
   return {
     names: () => Object.keys(tools),
