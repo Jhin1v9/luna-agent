@@ -48,6 +48,44 @@ describe('contato novo — grupos nunca viram solicitação de autorização', (
     expect(looksLikeGroupPreview('Brasileiros', '~Silvia: Muito bom')).toBe(true);
     expect(looksLikeGroupPreview('Cliente', 'Olá, preciso limpar meu sofá')).toBe(false);
   });
+
+  it('v15.4.1: badge is_group=false mas mensagens COM autor (grupo sem JID no preview) NÃO gera solicitação', async () => {
+    const queries: string[] = [];
+    const pool = {
+      query: async (sql: string) => {
+        queries.push(sql);
+        if (/FROM chat_registry/.test(sql)) return { rows: [] }; // desconhecido
+        if (/INSERT INTO contact_approval_requests/.test(sql)) return { rows: [{ id: '9' }], rowCount: 1 };
+        return { rows: [] };
+      },
+    };
+    const transport = {
+      readConversation: async () => [
+        { sender: 'x', direction: 'inbound' as const, text: 'alguém falou alguma coisa', author: 'Fulana' },
+      ],
+    };
+    const watcher = new IngestWatcher(
+      {
+        pool: pool as never,
+        transport: transport as never,
+        log: { info: () => {}, debug: () => {}, warn: () => {}, error: () => {} } as never,
+        page: {
+          evaluate: async () => [
+            { chat_id: 'g1', chat_name: 'Grupo X', unread: 2, preview: 'msg nova', is_group: false },
+          ],
+        },
+        selectors: {},
+        debounceMs: 5,
+        ingestAllowlist: [],
+        enforceIngestAllowlist: true,
+        ingestFn: async () => 'published',
+      },
+      { intervalMs: 60_000, sweepEnabled: false },
+    );
+    await watcher.tick(); // seed (+ reconcile do boot)
+    await watcher.tick(); // diff — cai no requestUnknownApproval
+    expect(queries.some((q) => q.includes('INSERT INTO contact_approval_requests'))).toBe(false);
+  });
 });
 
 describe('ESCOPO DE INGESTÃO — registry é autoridade + allowlist como restrição extra (v15.4)', () => {

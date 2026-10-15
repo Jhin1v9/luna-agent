@@ -496,6 +496,18 @@ export class IngestWatcher {
     const inbound = messages.filter((m) => m.direction === 'inbound' && m.text);
     const last = inbound[inbound.length - 1];
     if (!last) return false;
+    // REFORÇO ANTI-GRUPO (v15.4.1, bug ao vivo 15/10): badge de grupo pode vir
+    // com is_group=false quando o preview não expõe autor — um grupo gerou
+    // solicitação #0 pro owner. Se qualquer fala inbound carrega autor que não
+    // é o próprio interlocutor, é grupo — grupos NUNCA passam por approval.
+    const groupAuthor = inbound.find(
+      (m) => (m as { author?: string | null }).author != null &&
+        !/^(tú|você|voce|you|tu)$/i.test(String((m as { author?: string | null }).author)),
+    );
+    if (groupAuthor) {
+      this.deps.log.warn({ chat: badge.chat_name }, 'watcher: solicitação de GRUPO bloqueada (padrão de autor nas mensagens)');
+      return false;
+    }
     const context = inbound.slice(-3).map((m) => `${m.author ?? badge.chat_name}: ${m.text}`).join('\n');
     const request = await requestContactApproval(this.deps.pool, {
       chat_id: badge.chat_id,
