@@ -59,13 +59,24 @@ export class PanelGuard {
   /** Início de um ciclo de trabalho: espera o ciclo anterior terminar
    *  (endCycle) e ADQUIRE o lock — segura até o endCycle. */
   async beginCycle(context: string): Promise<void> {
-    await this.lock;
+    // Reserva a posição na fila ANTES de esperar o ciclo anterior. Fazer o
+    // await primeiro permitia que dois callers vissem a mesma Promise já
+    // resolvida e ambos entrassem no painel; o sweep então fechava o chat no
+    // meio de um envio.
+    const previous = this.lock;
     let release!: () => void;
     this.lock = new Promise((r) => {
       release = r;
     });
+    await previous;
     this.releaseLock = release;
-    await this.beginCycleInner(context);
+    try {
+      await this.beginCycleInner(context);
+    } catch (error) {
+      this.releaseLock?.();
+      this.releaseLock = null;
+      throw error;
+    }
   }
 
   private async beginCycleInner(context: string): Promise<void> {

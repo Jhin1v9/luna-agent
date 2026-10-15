@@ -40,12 +40,6 @@ async function main(): Promise<void> {
   // P3 (decreto owner): classify NUNCA morre por quota de UM provider. Em modo
   // kimiwork, a cadeia é kimiwork → API (kimi → kimi-2 → gemini). Noutros
   // modos, o adapter do modo já embute sua reserva (FallbackAdapter).
-  const apiChainAdapter = createAdapter({
-    mode: 'kimi-api',
-    apiKey: config.LLM_API_KEY,
-    apiBaseUrl: config.LLM_BASE_URL,
-    apiModel: config.LLM_MODEL,
-  });
   const modeAdapter = createAdapter({
     mode: config.KIMI_ADAPTER_MODE,
     apiKey: config.LLM_API_KEY,
@@ -55,6 +49,12 @@ async function main(): Promise<void> {
   let classifyAdapter = modeAdapter;
   if (config.KIMI_ADAPTER_MODE === 'kimiwork') {
     const { ChainAdapter } = await import('@luna/agent');
+    const apiChainAdapter = createAdapter({
+      mode: 'kimi-api',
+      apiKey: config.LLM_API_KEY,
+      apiBaseUrl: config.LLM_BASE_URL,
+      apiModel: config.LLM_MODEL,
+    });
     classifyAdapter = new ChainAdapter(
       [
         { nome: 'kimiwork', adapter: modeAdapter },
@@ -151,17 +151,23 @@ async function main(): Promise<void> {
   const { enqueueJob } = await import('@luna/database');
   // Brain watch (decreto owner 27/09): varredura de diffs do brain canônico
   // (VPS) — no boot e a cada 30 min. Cada commit novo vira sinapse local.
-  const { createBrainWatchHandler } = await import('./jobs/brain-watch.js');
-  runner.register('brain.watch', createBrainWatchHandler({ pool, log }));
-  const brainWatchTick = async (idem: string) => {
-    await enqueueJob(pool, { job_type: 'brain.watch', payload: {}, max_attempts: 2, idempotency_key: idem }).catch(() => {});
-  };
-  await brainWatchTick(`brainwatch:boot:${Date.now().toString(36)}`);
-  const brainWatchTimer = setInterval(() => {
-    const hour = new Date().toISOString().slice(0, 13);
-    brainWatchTick(`brainwatch:${hour}`).catch(() => {});
-  }, 30 * 60_000);
-  brainWatchTimer.unref();
+  // v15 (port superclim): flag-gated, mas ON por default no main (decreto);
+  // white-labels desligam com BRAIN_WATCH_ENABLED=false no .env.
+  if (process.env.BRAIN_WATCH_ENABLED !== 'false') {
+    const { createBrainWatchHandler } = await import('./jobs/brain-watch.js');
+    runner.register('brain.watch', createBrainWatchHandler({ pool, log }));
+    const brainWatchTick = async (idem: string) => {
+      await enqueueJob(pool, { job_type: 'brain.watch', payload: {}, max_attempts: 2, idempotency_key: idem }).catch(() => {});
+    };
+    await brainWatchTick(`brainwatch:boot:${Date.now().toString(36)}`);
+    const brainWatchTimer = setInterval(() => {
+      const hour = new Date().toISOString().slice(0, 13);
+      brainWatchTick(`brainwatch:${hour}`).catch(() => {});
+    }, 30 * 60_000);
+    brainWatchTimer.unref();
+  } else {
+    log.info('brain.watch desativado (BRAIN_WATCH_ENABLED=false)');
+  }
   // Summaries periódicos: a cada 24h enfileira a rodada (idempotente por dia).
   const day = new Date().toISOString().slice(0, 10);
   await enqueueJob(pool, { job_type: 'memory.summarize', payload: {}, idempotency_key: 'summarize:' + day });

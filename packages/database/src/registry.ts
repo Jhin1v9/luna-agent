@@ -19,7 +19,7 @@ export interface RegistryEntry {
   kind: 'individual' | 'group';
   canonicalName: string;
   displayHint: string | null;
-  role: 'allowed' | 'blocked';
+  role: 'owner' | 'allowed' | 'blocked';
   notifyChannel: string | null;
   phoneE164: string | null;
 }
@@ -77,7 +77,7 @@ export async function registryCheck(db: Sql, mention: string, acao: string): Pro
   if (!entry) {
     return {
       ok: false,
-      reason: `'${mention}' NÃO está no Chat Registry — não vou ${acao} sem identidade verificada. Peça ao Abner pra registrar (nome + número).`,
+      reason: `'${mention}' NÃO está no cadastro (chat_registry) — não vou ${acao} sem identidade verificada. Registre nome + número primeiro.`,
     };
   }
   if (entry.role === 'blocked') {

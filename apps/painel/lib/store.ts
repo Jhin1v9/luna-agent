@@ -46,6 +46,8 @@ export interface Ordem {
   result: string | null; created_at: string; executed_at: string | null;
 }
 export interface Comando { perguntas: Turno[]; ordens: Ordem[] }
+export interface SavedContact { id: string; name: string; chat_id: string; phone_e164: string | null }
+export interface AccessEntry extends SavedContact { role: 'owner' | 'allowed' | 'blocked'; note: string | null }
 
 // ---------------------------------------------------------------------------
 // Caminhos e .env (raiz do repo = dois níveis acima de apps/painel)
@@ -86,6 +88,102 @@ async function db<T>(query: string, params: unknown[] = []): Promise<T[]> {
   await c.connect();
   try { return (await c.query(query, params as never[])).rows as T[]; }
   finally { await c.end(); }
+}
+
+export async function queryDb<T>(query: string, params: unknown[] = []): Promise<T[]> {
+  return db<T>(query, params);
+}
+
+// ---------------------------------------------------------------------------
+// CONTATOS — Chat Registry é a fonte de autorização do WhatsApp
+// ---------------------------------------------------------------------------
+export async function getContacts(): Promise<{ contacts: SavedContact[] }> {
+  const contacts = await db<SavedContact>(
+    `SELECT id::text, canonical_name AS name, chat_key AS chat_id, phone_e164
+       FROM chat_registry
+      WHERE kind='individual' AND role IN ('allowed', 'owner')
+      ORDER BY lower(canonical_name)`,
+  );
+  return { contacts };
+}
+
+export async function saveContact(input: { name: string; chat_id: string }): Promise<{ ok: boolean; contact?: SavedContact; error?: string }> {
+  const name = input.name.trim().replace(/\s+/g, ' ');
+  const digits = input.chat_id.replace(/\D/g, '');
+  if (name.length < 2) return { ok: false, error: 'nome precisa ter ao menos 2 caracteres' };
+  if (digits.length < 8 || digits.length > 15) return { ok: false, error: 'número inválido: informe DDI + número' };
+
+  const env = envAll();
+  if (!env.DATABASE_URL) return { ok: false, error: 'DATABASE_URL ausente no .env' };
+  // v15 (port superclim): org e prefixo configuráveis — default Nexo; o
+  // deploy Superclim sobrescreve via .env (LUNA_PANEL_ORG / _ORG_SLUG / _CLIENT_PREFIX).
+  const orgName = process.env.LUNA_PANEL_ORG?.trim() || 'Nexo Digital';
+  const orgSlug = process.env.LUNA_PANEL_ORG_SLUG?.trim() || 'nexo';
+  const clientPrefix = process.env.LUNA_PANEL_CLIENT_PREFIX?.trim() || 'lx';
+  const c = new pg.Client({ connectionString: env.DATABASE_URL });
+  await c.connect();
+  try {
+    await c.query('BEGIN');
+    const org = await c.query<{ id: string }>(
+      `INSERT INTO organizations (name, slug)
+       VALUES ($1, $2)
+       ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, updated_at=now()
+       RETURNING id`,
+      [orgName, orgSlug],
+    );
+    const code = `${clientPrefix}-${digits}`;
+    const client = await c.query<{ id: string }>(
+      `INSERT INTO clients (organization_id, name, code, status, metadata)
+       VALUES ($1, $2, $3, 'active', $4::jsonb)
+       ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, status='active', updated_at=now()
+       RETURNING id`,
+      [org.rows[0]!.id, name, code, JSON.stringify({ source: 'luna_painel' })],
+    );
+    const contact = await c.query<{ id: string }>(
+      `INSERT INTO contacts (client_id, name, channel, address, is_primary, metadata)
+       VALUES ($1, $2, 'whatsapp', $3, true, $4::jsonb)
+       ON CONFLICT (client_id, channel, address) DO UPDATE
+         SET name=EXCLUDED.name, is_primary=true, metadata=contacts.metadata || EXCLUDED.metadata, updated_at=now()
+       RETURNING id`,
+      [client.rows[0]!.id, name, digits, JSON.stringify({ phone: `+${digits}`, role: 'cliente', source: 'luna_painel' })],
+    );
+    await c.query(
+      `INSERT INTO conversations (client_id, contact_id, channel, state, metadata)
+       SELECT $1, $2, 'whatsapp', 'NEW', $3::jsonb
+       WHERE NOT EXISTS (
+         SELECT 1 FROM conversations WHERE client_id=$1 AND contact_id=$2 AND channel='whatsapp'
+       )`,
+      [client.rows[0]!.id, contact.rows[0]!.id, JSON.stringify({ chat_id: digits, chat_name: name, source: 'luna_painel' })],
+    );
+    const saved = await c.query<SavedContact>(
+      `INSERT INTO chat_registry
+         (chat_key, kind, canonical_name, display_hint, role, notify_channel, phone_e164, resolved_by, note)
+       VALUES ($1, 'individual', $2, $2, 'allowed', $3, $4, 'luna_painel', 'Cadastrado pelo Painel da Luna')
+       ON CONFLICT (chat_key, kind) DO UPDATE SET
+         canonical_name=EXCLUDED.canonical_name, display_hint=EXCLUDED.display_hint,
+         role='allowed', notify_channel=EXCLUDED.notify_channel,
+         phone_e164=EXCLUDED.phone_e164, resolved_by='luna_painel',
+         note='Atualizado pelo Painel da Luna', updated_at=now()
+       RETURNING id::text, canonical_name AS name, chat_key AS chat_id, phone_e164`,
+      [digits, name, `whatsapp:+${digits}`, `+${digits}`],
+    );
+    await c.query('COMMIT');
+    return { ok: true, contact: saved.rows[0] };
+  } catch (e) {
+    await c.query('ROLLBACK').catch(() => {});
+    return { ok: false, error: (e as Error).message.slice(0, 200) };
+  } finally {
+    await c.end();
+  }
+}
+
+export async function removeContact(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!/^\d+$/.test(id)) return { ok: false, error: 'id inválido' };
+  const removed = await db<{ id: string }>(
+    `DELETE FROM chat_registry WHERE id=$1::bigint AND kind='individual' RETURNING id::text`,
+    [id],
+  );
+  return removed.length ? { ok: true } : { ok: false, error: 'contato não encontrado' };
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +299,8 @@ const DEADLINE_RE = /\b(essa semana|este fim de semana|nesta semana|amanh[aã]|h
 
 export async function sendMessage(input: { chat_id: string; body: string; sender: string }):
   Promise<{ ok: boolean; blocked?: boolean; error?: string; id?: string; send_state?: string }> {
-  const { chat_id, body, sender } = input;
+  const { body, sender } = input;
+  const chat_id = input.chat_id.replace(/\D/g, '');
   if (!chat_id || !body || !['luna', 'agent:venus'].includes(sender)) {
     return { ok: false, error: 'payload invalido' };
   }
@@ -213,7 +312,43 @@ export async function sendMessage(input: { chat_id: string; body: string; sender
     `SELECT conversation_id FROM messages WHERE metadata->>'chat_id' = $1 ORDER BY created_at DESC LIMIT 1`,
     [chat_id],
   );
-  if (!conv[0]) return { ok: false, error: 'conversation_id nao encontrada pra este chat_id' };
+  if (!conv[0]) {
+    const registered = await db<{ conversation_id: string }>(
+      `SELECT cv.id AS conversation_id
+         FROM conversations cv
+         JOIN contacts ct ON ct.id=cv.contact_id
+        WHERE cv.channel='whatsapp'
+          AND (ct.address=$1 OR cv.metadata->>'chat_id'=$1)
+        ORDER BY cv.updated_at DESC LIMIT 1`,
+      [chat_id],
+    );
+    if (registered[0]) conv.push(registered[0]);
+  }
+  if (!conv[0]) {
+    // Registros antigos podem existir apenas na allowlist. Materialize a
+    // estrutura operacional no primeiro envio, sem liberar números novos.
+    const allowed = await db<{ canonical_name: string }>(
+      `SELECT canonical_name
+         FROM chat_registry
+        WHERE kind='individual' AND role='allowed' AND chat_key=$1
+        LIMIT 1`,
+      [chat_id],
+    );
+    if (allowed[0]) {
+      const materialized = await saveContact({ name: allowed[0].canonical_name, chat_id });
+      if (!materialized.ok) return { ok: false, error: materialized.error ?? 'falha ao preparar contato autorizado' };
+      const created = await db<{ conversation_id: string }>(
+        `SELECT cv.id AS conversation_id
+           FROM conversations cv
+           JOIN contacts ct ON ct.id=cv.contact_id
+          WHERE cv.channel='whatsapp' AND ct.address=$1
+          ORDER BY cv.updated_at DESC LIMIT 1`,
+        [chat_id],
+      );
+      if (created[0]) conv.push(created[0]);
+    }
+  }
+  if (!conv[0]) return { ok: false, error: 'conversation_id nao encontrada pra este contato cadastrado' };
   const ins = await db<{ id: string }>(
     `INSERT INTO messages (conversation_id, direction, channel, sender, body, send_state, metadata)
      VALUES ($1, 'outbound', 'whatsapp', $2, $3, 'queued', $4) RETURNING id`,

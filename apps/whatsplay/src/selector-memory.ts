@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Memória de seletores (§13) — append-only, protocolo do Brain: data +
@@ -13,8 +14,9 @@ export interface SelectorChange {
   fallback: string;
 }
 
-const MEMORY_PATH =
-  '/home/nexo/luna-agent/.brain/luna/selectors/whatsapp.md';
+const MEMORY_PATH = fileURLToPath(
+  new URL('../../../.brain/luna/selectors/whatsapp.md', import.meta.url),
+);
 
 export function appendSelectorMemory(change: SelectorChange): void {
   const now = new Date().toISOString().slice(0, 10);
