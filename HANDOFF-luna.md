@@ -1110,3 +1110,50 @@ decisão da Kimi Code. Não force nada.
 
 **Pendências:** whatsplay ainda com 1 teste falhando no PC (`browser-reply` OperatorSession —
 pré-existente, zona whatsplay); PC do pai ainda não testou o instalador v14.3.
+
+---
+
+## 2026-10-15 12:15 CEST — Kimi Code: "a Luna ignora o Enoque" RESOLVIDO + specs do agentic loop
+
+**Root cause (prova em messages + audit_log):** TODOS os envios pro Enoque
+morriam com `destinatário fora da allowlist`. A conversa dele resolve o alvo
+pelo NÚMERO (`34689135159@s.whatsapp.net`) mas a allowlist tinha só o NOME
+(`Enoque`) — name≠digits nunca casava (nem no matcher antigo endsWith, nem no
+novo jidDigits). Por isso "a Luna ignora o Enoque faz eras".
+
+**Fixes aplicados (verificados — 8 mensagens SENT 09:59-10:05 UTC):**
+1. `whatsplay/src/allowlist.ts` + `outbound.ts`: `refusedByAllowlist` agora é
+   async e resolve entradas-NOME da allowlist pela identidade no
+   `chat_registry`/contacts (nome → dígitos do telefone) antes de recusar.
+2. Seed chat_registry (formato @c.us): Enoque 34689135159@c.us, Elias Pessoal,
+   Elias Superclim. **ATENÇÃO: algo no VPS reescreve o registry periodicamente
+   (linhas sumiram entre inserts) — investigar o sync e persistir essas entradas.**
+3. .env: `34689135159@s.whatsapp.net` adicionado na WHATSAPP_OUTBOUND_ALLOWLIST.
+4. `luna-kernel/packages/kernel/luna-tools.cjs`: bug `m.created_at?.slice is not
+   a function` (Date object) — dashboardGetWhatsAppHistory funcionando.
+
+**Voice calls: PIPELINE COMPLETO E PROVADO** (chamadas reais atendidas 20:12 e
+20:29 UTC de ontem). Report-back pós-chamada no chat de origem (brief.origem),
+tool voice.call no live-tools, investigação wa_recent/solicitacoes na
+conductora, prompt do operador com regra de satisfação + convite "fala Luna, ...".
+
+**SPEC — agentic loop DONE marker (pra Vênus implementar no luna-soul.cjs, que
+ela está editando):**
+1. `buildSystemPrompt` (linha ~396): adicionar seção: "REGRA DE CONCLUSÃO:
+   antes de responder, confira se o pedido foi totalmente SATISFEITO; se não,
+   continue executando. Só encerre quando satisfeito; ao encerrar, termine a
+   resposta com <luna_done/>. Sem o marcador, o sistema vai te mandar continuar."
+2. Case `luna_response_complete` (~linha 3115): após cancelStream — se
+   `fullResponse` NÃO contém `<luna_done/>` E houve tool call neste turno E
+   nudges<3: strip nada, set loopInput="[CONTINUE] Verifique: o pedido já foi
+   totalmente satisfeito? Se sim, reenvie a conclusão finalizando com
+   <luna_done/>. Se não, CONTINUE executando (uma tool por vez).", rebuild
+   context, continue. Se contém: strip o marcador do texto e encerra normal.
+3. Resume-on-boot: no init do soul, sessões cujo último evento é tool/action
+   sem fechamento assistant → auto-continuar com "continue o que estava fazendo".
+
+**PRÓXIMO (ideia do owner, aprovada por arquitetura):** call brain = SESSÃO
+LUNA WEB (mesmo núcleo das outras pontas): adaptador KimiLiveAdapter falando o
+contrato /api/chat da 3500, sessão "conductor" primada com o decreto, tool
+`call.respond` no catálogo web → pg_notify('call_responses') → whatsplay
+LISTEN → chat do operador. Substitui o FallbackAdapter cego na conductora.
