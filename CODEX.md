@@ -238,3 +238,32 @@ Limitação de testes encontrada:
 6. Executar `git pull --ff-only origin main` em cada um.
 7. Recriar ou preservar o link local `.brain -> ../brain-superclim`.
 8. Reiniciar os serviços com `pm2 startOrReload ecosystem.superclim.config.cjs`.
+
+## Configs avançadas da Luna (15/10/2026)
+
+Foi adicionada ao menu do Painel da Luna a página **Configs avançadas da Luna**, ligada aos componentes reais:
+
+- editor do prompt atual do WhatsApp (`.kimi-code/agents/luna.md`), recarregado por mtime pelo orquestrador;
+- editor do system prompt da Luna Web, lido e salvo pela API real do Luna Kernel em `:3458/api/config`;
+- editor do prompt do caller (`.luna-config/caller-prompt.md`), com variáveis `{{caller}}` e `{{contexto}}` e recarga por mtime no WhatsPlay;
+- catálogo das tools FAST e LIVE extraído dos catálogos do código, com nome, camada e explicação;
+- gestão de acesso por contato com papéis `owner`, `allowed` e `blocked`;
+- indicação explícita da política ativa: grupos bloqueados, desconhecidos bloqueados e cadastro deny-first.
+
+A migração append-only `020_chat_registry_owner.sql` amplia o papel do registro sem remover a blocklist. O contato `Elias Superclim Servicios` (`34624529442`) foi definido como `owner`, conforme solicitado. O contexto do WhatsApp agora injeta a autoridade real do contato no prompt: owner pode emitir ordens administrativas; contatos comuns continuam apenas no atendimento normal.
+
+A API `/api/advanced` protege tanto leitura quanto escrita com Bearer `LUNA_API_KEY`; prompts e a lista de owners não são expostos sem essa credencial. O token digitado no painel fica somente no `sessionStorage` da aba. A chave ainda precisa ser definida no ambiente antes do primeiro desbloqueio.
+
+Arquivos adicionados/alterados nesta etapa:
+
+- `.luna-config/caller-prompt.md`
+- `apps/painel/app/api/advanced/route.ts`
+- `apps/painel/lib/advanced.ts`
+- `apps/painel/app/page.tsx`
+- `apps/painel/lib/store.ts`
+- `apps/orchestrator/src/agent/context.ts`
+- `apps/whatsplay/src/voice/incoming-fastpath.ts`
+- `packages/database/migrations/020_chat_registry_owner.sql`
+- `packages/database/src/registry.ts`
+
+Validação: build de produção do painel passou; typecheck do Orchestrator e WhatsPlay passou; a migração foi aplicada. A suíte de registry mantém uma falha antiga de texto esperado (`Chat Registry`) versus texto atual (`cadastro Superclim`), sem relação com a mudança de owner.

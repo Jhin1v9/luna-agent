@@ -19,7 +19,7 @@ export interface RegistryEntry {
   kind: 'individual' | 'group';
   canonicalName: string;
   displayHint: string | null;
-  role: 'allowed' | 'blocked';
+  role: 'owner' | 'allowed' | 'blocked';
   notifyChannel: string | null;
   phoneE164: string | null;
 }

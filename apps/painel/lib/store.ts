@@ -47,6 +47,7 @@ export interface Ordem {
 }
 export interface Comando { perguntas: Turno[]; ordens: Ordem[] }
 export interface SavedContact { id: string; name: string; chat_id: string; phone_e164: string | null }
+export interface AccessEntry extends SavedContact { role: 'owner' | 'allowed' | 'blocked'; note: string | null }
 
 // ---------------------------------------------------------------------------
 // Caminhos e .env (raiz do repo = dois níveis acima de apps/painel)
@@ -89,6 +90,10 @@ async function db<T>(query: string, params: unknown[] = []): Promise<T[]> {
   finally { await c.end(); }
 }
 
+export async function queryDb<T>(query: string, params: unknown[] = []): Promise<T[]> {
+  return db<T>(query, params);
+}
+
 // ---------------------------------------------------------------------------
 // CONTATOS — Chat Registry é a fonte de autorização do WhatsApp
 // ---------------------------------------------------------------------------
@@ -96,7 +101,7 @@ export async function getContacts(): Promise<{ contacts: SavedContact[] }> {
   const contacts = await db<SavedContact>(
     `SELECT id::text, canonical_name AS name, chat_key AS chat_id, phone_e164
        FROM chat_registry
-      WHERE kind='individual' AND role='allowed'
+      WHERE kind='individual' AND role IN ('allowed', 'owner')
       ORDER BY lower(canonical_name)`,
   );
   return { contacts };

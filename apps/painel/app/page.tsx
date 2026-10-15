@@ -51,6 +51,13 @@ type LunaWebStatus = {
   roda?: LunaWebRodaEntry[];
   error?: string;
 };
+type AdvancedConfig = {
+  prompts: { whatsapp: string; web: string; caller: string };
+  kernelOnline: boolean;
+  tools: Array<{ name: string; description: string; layer: string }>;
+  access: Array<{ id: string; name: string; chat_id: string; phone_e164: string | null; role: 'owner' | 'allowed' | 'blocked'; note: string | null }>;
+  policy: { groupsAllowed: boolean; unknownContacts: boolean; defaultRole: string };
+};
 
 const ADAPTER_MODES = ['mock', 'kimi-web', 'kimi-api', 'kimi-cli', 'kimi-web-local', 'gemini', 'pi', 'kimiwork'];
 const PROVIDERS = ['kimi', 'kimiwork'];
@@ -161,6 +168,7 @@ const PAGES = [
   { id: 'venus', label: 'Vênus', icon: Sparkles },
   { id: 'servicos', label: 'Serviços', icon: Server },
   { id: 'config', label: '⚙️ Configurações', icon: Settings2 },
+  { id: 'advanced', label: 'Configs avançadas da Luna', icon: ShieldCheck },
 ] as const;
 type PageId = (typeof PAGES)[number]['id'];
 
@@ -219,6 +227,10 @@ export default function Painel() {
   const [lwProviderId, setLwProviderId] = useState('');
   const [lwModel, setLwModel] = useState('');
   const [lwSaving, setLwSaving] = useState(false);
+  const [adminToken, setAdminToken] = useState('');
+  const [advanced, setAdvanced] = useState<AdvancedConfig | null>(null);
+  const [promptDrafts, setPromptDrafts] = useState<AdvancedConfig['prompts']>({ whatsapp: '', web: '', caller: '' });
+  const [advancedSaving, setAdvancedSaving] = useState('');
   const [applying, setApplying] = useState(false);
   const [invoking, setInvoking] = useState(false);
   const [tarefa, setTarefa] = useState('');
@@ -285,6 +297,15 @@ export default function Painel() {
       }
     } catch { /* kernel offline — card mostra status */ }
   }, []);
+  const loadAdvanced = useCallback(async (token?: string) => {
+    const key = token ?? adminToken;
+    if (!key) return;
+    const r = await fetch('/api/advanced', { cache: 'no-store', headers: { authorization: `Bearer ${key}` } });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    setAdvanced(d); setPromptDrafts(d.prompts);
+    sessionStorage.setItem('luna-admin-token', key);
+  }, [adminToken]);
 
   useEffect(() => {
     loadModo().catch(() => toast.error('falha ao ler modo atual'));
@@ -296,6 +317,7 @@ export default function Painel() {
     loadLunaWeb();
     loadContacts();
   }, [loadModo, loadAtividade, loadAuto, loadProviders, loadFccModels, loadLunaWeb, loadContacts]);
+  useEffect(() => { const token = sessionStorage.getItem('luna-admin-token') || ''; if (token) { setAdminToken(token); loadAdvanced(token).catch(() => sessionStorage.removeItem('luna-admin-token')); } }, [loadAdvanced]);
 
   // auto-refresh 10s com countdown visível + refresh ao voltar pra aba
   useEffect(() => {
@@ -1343,9 +1365,60 @@ export default function Painel() {
     </div>
   );
 
+  async function saveAdvancedPrompt(kind: keyof AdvancedConfig['prompts']) {
+    setAdvancedSaving(`prompt:${kind}`);
+    try {
+      await fetch('/api/advanced', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ action: 'save-prompt', kind, content: promptDrafts[kind] }) }).then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`); });
+      toast.success(`prompt ${kind} salvo`); await loadAdvanced();
+    } catch (e: any) { toast.error(e.message); } finally { setAdvancedSaving(''); }
+  }
+  async function setAdvancedRole(id: string, role: 'owner' | 'allowed' | 'blocked') {
+    setAdvancedSaving(`role:${id}`);
+    try {
+      await fetch('/api/advanced', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ action: 'set-role', id, role }) }).then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`); });
+      toast.success(`acesso alterado para ${role}`); await loadAdvanced(); loadContacts();
+    } catch (e: any) { toast.error(e.message); } finally { setAdvancedSaving(''); }
+  }
+
+  const PageAdvanced = (
+    <div key="advanced" className="space-y-4" {...pageAnim}>
+      <Card index={0}>
+        <Title icon={KeyRound}>Acesso administrativo</Title>
+        <div className="flex gap-2">
+          <input type="password" className="input" placeholder="LUNA_API_KEY — fica somente nesta aba" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} />
+          <button className="btn btn-primary shrink-0" onClick={() => loadAdvanced().then(() => toast.success('configs carregadas')).catch((e) => toast.error(e.message))}><ShieldCheck size={14} />Desbloquear</button>
+        </div>
+        <div className="hint mt-2">Prompts e owners são dados sensíveis. A chave fica no sessionStorage e não é devolvida por nenhuma API.</div>
+      </Card>
+      {!advanced ? <Card index={1}><Empty>Informe o token administrativo para ver e alterar as configurações avançadas.</Empty></Card> : <>
+        <div className="grid gap-4 xl:grid-cols-3">
+          {(['whatsapp', 'web', 'caller'] as const).map((kind, i) => (
+            <Card index={i + 1} key={kind}>
+              <Title icon={kind === 'caller' ? Activity : kind === 'web' ? Globe : MessageSquare} extra={kind === 'web' ? <span className={`badge ${advanced.kernelOnline ? 'badge-ok' : 'badge-fail'}`}>{advanced.kernelOnline ? 'kernel online' : 'kernel offline'}</span> : undefined}>Prompt atual · {kind === 'whatsapp' ? 'WhatsApp' : kind === 'web' ? 'Luna Web' : 'Caller'}</Title>
+              <textarea className="input mono min-h-[420px] resize-y" value={promptDrafts[kind]} onChange={(e) => setPromptDrafts((s) => ({ ...s, [kind]: e.target.value }))} />
+              <button className="btn btn-primary mt-3 w-full" disabled={advancedSaving === `prompt:${kind}` || (kind === 'web' && !advanced.kernelOnline)} onClick={() => saveAdvancedPrompt(kind)}>{advancedSaving === `prompt:${kind}` ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}Salvar prompt</button>
+            </Card>
+          ))}
+        </div>
+        <Card index={4}>
+          <Title icon={ShieldCheck}>Owner e allowlist</Title>
+          <div className="mb-3 rounded-lg border border-line bg-bg/60 p-3 text-[12px] text-dim">Somente contatos cadastrados aparecem aqui. <span className="text-luna">owner</span> pode dar ordens administrativas; <span className="text-ok">allowed</span> pode conversar e receber ações normais; <span className="text-fail">blocked</span> é recusado. Grupos e desconhecidos continuam bloqueados.</div>
+          <div className="space-y-2">{advanced.access.map((entry) => <div key={entry.id} className="grid items-center gap-2 rounded-lg border border-line/70 bg-bg/40 p-3 md:grid-cols-[1fr_170px]">
+            <div><div className="text-[13px] font-medium">{entry.name}</div><div className="mono text-dim">{entry.phone_e164 || entry.chat_id}</div></div>
+            <select className="input" value={entry.role} disabled={advancedSaving === `role:${entry.id}`} onChange={(e) => setAdvancedRole(entry.id, e.target.value as 'owner' | 'allowed' | 'blocked')}><option value="owner">owner</option><option value="allowed">allowlist</option><option value="blocked">bloqueado</option></select>
+          </div>)}</div>
+        </Card>
+        <Card index={5}>
+          <Title icon={Zap} extra={<span className="badge badge-luna">{advanced.tools.length} tools</span>}>Tools disponíveis para a Luna</Title>
+          <div className="grid gap-2 md:grid-cols-2">{advanced.tools.map((tool, i) => <div key={`${tool.layer}:${tool.name}:${i}`} className="rounded-lg border border-line/70 bg-bg/40 p-3"><div className="flex items-center justify-between gap-2"><code className="text-[12px] text-luna">{tool.name}</code><span className="badge">{tool.layer}</span></div><p className="mt-2 text-[12px] leading-relaxed text-dim">{tool.description}</p></div>)}</div>
+        </Card>
+      </>}
+    </div>
+  );
+
   const pages: Record<PageId, React.ReactNode> = {
     geral: PageGeral, mensageiro: PageMensageiro, comando: PageComando,
-    inbox: PageInbox, venus: PageVenus, servicos: PageServicos, config: PageConfig,
+    inbox: PageInbox, venus: PageVenus, servicos: PageServicos, config: PageConfig, advanced: PageAdvanced,
   };
 
   return (

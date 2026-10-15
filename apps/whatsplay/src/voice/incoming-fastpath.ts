@@ -3,6 +3,8 @@ import type { KimiLiveAdapter } from '@luna/agent';
 import { matchesAllowlist } from '../allowlist.js';
 import { OperatorSession } from './operator-session.js';
 import { CallConductor } from './call-conductor.js';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * FAST PATH DE CHAMADA RECEBIDA (decreto owner 2026-09-24, 08:16): "a chamada
@@ -61,8 +63,29 @@ export interface IncomingCallEvent {
 }
 
 /** Prompt de atendimento: regras duras + contexto real. Instante — zero LLM. */
-export const INBOUND_OPERATOR_PROMPT = (caller: string, contexto: string | null): string =>
-  [
+let callerPromptCache: { mtime: number; content: string } | null = null;
+function callerPromptOverride(): string | null {
+  try {
+    let dir = process.cwd();
+    for (;;) {
+      const candidate = resolve(dir, '.luna-config/caller-prompt.md');
+      if (existsSync(candidate)) {
+        const mtime = statSync(candidate).mtimeMs;
+        if (!callerPromptCache || callerPromptCache.mtime !== mtime) callerPromptCache = { mtime, content: readFileSync(candidate, 'utf8') };
+        return callerPromptCache.content;
+      }
+      const parent = resolve(dir, '..');
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch { /* usa o prompt embutido */ }
+  return null;
+}
+
+export const INBOUND_OPERATOR_PROMPT = (caller: string, contexto: string | null): string => {
+  const override = callerPromptOverride();
+  if (override) return override.replaceAll('{{caller}}', caller).replaceAll('{{contexto}}', contexto?.trim() || '(sem contexto prévio)');
+  return [
     `ATENDIMENTO ATIVO AGORA: você é a VOZ DA LUNA (SUPERCLIM) numa chamada de voz WhatsApp com ${caller}.`,
     '',
     'REGRAS DE OURO:',
@@ -79,6 +102,7 @@ export const INBOUND_OPERATOR_PROMPT = (caller: string, contexto: string | null)
     '',
     'A chamada JÁ ESTÁ ROLANDO. Comece AGORA: "Alô? Aqui é a Luna, da Superclim."',
   ].join('\n');
+};
 
 export async function fastAnswerIncoming(
   deps: IncomingFastpathDeps,
