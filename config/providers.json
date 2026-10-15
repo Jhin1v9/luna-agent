@@ -1,40 +1,434 @@
 {
-  "_about": "Isolated Superclim provider wheel. Add API keys only through local env files.",
-  "fastBrain": "pollinations",
-  "liveBrain": "pollinations",
+  "fastBrain": "gemini",
+  "liveBrain": "github-models",
   "providers": [
     {
-      "id": "gemini",
-      "label": "Gemini Flash (Google)",
-      "model": "gemini-2.5-flash",
+      "id": "openrouter-nemotron-super",
+      "label": "OpenRouter grátis · Nemotron Super 120B",
       "transport": "openai",
-      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
-      "apiKeyEnv": "GEMINI_API_KEY",
-      "priority": 10,
-      "enabled": false,
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "models": [
+        "nvidia/nemotron-3-super-120b-a12b:free"
+      ],
+      "enabled": true,
+      "priority": 2,
+      "builtin": false,
       "role": "ambos"
     },
     {
-      "id": "github-gpt4o",
-      "label": "GitHub Models GPT-4o",
-      "model": "openai/gpt-4o",
+      "id": "openrouter-nemotron-ultra",
+      "label": "OpenRouter grátis · Nemotron Ultra 550B",
       "transport": "openai",
-      "baseUrl": "https://models.github.ai/inference",
-      "apiKeyEnv": "GITHUB_TOKEN",
-      "priority": 20,
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b:free"
+      ],
+      "enabled": true,
+      "priority": 3,
+      "builtin": false,
+      "role": "ambos"
+    },
+    {
+      "id": "openrouter-gemma-31b",
+      "label": "OpenRouter grátis · Gemma 4 31B",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "google/gemma-4-31b-it:free",
+      "models": [
+        "google/gemma-4-31b-it:free"
+      ],
+      "enabled": true,
+      "priority": 4,
+      "builtin": false,
+      "role": "conversa"
+    },
+    {
+      "id": "fcc-local",
+      "label": "FCC (local · rota LIVE)",
+      "transport": "fcc-local",
+      "baseUrl": "http://127.0.0.1:8082",
+      "apiKeyEnv": null,
+      "model": "nvidia_nim/deepseek-ai/deepseek-v4.1-flash",
+      "models": [],
+      "enabled": true,
+      "priority": 3,
+      "builtin": true,
+      "role": "ambos"
+    },
+    {
+      "id": "openrouter-gemma-26b",
+      "label": "OpenRouter grátis · Gemma 4 26B",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "google/gemma-4-26b-a4b-it:free",
+      "models": [
+        "google/gemma-4-26b-a4b-it:free"
+      ],
+      "enabled": true,
+      "priority": 5,
+      "builtin": false,
+      "role": "conversa"
+    },
+    {
+      "id": "openrouter-laguna-s",
+      "label": "OpenRouter grátis · Laguna S (coding)",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "poolside/laguna-s-2.1:free",
+      "models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "enabled": true,
+      "priority": 6,
+      "builtin": false,
+      "role": "coding"
+    },
+    {
+      "id": "openrouter-north-code",
+      "label": "OpenRouter grátis · North Mini Code",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "cohere/north-mini-code:free",
+      "models": [
+        "cohere/north-mini-code:free"
+      ],
+      "enabled": true,
+      "priority": 7,
+      "builtin": false,
+      "role": "coding"
+    },
+    {
+      "id": "cerebras",
+      "label": "Cerebras (grátis, ultrarrápido)",
+      "transport": "openai",
+      "baseUrl": "https://api.cerebras.ai/v1",
+      "apiKeyEnv": "CEREBRAS_API_KEY",
+      "model": "llama-3.3-70b",
+      "models": [
+        "llama-3.3-70b"
+      ],
       "enabled": false,
-      "role": "chat"
+      "priority": 6,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "openrouter-dots-note",
+      "label": "OpenRouter grátis · Dots 3 Note",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "dots-studio/dots-3-note-preview:free",
+      "models": [
+        "dots-studio/dots-3-note-preview:free"
+      ],
+      "enabled": true,
+      "priority": 8,
+      "builtin": false,
+      "role": "conversa"
+    },
+    {
+      "id": "zai-glm",
+      "label": "Z.AI GLM (grátis, forte p/ coding)",
+      "transport": "openai",
+      "baseUrl": "https://api.z.ai/api/paas/v4",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "model": "glm-4.7-flash",
+      "models": [
+        "glm-4.7-flash"
+      ],
+      "enabled": false,
+      "priority": 7,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "openrouter-nano-omni",
+      "label": "OpenRouter grátis · Nemotron Nano Omni 30B",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "models": [
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+      ],
+      "enabled": true,
+      "priority": 9,
+      "builtin": false,
+      "role": "ambos"
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral (tier grátis, Codestral)",
+      "transport": "openai",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "apiKeyEnv": "MISTRAL_API_KEY",
+      "model": "codestral-latest",
+      "models": [
+        "codestral-latest",
+        "mistral-small-latest"
+      ],
+      "enabled": false,
+      "priority": 8,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "openrouter-lightning",
+      "label": "OpenRouter grátis · Nemotron 3.5 Lightning",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "enabled": true,
+      "priority": 10,
+      "builtin": false,
+      "role": "ambos"
+    },
+    {
+      "id": "ovh-ai",
+      "label": "OVH AI Endpoints (grátis, Llama 3.3)",
+      "transport": "openai",
+      "baseUrl": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "apiKeyEnv": "OVH_API_KEY",
+      "model": "Llama-3.3-70B-Instruct",
+      "models": [
+        "Llama-3.3-70B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 9,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "openrouter-laguna-xs",
+      "label": "OpenRouter grátis · Laguna XS (coding)",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "poolside/laguna-xs-2.1:free",
+      "models": [
+        "poolside/laguna-xs-2.1:free"
+      ],
+      "enabled": true,
+      "priority": 11,
+      "builtin": false,
+      "role": "coding"
+    },
+    {
+      "id": "glhf",
+      "label": "glhf.chat (grátis, Llama 3.1 70B)",
+      "transport": "openai",
+      "baseUrl": "https://glhf.chat/api/openai/v1",
+      "apiKeyEnv": "GLHF_API_KEY",
+      "model": "hf:meta-llama/Llama-3.1-70B-Instruct",
+      "models": [
+        "hf:meta-llama/Llama-3.1-70B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 10,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "openrouter-lfm",
+      "label": "OpenRouter grátis · LFM 2.5 2.6B (leve)",
+      "transport": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "model": "liquid/lfm-2.5-2.6b:free",
+      "models": [
+        "liquid/lfm-2.5-2.6b:free"
+      ],
+      "enabled": true,
+      "priority": 12,
+      "builtin": false,
+      "role": "conversa"
+    },
+    {
+      "id": "hf-router",
+      "label": "Hugging Face router (grátis)",
+      "transport": "openai",
+      "baseUrl": "https://router.huggingface.co/v1",
+      "apiKeyEnv": "HF_TOKEN",
+      "model": "meta-llama/Llama-3.1-8B-Instruct",
+      "models": [
+        "meta-llama/Llama-3.1-8B-Instruct"
+      ],
+      "enabled": false,
+      "priority": 11,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "kimi-coding",
+      "label": "Kimi for Coding (kernel)",
+      "transport": "openai",
+      "baseUrl": "https://api.kimi.com/coding/v1",
+      "apiKeyEnv": "KIMI_API_KEY",
+      "model": "kimi-k2.6",
+      "models": [
+        "kimi-for-coding",
+        "k3",
+        "k3-256k",
+        "kimi-k2.6"
+      ],
+      "enabled": true,
+      "priority": 15,
+      "builtin": true,
+      "role": "coding"
+    },
+    {
+      "id": "hetzner",
+      "label": "Hetzner Inference (grátis, Qwen3.6)",
+      "transport": "openai",
+      "baseUrl": "https://inference.hetzner.com/api/v1",
+      "apiKeyEnv": "HETZNER_API_KEY",
+      "model": "qwen3.6-35b-a3b",
+      "models": [
+        "qwen3.6-35b-a3b"
+      ],
+      "enabled": false,
+      "priority": 12,
+      "builtin": true,
+      "role": "ambos"
+    },
+    {
+      "id": "groq",
+      "label": "Groq (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiKeyEnv": "GROQ_API_KEY",
+      "model": "llama-3.3-70b-versatile",
+      "models": [
+        "llama-3.3-70b-versatile"
+      ],
+      "enabled": true,
+      "priority": 13,
+      "builtin": true,
+      "role": "conversa"
     },
     {
       "id": "pollinations",
-      "label": "Pollinations (sem key)",
-      "model": "openai",
+      "label": "Pollinations (grátis, sem key)",
       "transport": "openai",
       "baseUrl": "https://text.pollinations.ai/openai",
       "apiKeyEnv": null,
-      "priority": 90,
+      "model": "openai",
+      "models": [
+        "openai"
+      ],
       "enabled": true,
+      "priority": 14,
+      "builtin": true,
+      "role": "conversa"
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "model": "gemini-3.6-flash",
+      "models": [
+        "gemini-3.6-flash"
+      ],
+      "enabled": true,
+      "priority": 1,
+      "builtin": true,
       "role": "ambos"
+    },
+    {
+      "id": "xai",
+      "label": "xAI Grok 4.5 (conversacional)",
+      "transport": "openai",
+      "baseUrl": "https://api.x.ai/v1",
+      "apiKeyEnv": "XAI_API_KEY",
+      "model": "grok-3-mini",
+      "models": [
+        "grok-4.5",
+        "grok-3",
+        "grok-3-mini"
+      ],
+      "enabled": true,
+      "priority": 14,
+      "builtin": true,
+      "role": "ambos"
+    },
+    {
+      "id": "github-models",
+      "label": "GitHub Copilot (grátis)",
+      "transport": "openai",
+      "baseUrl": "https://api.githubcopilot.com",
+      "apiKeyEnv": "GITHUB_API_KEY",
+      "model": "gpt-4o",
+      "models": [
+        "gpt-4o",
+        "gpt-4o-mini"
+      ],
+      "enabled": false,
+      "priority": 13,
+      "builtin": false,
+      "disabledReason": "endpoint responde OK degenerado (2026-10-13) — verificar token/rede"
+    },
+    {
+      "id": "open-webui",
+      "label": "Open WebUI (local)",
+      "transport": "openai",
+      "baseUrl": "http://127.0.0.1:3000/api/v1",
+      "apiKeyEnv": "OPENWEBUI_API_KEY",
+      "model": "openai-fast",
+      "models": [
+        "openai-fast"
+      ],
+      "enabled": true,
+      "priority": 30,
+      "builtin": false,
+      "role": "ambos"
+    },
+    {
+      "id": "nvidia-nim",
+      "label": "NVIDIA NIM kimi-k3 (kernel)",
+      "transport": "openai",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "apiKeyEnv": "NVIDIA_API_KEY",
+      "model": "nvidia/nemotron-3-super-120b-a12b",
+      "models": [
+        "nvidia/nemotron-3-super-120b-a12b",
+        "moonshotai/kimi-k3",
+        "z-ai/glm-5.3"
+      ],
+      "enabled": true,
+      "priority": 40,
+      "builtin": true,
+      "role": "ambos"
+    },
+    {
+      "id": "luna-kernel",
+      "label": "Luna Kernel (local, coding)",
+      "transport": "openai",
+      "baseUrl": "http://127.0.0.1:3458/v1",
+      "apiKeyEnv": null,
+      "model": "kimi-for-coding",
+      "models": [
+        "kimi-for-coding",
+        "k3"
+      ],
+      "enabled": true,
+      "priority": 98,
+      "builtin": false,
+      "role": "coding"
     }
   ]
 }

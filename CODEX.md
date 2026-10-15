@@ -121,6 +121,23 @@ Resultado: 8 testes do `panel-guard` passaram e o typecheck do WhatsPlay passou.
 - `config/providers.json`: catálogo reduzido aos providers realmente usados pelo cérebro configurado, removendo a configuração herdada e extensa da Nexo.
 - `ecosystem.superclim.config.cjs`: configuração PM2 completa para todos os processos locais.
 
+## Catálogo de providers e prompt do WhatsApp
+
+Problema identificado em 2026-10-15: durante o isolamento da Superclim, `config/providers.json` foi reduzido de 29 providers para apenas Gemini, GitHub Models e Pollinations. Como consequência, a tela de Configurações do Painel da Luna aparecia praticamente vazia e deixava de oferecer as APIs e serviços já previstos pela instalação original.
+
+Solução aplicada:
+
+- Restaurado o catálogo original e removido apenas `colibri-local` por decisão explícita do owner, ficando 28 providers.
+- Preservada a regra de segurança: o JSON contém somente o nome da variável (`apiKeyEnv`), nunca o valor da key.
+- O painel continua lendo o `.env` local e mostra apenas presença e preview mascarado da key.
+- FAST, LIVE e Luna Web continuam compartilhando a mesma configuração da roda quando essa opção está ligada.
+- A API de configuração passou a testar endpoints locais conhecidos e informar no frontend `instalado e online` ou `local indisponível`.
+- Na validação local, Luna Kernel em `127.0.0.1:3458` foi detectado online; FCC `:8082` e Open WebUI `:3000` não estavam ativos naquele momento.
+- Nenhum download foi realizado. Colibri foi removido do catálogo, dos defaults e dos presets.
+- Providers remotos permanecem visíveis mesmo sem key, para receber configuração pelo painel.
+
+O arquivo integral `.kimi-code/agents/luna.md` ainda mantinha a identidade Nexo, apesar do resumo do orchestrator já mencionar Superclim. Ele foi atualizado preservando capacidades e tools originais da Luna — voz, imagens, brain, arquivos, comandos, APIs, browser e investigação — e alterando identidade, atendimento e regras comerciais para Superclim Servicios. O Chat Registry continua sendo a autoridade de contatos e grupos permanecem bloqueados nesta fase.
+
 ## Alteração relacionada no luna-kernel (outro repositório)
 
 No repositório irmão `luna-kernel`, foi alterado:
@@ -182,6 +199,9 @@ Limitação de testes encontrada:
 - `apps/orchestrator/src/index.ts`
 - `apps/orchestrator/src/notifications/engine.ts`
 - `apps/painel/lib/store.ts`
+- `apps/painel/lib/providers.ts`
+- `apps/painel/app/api/config/route.ts`
+- `apps/painel/app/page.tsx`
 - `apps/painel/app/api/contacts/route.ts`
 - `apps/painel/app/api/contacts/[id]/route.ts`
 - `apps/whatsplay/src/discover.ts`
@@ -203,6 +223,7 @@ Limitação de testes encontrada:
 - `apps/worker/src/jobs/escalation-tick.ts`
 - `apps/worker/src/jobs/live-tools.ts`
 - `config/providers.json`
+- `.kimi-code/agents/luna.md`
 - `packages/database/src/escalation-alert.ts`
 - `packages/database/src/registry.ts`
 - remoção do antigo conteúdo rastreado em `.brain/`.

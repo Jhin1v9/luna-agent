@@ -35,7 +35,8 @@ export interface ProvidersConfig {
 }
 
 export interface KeyStatus { configured: boolean; preview: string | null }
-export type ProviderWithStatus = ProviderEntry & { keyStatus: KeyStatus };
+export interface RuntimeStatus { checked: boolean; available: boolean; detail: string }
+export type ProviderWithStatus = ProviderEntry & { keyStatus: KeyStatus; runtimeStatus?: RuntimeStatus };
 
 const CONFIG_DIR = path.join(REPO_ROOT, 'config');
 const PROVIDERS_FILE = path.join(CONFIG_DIR, 'providers.json');
@@ -103,12 +104,6 @@ const DEFAULT_CONFIG: ProvidersConfig = {
       models: ['moonshotai/kimi-k3', 'deepseek-ai/deepseek-v4.1-flash', 'z-ai/glm-5.3', 'nvidia/nemotron-3-super-120b-a12b'],
       enabled: false, priority: 7, builtin: true,
     },
-    {
-      id: 'colibri-local', label: 'Colibri (local)', transport: 'openai',
-      baseUrl: 'http://127.0.0.1:8000/v1', apiKeyEnv: null,
-      model: 'qwen3-coder-30b-a3b-colibri', models: ['qwen3-coder-30b-a3b-colibri'],
-      enabled: false, priority: 99, builtin: true,
-    },
   ],
 };
 
@@ -167,12 +162,6 @@ export const PRESETS: ProviderEntry[] = [
     id: 'kimi-api', label: 'Kimi API (platform)', transport: 'openai',
     baseUrl: 'https://api.moonshot.ai/v1', apiKeyEnv: 'KIMI_API_KEY_2',
     model: 'kimi-k2-0905-preview', models: ['kimi-k2-0905-preview', 'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-    enabled: true, priority: 99, builtin: false,
-  },
-  {
-    id: 'colibri-local', label: 'Colibri (local)', transport: 'openai',
-    baseUrl: 'http://127.0.0.1:8000/v1', apiKeyEnv: null,
-    model: 'qwen3-coder-30b-a3b-colibri', models: ['qwen3-coder-30b-a3b-colibri'],
     enabled: true, priority: 99, builtin: false,
   },
   {
@@ -364,11 +353,39 @@ function keyStatusOf(envName: string | null): KeyStatus {
   return { configured: true, preview };
 }
 
-export function getProvidersWithStatus(): ProvidersConfig & { providers: ProviderWithStatus[] } {
+async function runtimeStatusOf(p: ProviderEntry): Promise<RuntimeStatus | undefined> {
+  let url: URL;
+  try { url = new URL(p.baseUrl); } catch { return undefined; }
+  if (!['127.0.0.1', 'localhost', '::1'].includes(url.hostname)) return undefined;
+
+  const base = p.baseUrl.replace(/\/$/, '');
+  const probe = p.id === 'fcc-local'
+    ? `${base}/admin/api/models`
+    : p.id === 'luna-kernel'
+      ? 'http://127.0.0.1:3458/health'
+      : `${base}/models`;
+  try {
+    const response = await fetch(probe, { signal: AbortSignal.timeout(1_500) });
+    return {
+      checked: true,
+      available: response.ok,
+      detail: response.ok ? `disponível em ${url.host}` : `respondeu HTTP ${response.status}`,
+    };
+  } catch {
+    return { checked: true, available: false, detail: `não detectado em ${url.host}` };
+  }
+}
+
+export async function getProvidersWithStatus(): Promise<ProvidersConfig & { providers: ProviderWithStatus[] }> {
   const cfg = getProvidersConfig();
+  const runtime = await Promise.all(cfg.providers.map(runtimeStatusOf));
   return {
     ...cfg,
-    providers: cfg.providers.map((p) => ({ ...p, keyStatus: keyStatusOf(p.apiKeyEnv) })),
+    providers: cfg.providers.map((p, index) => ({
+      ...p,
+      keyStatus: keyStatusOf(p.apiKeyEnv),
+      ...(runtime[index] ? { runtimeStatus: runtime[index] } : {}),
+    })),
   };
 }
 

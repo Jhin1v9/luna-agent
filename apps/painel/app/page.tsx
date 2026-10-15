@@ -35,6 +35,7 @@ type ProviderEntry = {
   baseUrl: string; apiKeyEnv: string | null; model: string; models: string[];
   enabled: boolean; priority: number; builtin: boolean;
   keyStatus?: { configured: boolean; preview: string | null };
+  runtimeStatus?: { checked: boolean; available: boolean; detail: string };
 };
 type ProvidersConfig = { fastBrain: string; liveBrain: string; providers: ProviderEntry[] };
 type PDraft = { enabled: boolean; model: string; priority: number };
@@ -1058,6 +1059,11 @@ export default function Painel() {
           <span className={`text-[13px] font-medium ${d.enabled ? '' : 'text-dim'}`}>{p.label}</span>
           <span className={`badge ${p.transport === 'fcc-local' ? 'badge-luna' : 'badge-info'}`}>{p.transport}</span>
           <span className={`badge ${p.builtin ? '' : 'badge-warn'}`}>{p.builtin ? 'embutido' : 'custom'}</span>
+          {p.runtimeStatus && (
+            <span className={`badge ${p.runtimeStatus.available ? 'badge-ok' : 'badge-fail'}`} title={p.runtimeStatus.detail}>
+              {p.runtimeStatus.available ? 'instalado e online' : 'local indisponível'}
+            </span>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <label className="text-[10px] uppercase tracking-wider text-dim">prioridade</label>
             <input type="number" className="input w-20 px-2 py-1 text-center" value={d.priority}
