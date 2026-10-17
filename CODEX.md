@@ -291,3 +291,23 @@ Arquivos desta etapa:
 - `apps/orchestrator/src/agent/router/tools.ts`
 
 Validação: migração aplicada; typecheck de WhatsPlay e Orchestrator passou; teste específico de bloqueio de grupos passou. Durante o primeiro teste vivo, o pedido `#0` foi gerado para um grupo por ausência de JID no DOM; ele foi negado automaticamente, o owner recebeu uma correção explícita e a detecção foi reforçada pelo padrão de autor do preview. As solicitações privadas `#2` e `#3` foram entregues ao owner e permanecem pendentes até resposta numerada.
+
+## Sincronização pós-Kimi e aprovação avançada (17/10/2026)
+
+A branch `luna-agent-superclim` foi atualizada por fast-forward até `fb75ba6`, preservando e reaplicando as alterações locais feitas pelo Kimi Code. A `main` mais nova não foi mesclada: ela contém aprovação de grupos, incompatível com a regra da Superclim de que a Luna não entra nem interage em grupos.
+
+O fluxo local de aprovação passou a aceitar decisões em lote (`sim 3 5 8`), por nome (`sim abner`) e de todas as pendências (`sim todos`), além do comando `pendentes`. Também permite corrigir uma decisão anterior para contatos individuais: uma aprovação pode ser revogada e uma negação pode ser reconsiderada. Grupos continuam bloqueados de forma absoluta, inclusive diante de falso-negativo do DOM, por detecção adicional de múltiplos autores no contexto.
+
+O alerta ao owner agora explica os comandos disponíveis e a resposta de decisão apresenta um resumo de aprovados, negados e itens ignorados. A entrada do WhatsPlay reconhece tanto comandos de decisão quanto a listagem de pendências antes de publicar uma mensagem para o restante do pipeline.
+
+Arquivos locais desta etapa:
+
+- `apps/whatsplay/src/contact-approval.ts`
+- `apps/whatsplay/src/contact-approval.test.ts`
+- `apps/whatsplay/src/ingest.ts`
+- `apps/whatsplay/src/watcher.ts`
+- `config/providers.json`
+
+O provider principal permanece `OpenRouter Superclim · Principal` para os cérebros FAST e LIVE. O arquivo versionado contém somente o nome da variável `OPENROUTER_API_KEY`; o valor secreto continua exclusivamente no `.env` local.
+
+Validação após o pull: 10/10 testes de `contact-approval.test.ts` passaram; os typechecks de WhatsPlay, Orchestrator e Worker passaram sem erros. Um core dump de 172 MB do Chrome, que não era código, foi removido da árvore de trabalho e preservado temporariamente em `/tmp` para recuperação se necessária.

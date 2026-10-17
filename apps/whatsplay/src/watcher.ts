@@ -503,6 +503,7 @@ export class IngestWatcher {
       text: context,
       external_id: `wa:${badge.chat_id}:${Buffer.from(`${last.author ?? ''}|${last.text}`).toString('base64')}`,
       author_name: last.author ?? badge.chat_name,
+      is_group: badge.is_group,
     });
     this.deps.log.info({ chat: badge.chat_name, request_id: request.id, created: request.created }, 'watcher: contato desconhecido enviado para aprovação do owner');
     return true;

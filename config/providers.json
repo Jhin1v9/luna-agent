@@ -1,10 +1,10 @@
 {
-  "fastBrain": "gemini",
-  "liveBrain": "github-models",
+  "fastBrain": "openrouter-nemotron-super",
+  "liveBrain": "openrouter-nemotron-super",
   "providers": [
     {
       "id": "openrouter-nemotron-super",
-      "label": "OpenRouter grátis · Nemotron Super 120B",
+      "label": "OpenRouter Superclim · Principal",
       "transport": "openai",
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKeyEnv": "OPENROUTER_API_KEY",
@@ -13,7 +13,7 @@
         "nvidia/nemotron-3-super-120b-a12b:free"
       ],
       "enabled": true,
-      "priority": 2,
+      "priority": 1,
       "builtin": false,
       "role": "ambos"
     },
