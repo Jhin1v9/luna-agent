@@ -990,3 +990,98 @@ Conversa de time em grupo: assunto sobre acesso ao Hostinger do Matheus e workfl
 }
 ```
 
+## 2026-10-20 — Luna
+
+Conversa interna do time (Abner/Enoque) sobre a Luna e um site; cliente apenas ecoou mensagens sem entender. Luna respondeu 'plain Copy' sem conteúdo útil.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "outro",
+  "product": "",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Luna respondeu com placeholder 'plain Copy' — verificar pipeline de classificação/resposta.",
+  "quality_score": 1,
+  "summary": "Conversa interna do time (Abner/Enoque) sobre a Luna e um site; cliente apenas ecoou mensagens sem entender. Luna respondeu 'plain Copy' sem conteúdo útil.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-20 — Luna
+
+Conversa mista do time sobre a Luna com o cliente no grupo; cliente cobrou solução para subir o site (senha/deploy) e perguntou sobre atendimento presencial. Luna falhou ao responder (output stopped). Novo pedido de merch mencionado ao final.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "suporte_tecnico",
+  "product": "web Production",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Cliente perguntou se precisa ir pessoalmente ou há outra opção para subir a web; resposta da Luna travou (Content generation stopped) sem responder. Enoque ainda sinalizou pedido novo: 2 camisas e sudaderas com logo do Juninho.",
+  "quality_score": 1,
+  "summary": "Conversa mista do time sobre a Luna com o cliente no grupo; cliente cobrou solução para subir o site (senha/deploy) e perguntou sobre atendimento presencial. Luna falhou ao responder (output stopped). Novo pedido de merch mencionado ao final.",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-10-20 — Luna
+
+Conversa de grupo com time (Abner/Enoque) testando a Luna, que falhou completamente: enviou respostas vazias/cópias de UI, parou de gerar conteúdo e perdeu conexão com o Chrome. Cliente não teve demanda atendida; Enoque mencionou pedido de camisetas/sudaderas do Juninho no meio do caos.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "Luna / webchat",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna falhou no atendimento: respostas vazias ('plain Copy', 'JSON Copy'), 'Content generation stopped', 'Sem resposta' e Chrome desconectando. Cliente (🏆Production - 2026🙏🏻) ficou sem resposta e o time (Enoque) teve que assumir. Investigar causa raiz no runtime antes de reativar atendimento automático.",
+  "quality_score": 1,
+  "summary": "Conversa de grupo com time (Abner/Enoque) testando a Luna, que falhou completamente: enviou respostas vazias/cópias de UI, parou de gerar conteúdo e perdeu conexão com o Chrome. Cliente não teve demanda atendida; Enoque mencionou pedido de camisetas/sudaderas do Juninho no meio do caos.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-20 — Luna
+
+Conversa bugada: Luna travou, deu respostas vazias e desconectou. Time (Abner/Enoque) testou o sistema e riu da IA se desculpando. Cliente ficou sem resposta sobre subir o site e mandou link de roupas personalizadas no final.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "suporte_tecnico",
+  "product": "Luna / atendimento WhatsApp",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna falhou na conversa: respostas vazias ('plain Copy', 'Sem resposta'), output stopped e Chrome desconectou. Cliente (Enoque) pediu opcoes sobre subir o web e depois mandou link de roupas personalizadas — necessario retomar o atendimento e responder a duvida dele.",
+  "quality_score": 1,
+  "summary": "Conversa bugada: Luna travou, deu respostas vazias e desconectou. Time (Abner/Enoque) testou o sistema e riu da IA se desculpando. Cliente ficou sem resposta sobre subir o site e mandou link de roupas personalizadas no final.",
+  "client_signal": "duvida"
+}
+```
+
+## 2026-10-20 — Luna
+
+Conversa interna do time sobre bugs da Luna; cliente (grupo Production) não teve demanda atendida — Luna falhou com 'Content generation stopped' e desconexões do Chrome.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 1,
+  "summary": "Conversa interna do time sobre bugs da Luna; cliente (grupo Production) não teve demanda atendida — Luna falhou com 'Content generation stopped' e desconexões do Chrome.",
+  "client_signal": "nenhum"
+}
+```
+

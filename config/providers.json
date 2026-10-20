@@ -1,6 +1,6 @@
 {
-  "fastBrain": "gemini",
-  "liveBrain": "github-models",
+  "fastBrain": "luna-kernel",
+  "liveBrain": "luna-kernel",
   "providers": [
     {
       "id": "openrouter-nemotron-super",
@@ -12,8 +12,8 @@
       "models": [
         "nvidia/nemotron-3-super-120b-a12b:free"
       ],
-      "enabled": true,
-      "priority": 2,
+      "enabled": false,
+      "priority": 3,
       "builtin": false,
       "role": "ambos"
     },
@@ -27,7 +27,7 @@
       "models": [
         "nvidia/nemotron-3-ultra-550b-a55b:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 3,
       "builtin": false,
       "role": "ambos"
@@ -42,7 +42,7 @@
       "models": [
         "google/gemma-4-31b-it:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 4,
       "builtin": false,
       "role": "conversa"
@@ -55,7 +55,7 @@
       "apiKeyEnv": null,
       "model": "nvidia_nim/deepseek-ai/deepseek-v4.1-flash",
       "models": [],
-      "enabled": true,
+      "enabled": false,
       "priority": 3,
       "builtin": true,
       "role": "ambos"
@@ -70,7 +70,7 @@
       "models": [
         "google/gemma-4-26b-a4b-it:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 5,
       "builtin": false,
       "role": "conversa"
@@ -85,7 +85,7 @@
       "models": [
         "poolside/laguna-s-2.1:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 6,
       "builtin": false,
       "role": "coding"
@@ -100,7 +100,7 @@
       "models": [
         "cohere/north-mini-code:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 7,
       "builtin": false,
       "role": "coding"
@@ -130,7 +130,7 @@
       "models": [
         "dots-studio/dots-3-note-preview:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 8,
       "builtin": false,
       "role": "conversa"
@@ -160,7 +160,7 @@
       "models": [
         "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 9,
       "builtin": false,
       "role": "ambos"
@@ -191,7 +191,7 @@
       "models": [
         "nvidia/nemotron-3.5-lightning:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 10,
       "builtin": false,
       "role": "ambos"
@@ -221,7 +221,7 @@
       "models": [
         "poolside/laguna-xs-2.1:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 11,
       "builtin": false,
       "role": "coding"
@@ -251,7 +251,7 @@
       "models": [
         "liquid/lfm-2.5-2.6b:free"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 12,
       "builtin": false,
       "role": "conversa"
@@ -284,7 +284,7 @@
         "k3-256k",
         "kimi-k2.6"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 15,
       "builtin": true,
       "role": "coding"
@@ -314,7 +314,7 @@
       "models": [
         "llama-3.3-70b-versatile"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 13,
       "builtin": true,
       "role": "conversa"
@@ -329,7 +329,7 @@
       "models": [
         "openai"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 14,
       "builtin": true,
       "role": "conversa"
@@ -344,8 +344,8 @@
       "models": [
         "gemini-3.6-flash"
       ],
-      "enabled": true,
-      "priority": 1,
+      "enabled": false,
+      "priority": 3,
       "builtin": true,
       "role": "ambos"
     },
@@ -361,7 +361,7 @@
         "grok-3",
         "grok-3-mini"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 14,
       "builtin": true,
       "role": "ambos"
@@ -392,7 +392,7 @@
       "models": [
         "openai-fast"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 30,
       "builtin": false,
       "role": "ambos"
@@ -409,7 +409,7 @@
         "moonshotai/kimi-k3",
         "z-ai/glm-5.3"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 40,
       "builtin": true,
       "role": "ambos"
@@ -426,7 +426,7 @@
         "k3"
       ],
       "enabled": true,
-      "priority": 98,
+      "priority": 1,
       "builtin": false,
       "role": "coding"
     },
@@ -440,7 +440,7 @@
       "models": [
         "qwen3-coder-30b-a3b-colibri"
       ],
-      "enabled": true,
+      "enabled": false,
       "priority": 99,
       "builtin": true,
       "role": "coding"

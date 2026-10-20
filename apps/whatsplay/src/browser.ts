@@ -872,7 +872,13 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
 
     const isJid = nameOrId.includes('@');
     const searchKey = isJid ? nameOrId.split('@')[0] : nameOrId;
-    const isDirectNumber = /^\d{8,15}$/.test(searchKey);
+    // fix owner 2026-10-20: "+34 685 09 31 92" / "(34) 685-093-192" falhavam no
+    // regex puro -> numero virava "nome" -> matches() abortava COM O CHAT
+    // CERTO ABERTO. Classifica como numero quando so tem digitos/separadores
+    // e 8+ digitos (com DDI). O fallback de contato salvo do matches() (header
+    // mostra o NOME salvo -> aceita painel nao-grupo) passa a ser alcancavel.
+    const __digitsOnly = searchKey.replace(/\D/g, '');
+    const isDirectNumber = !isJid && __digitsOnly.length >= 8 && /^[\d\s()+.\-]+$/.test(searchKey.trim());
     const key = nameOrId.replace(/"/g, '\\"');
     await this.ensureMainChatList();
 

@@ -87,6 +87,97 @@ export function estimateCost(
   };
 }
 
+// ── QUIET HOURS (decreto owner 20/10): fora de 20:00→08:00 (hora local)
+// a Luna NÃO responde clientes nem grupos — segura tudo em silêncio até o
+// fim da janela. Bypass: autor na allowlist (QUIET_HOURS_ALLOWED, ex.: o
+// owner) e pedido explícito de humano (§8.1 — escalación chama o TIME,
+// não é resposta a cliente, então passa).
+const QUIET_START_HOUR = Number(process.env.QUIET_START_HOUR ?? 20);
+const QUIET_END_HOUR = Number(process.env.QUIET_END_HOUR ?? 8);
+function isQuietHoursNow(): boolean {
+  const h = new Date().getHours();
+  return QUIET_START_HOUR > QUIET_END_HOUR
+    ? h >= QUIET_START_HOUR || h < QUIET_END_HOUR
+    : h >= QUIET_START_HOUR && h < QUIET_END_HOUR;
+}
+
+// v16.0 — FASE 1 (decreto owner 20/10): conversa WhatsApp -> kernel na sessao
+// work-<conversation> (area 'work'). Mesmo pipeline curado do webchat, sem
+// tradutor de protocolo, contexto persistente ate encher (regra: so a msg
+// pendente vai pro chat novo). Polling simples do endpoint de mensagens.
+async function askKernelWorkKernel(
+  text: string,
+  conversationId: string,
+  log: { info: (obj: unknown, msg: string) => void; warn: (obj: unknown, msg: string) => void },
+): Promise<string> {
+  const base = (process.env.LUNA_KERNEL_URL || 'http://localhost:3458').replace(/\/+$/, '');
+  const sessionId = 'work-' + conversationId;
+  const fetchJson = async (url: string) => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      return await r.json().catch(() => null);
+    } catch { return null; }
+  };
+  const listMessages = async () => {
+    const data = (await fetchJson(`${base}/api/chat/session/${sessionId}/messages`)) as
+      | Array<{ role?: string; content?: string }>
+      | { messages?: Array<{ role?: string; content?: string }> }
+      | null;
+    if (Array.isArray(data)) return data;
+    return data?.messages ?? [];
+  };
+
+  const before = await listMessages();
+  const beforeCount = before.length;
+
+  const post = await fetch(`${base}/api/chat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      message: text,
+      sessionId,
+      area: 'work',
+      mode: process.env.LUNA_WORK_MODE || 'instant',
+    }),
+  });
+  if (!post.ok) throw new Error(`kernel /api/chat HTTP ${post.status}`);
+  log.info({ sessionId }, 'work: msg enviada pro kernel (sessao work persistente)');
+
+  const startedAt = Date.now();
+  const timeoutMs = Number(process.env.LUNA_WORK_TIMEOUT_MS || 180_000);
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const arr = await listMessages();
+    if (arr.length > beforeCount) {
+      const fresh = arr.slice(beforeCount);
+      // v16.1-fix (owner 20/10): durante o streaming o kernel persiste
+      // response_delta/thinking/tool-result como msgs separadas. So o
+      // evento FINAL (type done) eh resposta — o primeiro assistant que
+      // aparecia era um delta de poucos chars e virava flood no zap.
+      const evtType = (m) => (m && typeof m === 'object' ? String(m.type || '') : '');
+      const finalMsg =
+        fresh.find((m) => m && m.role === 'assistant' && evtType(m) === 'done') ||
+        fresh.find((m) => m && m.role === 'assistant' && (evtType(m) === 'assistant' || evtType(m) === '')) ||
+        null;
+      if (finalMsg && typeof finalMsg.content === 'string' && finalMsg.content.trim()) {
+        let content = finalMsg.content;
+        // limpeza plain Copy/JSON Copy (linhas soltas) — independe do patch do kernel.
+        if (/plain\s*copy|json\s*copy/i.test(content)) {
+          const strip = (s) =>
+            s.split('\n').filter((l) => !/plain\s*copy|json\s*copy/i.test(l)).join('\n').trim();
+          const real = (finalMsg.result && (finalMsg.result.response || finalMsg.result.text)) || '';
+          const strippedReal = typeof real === 'string' && real.trim() ? strip(real) : '';
+          const strippedRaw = strip(content);
+          content = (strippedReal && strippedReal.length >= strippedRaw.length) ? strippedReal : (strippedRaw || content);
+        }
+        return content;
+      }
+    }
+  }
+  throw new Error('kernel work: timeout aguardando resposta (' + Math.round(timeoutMs / 1000) + 's)');
+}
+
 export function createMessageHandler(deps: MessageHandlerDeps) {
   const { pool, adapter, log } = deps;
   const eventPool = pool; // publishEvent precisa de Pool (client dedicado do lock é PoolClient)
@@ -172,6 +263,35 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
   ): Promise<void> {
     const conversationId = payload.conversation_id!;
     const text = payload.text ?? '';
+
+    // QUIET HOURS (decreto owner 20/10) — 20:00→08:00: silêncio total para
+    // clientes/grupos. Allowlist de autores e §8.1 (humano explícito) passam.
+    if (isQuietHoursNow()) {
+      const allowed = (process.env.QUIET_HOURS_ALLOWED ?? '')
+        .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+      const author = (payload.author_name ?? '').toLowerCase();
+      if (!allowed.includes(author) && !isExplicitHumanRequest(text)) {
+        log.info(
+          { event_id: event.event_id, author: payload.author_name, is_group: payload.is_group === true },
+          'QUIET HOURS — fora do expediente: mensagem segurada sem resposta (decreto owner 20/10)',
+        );
+        await recordAudit(db, {
+          actor: 'orchestrator',
+          action: 'agent.reply.quiet_hours_held',
+          tool: 'message_handler',
+          client_id: event.client_id,
+          correlation_id: event.correlation_id,
+          result: 'success',
+          metadata: {
+            event_id: event.event_id,
+            author: payload.author_name ?? null,
+            is_group: payload.is_group === true,
+            text: text.slice(0, 120),
+          },
+        });
+        return;
+      }
+    }
 
     // Reprocessamento (retry do dispatcher)? Resposta já existe → ignora.
     const already = await db.query(
@@ -394,20 +514,95 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     }
     const packName = (pack as { name?: string }).name ?? 'CLIENT_CONVERSATION';
 
-    const decision = await runFastRoute(
-      { pool: eventPool, adapter, log },
-      {
-        event,
-        prompt,
-        sessionKey: conversationId,
-        allowLiveHandoff: route.allowLiveHandoff,
-        imageBase64,
-        // Config da route (§4, routes.json) — investigation_budget /
-        // investigation_timeout_ms, zero hardcode.
-        investigationBudget: route.investigationBudget,
-        investigationTimeoutMs: route.investigationTimeoutMs,
-      },
-    );
+    // v16.0 — FASE 1 (decreto owner 20/10): WhatsApp -> kernel (area work,
+    // sessao work-<conversation> persistente). LUNA CODE continua no brain
+    // local. LUNA_WORK_VIA_KERNEL=0 volta pro runFastRoute (A/B).
+    type FastDecision = Awaited<ReturnType<typeof runFastRoute>>;
+    let decision: FastDecision;
+    if (process.env.LUNA_WORK_VIA_KERNEL !== '0') {
+      // v16.2-fix (decreto owner 20/10): BATCH POR AUTOR + LOCK GLOBAL.
+      // Num grupo: junta TODAS as pendentes do MESMO autor num prompt so,
+      // 1 resposta, 1 msg no zap. Nunca mistura autores. Chats em serie.
+      let batchText = text;
+      try {
+        if (process.env.LUNA_WORK_BATCH !== '0') {
+          await new Promise((r) => setTimeout(r, Number(process.env.LUNA_WORK_DEBOUNCE_MS || 6000)));
+          const author = payload.author_name ?? null;
+          const pend = await db.query(
+            `SELECT m.body FROM messages m
+             WHERE m.conversation_id = $1 AND m.direction = 'inbound'
+               AND m.created_at > now() - interval '15 minutes'
+               AND (m.author_name = $2 OR ($2::text IS NULL AND m.author_name IS NULL))
+               AND NOT EXISTS (SELECT 1 FROM messages r WHERE r.conversation_id = $1
+                               AND r.direction = 'outbound' AND r.created_at > m.created_at)
+             ORDER BY m.created_at ASC LIMIT 20`,
+            [conversationId, author],
+          );
+          const msgs = (pend.rows as Array<{ body?: string | null }>)
+            .map((r) => (r.body ?? '').trim()).filter(Boolean);
+          if (msgs.length > 1) {
+            batchText = '(varias mensagens seguidas do mesmo autor — responda a todas de uma vez, em 1 so msg)' + '\n' + msgs.join('\n');
+            log.info({ conversation_id: conversationId, author, folded: msgs.length }, 'work: batch por autor');
+          } else if (msgs.length === 1) {
+            batchText = msgs[0] || text;
+          }
+        }
+      } catch (err) {
+        log.warn({ err: String(err).slice(0, 140) }, 'work: batch falhou — segue com msg unica');
+      }
+      // anti-duplicada: resposta Luna posterior ao inbound = ja respondida.
+      try {
+        const mine = await db.query(
+          `SELECT m.created_at FROM messages m
+           WHERE m.conversation_id = $1 AND m.direction = 'inbound' AND m.body = $2
+           ORDER BY m.created_at DESC LIMIT 1`,
+          [conversationId, text],
+        );
+        const mineRow = mine.rows[0] as { created_at?: string } | undefined;
+        if (mineRow?.created_at) {
+          const answered = await db.query(
+            `SELECT id FROM messages WHERE conversation_id = $1 AND direction = 'outbound'
+             AND author_name = 'Luna' AND created_at > $2 LIMIT 1`,
+            [conversationId, mineRow.created_at],
+          );
+          if (answered.rowCount) {
+            log.info({ conversation_id: conversationId }, 'work: ja respondida em batch anterior — skip');
+            await recordAudit(db, {
+              actor: 'orchestrator',
+              action: 'agent.reply.batch_already_answered',
+              tool: 'message_handler',
+              client_id: event.client_id,
+              correlation_id: event.correlation_id,
+              result: 'success',
+              metadata: { conversation_id: conversationId },
+            });
+            return;
+          }
+        }
+      } catch { /* segue */ }
+      const answerText = await askKernelWorkKernel(batchText, conversationId, log);
+      decision = {
+        output: { type: 'ANSWER' as const },
+        answerText,
+        toolRounds: 0,
+        turn: {},
+      } as unknown as FastDecision;
+    } else {
+      decision = await runFastRoute(
+        { pool: eventPool, adapter, log },
+        {
+          event,
+          prompt,
+          sessionKey: conversationId,
+          allowLiveHandoff: route.allowLiveHandoff,
+          imageBase64,
+          // Config da route (§4, routes.json) — investigation_budget /
+          // investigation_timeout_ms, zero hardcode.
+          investigationBudget: route.investigationBudget,
+          investigationTimeoutMs: route.investigationTimeoutMs,
+        },
+      );
+    }
 
     // SILENCE (decreto owner 14/10): o modelo viu a mensagem e decidiu que
     // não deve falar (grupo, conversa entre humanos, sem valor real). Nada
@@ -594,12 +789,12 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     const client = await pool.connect();
     try {
       await client.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [
-        `luna:conv:${conversationId}`,
+        `luna:work:global`,
       ]);
       await processLocked(client, event, payload);
     } finally {
       await client
-        .query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [`luna:conv:${conversationId}`])
+        .query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [`luna:work:global`])
         .catch(() => {});
       client.release();
     }

@@ -555,13 +555,41 @@ router.post('/api/chat', async (req, res) => {
       if (['response_delta', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta', 'thinking_update', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress', 'confirmation_required'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
         // Wave 1 Fix B5: 'error'/'system' events carry text in ev.error/ev.message, not ev.text
-        const content = ev.type === 'done'
+        const rawContent = ev.type === 'done'
           ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
           : ev.type === 'assistant'
             ? (ev.response || ev.text || ev.fullResponse || '')
             : (ev.type === 'error' || ev.type === 'system' || ev.type === 'confirmation_required')
               ? (ev.message || ev.error || ev.text || ev.fullResponse || '')
               : (ev.fullText || ev.text || ev.fullResponse || '');
+
+        // luna-fix-plain-copy (2026-10-20): strip "plain Copy"/"JSON Copy" UI pollution
+        // before persistence; real response preferred from ev.result/ev.response.
+        const content = (function sanitizeStreamContent(raw, ev) {
+          if (typeof raw !== 'string' || !raw) return raw;
+          if (raw.indexOf('plain Copy') === -1 && raw.indexOf('JSON Copy') === -1) return raw;
+          function stripPollution(s) {
+            return s
+              .split('\n')
+              .filter(function (l) {
+                return l.indexOf('plain Copy') === -1 && l.indexOf('JSON Copy') === -1;
+              })
+              .join('\n')
+              .trim();
+          }
+          var filteredRaw = stripPollution(raw);
+          var real = '';
+          try {
+            real = (ev && (ev.result && ev.result.response) || ev.response || ev.text) || '';
+          } catch (e) { real = ''; }
+          if (typeof real === 'string' && real) {
+            if (real.indexOf('plain Copy') === -1 && real.indexOf('JSON Copy') === -1) return real;
+            var filteredReal = stripPollution(real);
+            if (filteredReal && filteredReal.length >= filteredRaw.length) return filteredReal;
+          }
+          return filteredRaw;
+        })(rawContent, ev);
+
 
         // DEBUG: dedup temporarily disabled to verify thinking delivery.
         // Re-enabled carefully: only thinking_update is replaced in addMessageToSession.

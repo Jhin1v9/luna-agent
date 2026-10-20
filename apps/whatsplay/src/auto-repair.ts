@@ -14,6 +14,12 @@ import { appendSelectorMemory } from './selector-memory.js';
  * vivo com contexto. Visão do kimi-k2.6 validada por probe no boot (ADR-021).
  */
 
+// v14.8-fix (owner 20/10): cooldown pos-esgotamento — UMA sessao de reparo
+// por acao por janela. Sem isso, N msgs na fila viravam N sessoes de reparo
+// (N x 3 diagnosticos = enchente de abas no provider).
+const REPAIR_COOLDOWN_MS = Number(process.env.REPAIR_COOLDOWN_MS || 10 * 60 * 1000);
+const __repairExhaustedAt = new Map<string, number>();
+
 export interface RepairableTransport extends WhatsAppTransport {
   captureEvidence(prefix: string): Promise<{ screenshotPath: string; domPath: string }>;
 }
@@ -49,17 +55,25 @@ export function parseAnalysis(raw: string): Analysis {
   }
 }
 
-const ANALYSIS_PROMPT = (actionName: string, error: string, dom: string) =>
+const ANALYSIS_PROMPT = (actionName: string, error: string, dom: string, withImage = false) =>
   [
     'Você é a Luna analisando uma falha de automação no WhatsApp Web (Playwright).',
     `Ação que falhou: ${actionName}`,
     `Erro: ${error}`,
-    'A imagem anexada é o screenshot da tela no momento da falha; abaixo o DOM simplificado.',
+    withImage
+      ? 'A imagem anexada é o screenshot da tela no momento da falha; abaixo o DOM simplificado.'
+      : 'Diagnóstico textual (1a rodada): abaixo o DOM simplificado no momento da falha.',
     '',
     dom.slice(0, 2500),
     '',
+    'REGRAS DURAS (v16.4-fix): voce e um diagnostico SILENCIOSO.',
+    'PROIBIDO usar qualquer tool. PROIBIDO enviar mensagem para qualquer',
+    'pessoa (inclusive o owner). PROIBIDO abrir chat ou chamar contato.',
+    'Sua unica saida e o JSON abaixo — nada de texto fora dele, nenhuma',
+    'acao externa. Seja invisivel.',
     'Responda APENAS um JSON: {"diagnosis": "causa provável em uma frase",',
-    '"suggested_selector": "seletor CSS alternativo plausível ou null"}.',
+    '"suggested_selector": "seletor CSS alternativo plausível ou null",',
+    '"recovery": "recarregar_pagina | relancar_browser | reparar_sessao | null"}.',
   ].join('\n');
 
 export async function withAutoRepair<T>(
@@ -71,6 +85,13 @@ export async function withAutoRepair<T>(
   const max = deps.maxAttempts ?? 3;
   let lastErr: unknown = null;
   let suggested: string | null = null;
+  // v14.8-fix: cooldown pos-esgotamento — fail fast, sem novas sessoes de
+  // reparo nem diagnosticos (a enchente de abas morre aqui).
+  const __lastExhaust = __repairExhaustedAt.get(actionName) || 0;
+  if (__lastExhaust && Date.now() - __lastExhaust < REPAIR_COOLDOWN_MS) {
+    deps.log.warn({ action: actionName }, 'auto-reparo: cooldown pos-esgotamento — falhando rapido sem novos diagnosticos');
+    throw new Error(`auto-reparo de '${actionName}' em cooldown (esgotou recentemente) — fila segurada ate o time`);
+  }
 
   for (let attempt = 1; attempt <= max; attempt++) {
     try {
@@ -114,13 +135,14 @@ export async function withAutoRepair<T>(
       } catch {
         // evidência é melhor-esforço; o reparo continua sem ela
       }
-      // FAST com visão analisa (ADR-021: k2.6 aceita imagem — probe no boot).
+      // ESCADA DE EVIDENCIA (owner 20/10): 1a falha = so texto; 2a = PRINT real.
       let analysis: Analysis = { diagnosis: String(err).slice(0, 300), suggested_selector: null };
       try {
-        const image = screenshotPath ? readFileSync(screenshotPath).toString('base64') : undefined;
+        const withImage = attempt >= 2;
+        const image = withImage && screenshotPath ? readFileSync(screenshotPath).toString('base64') : undefined;
         const turn = await deps.adapter.sendTurn({
           session_key: `repair:${actionName}`,
-          prompt: ANALYSIS_PROMPT(actionName, String(err), dom),
+          prompt: ANALYSIS_PROMPT(actionName, String(err), dom, withImage),
           image_base64: image,
         });
         analysis = parseAnalysis(turn.reply_text);
@@ -134,6 +156,8 @@ export async function withAutoRepair<T>(
       );
     }
   }
+
+  __repairExhaustedAt.set(actionName, Date.now());
 
   // Esgotou (§14): incidente + Telegram vivo. Sem token = falha explícita
   // registrada (nunca inventar envio).

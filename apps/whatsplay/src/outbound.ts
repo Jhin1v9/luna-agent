@@ -195,6 +195,16 @@ export function createOutboundListener(deps: OutboundDeps) {
     throw new Error('send_safety_blocked');
   }
 
+  // v16.3-fix (owner 20/10): CADEIA de entrega — 1 msg por vez na pagina.
+  // Dois NOTIFYs juntos disparavam deliverOne concurrentes digitando no
+  // mesmo campo (busca/composer corrompidos, msgs de 1 char, texto de
+  // resposta caindo na busca do numero). Toda entrega passa por deliverQueued.
+  let deliverChain: Promise<void> = Promise.resolve();
+  function deliverQueued(messageId: string): void {
+    deliverChain = deliverChain
+      .then(() => deliverOne(messageId))
+      .catch((err) => log.error({ err }, 'entrega falhou'));
+  }
   async function deliverOne(messageId: string): Promise<void> {
     const res = await pool.query<OutboundMessageRow>(
       `SELECT m.id, m.body, m.conversation_id, ct.address, ct.name AS contact_name,
@@ -364,6 +374,10 @@ export function createOutboundListener(deps: OutboundDeps) {
         metadata: { message_id: messageId, target },
       });
       log.info({ message_id: messageId, target }, 'resposta entregue no WhatsApp');
+      // v14.9-fix (owner 20/10) — DRENO POR CONVERSA: termina TODAS as pendentes
+      // desta conversa (chat ja aberto) antes de qualquer outra. Dedup incluso.
+      const __justSentText = sanitizeOutboundText(extractAnswerEnvelopeText(row.body) ?? row.body);
+      await drainSameConversation(row.conversation_id, sendTarget, __justSentText);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       // 2026-10-14 (silêncio ao vivo): falha única de entrega (página WA
@@ -380,7 +394,7 @@ export function createOutboundListener(deps: OutboundDeps) {
         );
         log.warn({ message_id: messageId, attempts, backoffSec }, 'entrega falhou — reenfileirada com backoff');
         setTimeout(() => {
-          deliverOne(messageId).catch((e2: unknown) => log.error({ err: e2 }, 'retry de entrega falhou'));
+          deliverQueued(messageId);
         }, backoffSec * 1000);
         return;
       }
@@ -411,6 +425,69 @@ export function createOutboundListener(deps: OutboundDeps) {
     }
   }
 
+  // v14.9-fix (owner 20/10) — DRENO POR CONVERSA + DEDUP
+  const __drainingConversations = new Set<string>();
+  async function drainSameConversation(conversationId: string, sendTarget: string, lastText: string): Promise<void> {
+    if (__drainingConversations.has(conversationId)) return;
+    __drainingConversations.add(conversationId);
+    let textoAnterior = lastText;
+    try {
+      for (let i = 0; i < 10; i++) {
+        const next = await pool.query<OutboundMessageRow>(
+          `SELECT m.id, m.body, m.conversation_id, m.metadata,
+                  m.metadata->>'reply_to_query' AS reply_to_query
+           FROM messages m
+           WHERE m.conversation_id = $1 AND m.send_state = 'queued'
+             AND (m.metadata->>'next_retry_at' IS NULL OR (m.metadata->>'next_retry_at')::timestamptz <= now())
+           ORDER BY m.created_at ASC
+           LIMIT 1`,
+          [conversationId],
+        );
+        if (!next.rowCount) return;
+        const nmsg = next.rows[0]!;
+        const rawN = extractAnswerEnvelopeText(nmsg.body) ?? nmsg.body;
+        const textoN = sanitizeOutboundText(rawN);
+        // DEDUP: conteudo identico ao envio imediatamente anterior -> pula (auditado)
+        if (textoN && textoN === textoAnterior) {
+          await mark(nmsg.id, 'sent');
+          await recordAudit(pool, {
+            actor: 'whatsplay',
+            action: 'whatsapp.message.dedup_skipped',
+            tool: 'whatsplay_transport',
+            result: 'success',
+            metadata: { message_id: nmsg.id, target: sendTarget, reason: 'conteudo identico ao envio imediatamente anterior (dreno)' },
+          });
+          log.info({ message_id: nmsg.id }, 'dreno: DEDUP — conteudo identico ao anterior, envio pulado');
+          continue;
+        }
+        try {
+          // delay curto: mesmo chat ja aberto, so digita e manda (anti-ban mantido)
+          await new Promise((r) => setTimeout(r, 700 + Math.floor(Math.random() * 500)));
+          if (nmsg.reply_to_query && transport.replyToMessage) {
+            await withSendLock(() => transport.replyToMessage!(sendTarget, nmsg.reply_to_query!, textoN));
+          } else {
+            await withSendLock(() => transport.sendMessage(sendTarget, textoN));
+          }
+          await mark(nmsg.id, 'sent');
+          textoAnterior = textoN;
+          await recordAudit(pool, {
+            actor: 'whatsplay',
+            action: 'whatsapp.message.sent',
+            tool: 'whatsplay_transport',
+            result: 'success',
+            metadata: { message_id: nmsg.id, target: sendTarget, via: 'drain_same_conversation' },
+          });
+          log.info({ message_id: nmsg.id, target: sendTarget }, 'dreno: msg da MESMA conversa entregue (chat ja aberto)');
+        } catch (err) {
+          log.warn({ err, message_id: nmsg.id }, 'dreno: falha — deixa pro fluxo normal (backoff)');
+          return;
+        }
+      }
+    } finally {
+      __drainingConversations.delete(conversationId);
+    }
+  }
+
   async function mark(messageId: string, state: 'sent' | 'failed', error?: string): Promise<void> {
     await pool.query(
       `UPDATE messages SET send_state = $2, sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END,
@@ -425,7 +502,7 @@ export function createOutboundListener(deps: OutboundDeps) {
     const client = await pool.connect();
     await client.query('LISTEN luna_outbound');
     client.on('notification', (n) => {
-      if (n.payload) deliverOne(n.payload).catch((err) => log.error({ err }, 'entrega falhou'));
+      if (n.payload) deliverQueued(n.payload);
     });
     log.info('ouvindo NOTIFY luna_outbound (fila de saída)');
     // Dreno no boot: NOTIFY disparado durante um restart do daemon se perde
@@ -441,7 +518,7 @@ export function createOutboundListener(deps: OutboundDeps) {
       .catch(() => ({ rows: [] as Array<{ id: string }> }));
     for (const row of stale.rows) {
       log.info({ message_id: row.id }, 'fila: mensagem queued encontrada no boot — drenando');
-      deliverOne(row.id).catch((err) => log.error({ err }, 'entrega falhou'));
+      deliverQueued(row.id);
     }
     return client;
   }
