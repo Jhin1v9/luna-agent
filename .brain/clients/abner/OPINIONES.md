@@ -154,3 +154,41 @@ Abner testou envio de mensagens e a Luna falhou repetidamente: respondeu 'plain 
 }
 ```
 
+## 2026-10-20 — Luna
+
+Abner testou envio de mensagens e regras de horário; Luna respondeu 'plain Copy' e depois ficou sem responder a vários pedidos (senha env, correção do nome Juninho, resumo de capacidades).
+
+```json
+{
+  "outcome": "reclamacao",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna parou de responder no meio do atendimento (vários 'Sem resposta') e enviou 'plain Copy' em vez de mensagens reais. Investigar runtime e regras de horário (20h) com o Abner.",
+  "quality_score": 1,
+  "summary": "Abner testou envio de mensagens e regras de horário; Luna respondeu 'plain Copy' e depois ficou sem responder a vários pedidos (senha env, correção do nome Juninho, resumo de capacidades).",
+  "client_signal": "reclamacao_recorrente"
+}
+```
+
+## 2026-10-20 — Luna
+
+Owner (Abner, time) fez varios pedidos operacionais e a Luna nao respondeu nenhum — 'Sem resposta' em todas as mensagens. Pedidos incluiam corrigir identidade (jininho), enviar mensagem pro Noke, responder mensagem recebida no privado e executar tool de leitura de pasta luna-kernel.
+
+```json
+{
+  "outcome": "reclamacao",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna ficou sem responder varios pedidos sequenciais do owner (Abner): corrigir nome jininho->juninho, enviar msg pro Noke, responder Noke no privado, e executar tool de leitura de pasta. Investigar por que a Luna nao respondeu nem executou tools neste chat.",
+  "quality_score": 1,
+  "summary": "Owner (Abner, time) fez varios pedidos operacionais e a Luna nao respondeu nenhum — 'Sem resposta' em todas as mensagens. Pedidos incluiam corrigir identidade (jininho), enviar mensagem pro Noke, responder mensagem recebida no privado e executar tool de leitura de pasta luna-kernel.",
+  "client_signal": "reclamacao_recorrente"
+}
+```
+

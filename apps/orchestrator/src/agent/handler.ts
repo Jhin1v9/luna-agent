@@ -580,7 +580,18 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
           }
         }
       } catch { /* segue */ }
-      const answerText = await askKernelWorkKernel(batchText, conversationId, log);
+      // v16.8-fix (owner 20/10): origem da msg no prompt do work — sem isso
+      // a Luna respondia no privado mensagens que vieram do grupo.
+      let sourceLabel = null;
+      try {
+        const convRow = await db.query(
+          `SELECT ct.name FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id WHERE cv.id = $1 LIMIT 1`,
+          [conversationId],
+        );
+        sourceLabel = (convRow.rows[0] && (convRow.rows[0] as { name?: string | null }).name) || null;
+      } catch { /* segue sem nome */ }
+      const originTag = '[chat: ' + (sourceLabel || conversationId) + (payload.author_name ? ' | autor: ' + payload.author_name : '') + ']';
+      const answerText = await askKernelWorkKernel(originTag + '\n' + batchText, conversationId, log);
       decision = {
         output: { type: 'ANSWER' as const },
         answerText,
@@ -729,16 +740,21 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       });
     } else {
       await transitionConversation(db, conversationId, 'RESOLVED');
-      // §27: classificação pós-conversa — job pro worker (cola, §7.12).
-      await enqueueJob(db, {
-        job_type: 'conversation.classify',
-        payload: {
-          conversation_id: conversationId,
-          client_id: event.client_id,
-          correlation_id: event.correlation_id,
-        },
-        idempotency_key: `classify:${event.event_id}`,
-      });
+      // v16.9-fix (owner 20/10): auto-classify DESLIGADO por padrao —
+      // classificava o historico inteiro (sujo) a cada msg, abria aba
+      // nova por execucao e spammava. Reativar so quando o job classificar
+      // a ultima troca (nao o historico): LUNA_CLASSIFY_ENABLED=1 no .env.
+      if (process.env.LUNA_CLASSIFY_ENABLED === '1') {
+        await enqueueJob(db, {
+          job_type: 'conversation.classify',
+          payload: {
+            conversation_id: conversationId,
+            client_id: event.client_id,
+            correlation_id: event.correlation_id,
+          },
+          idempotency_key: `classify:${event.event_id}`,
+        });
+      }
     }
 
     // §20 — activity (humano) + audit (máquina), correlation_id presente.

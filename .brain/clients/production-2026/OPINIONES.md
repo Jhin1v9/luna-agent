@@ -1104,3 +1104,22 @@ Luna apresentou falhas técnicas graves durante o atendimento (Chrome desconecta
 }
 ```
 
+## 2026-10-20 — Luna
+
+Conversa interna do time sobre bugs da Luna (Chrome desconectou, respostas vazias); cliente encaminhou links de uniformes personalizados sem pedido claro.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "outro",
+  "product": "grupo Production - 2026",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 1,
+  "summary": "Conversa interna do time sobre bugs da Luna (Chrome desconectou, respostas vazias); cliente encaminhou links de uniformes personalizados sem pedido claro.",
+  "client_signal": "nenhum"
+}
+```
+

@@ -45,7 +45,7 @@ const CLASSIFY_PROMPT = (clientName: string, transcript: string) =>
     'quality_score 1-5 (a resposta da Luna foi boa?); client_signal = pedido|',
     'reclamacao_recorrente|elogio|duvida|nenhum (sinal de negócio).',
     '',
-    'Transcrição (Quem: mensagem):',
+    'Contexto (leia ao vivo pela tool; amostra minima abaixo):',
     transcript.slice(0, 3000),
     '',
     'Exemplo: {"outcome":"cliente_feliz","sentiment":"positivo","topic":"site",',
@@ -81,14 +81,18 @@ export function createClassifyHandler(deps: ClassifyDeps) {
 
     const msgs = await pool.query<{ author_name: string | null; direction: string; body: string }>(
       `SELECT author_name, direction, body FROM messages
-       WHERE conversation_id = $1 ORDER BY created_at ASC LIMIT 40`,
+       WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 8`,
       [conversationId],
     );
     if (!msgs.rowCount || msgs.rowCount < 2) return; // sem conversa de verdade, nada a classificar
 
-    const transcript = msgs.rows
+    // v16.11-fix (owner 20/10): o modelo LE o chat ao vivo via
+    // dashboardGetWhatsAppHistory e classifica pelo que leu. A amostra
+    // (ultimas 8, ordem cronologica) e so cinto-e-suspensorio.
+    const recentSample = msgs.rows.slice().reverse()
       .map((m) => `${m.author_name ?? (m.direction === 'inbound' ? 'cliente' : 'Luna')}: ${m.body}`)
       .join('\n');
+    const transcript = 'INSTRUCAO: antes de classificar, LEIA as mensagens recentes deste chat ao vivo usando a tool dashboardGetWhatsAppHistory (parametro chat = o nome desta conversa). Classifique com base no que voce LEU. Amostra minima das ultimas 8 mensagens (use so se a tool falhar):\n' + recentSample;
 
     const turn = await adapter.sendTurn({
       session_key: `classify:${conversationId}`,
