@@ -215,14 +215,26 @@ export async function createCallExecutor(deps: CallExecutorDeps) {
           'consultar solicitações dos clientes (solicitacoes)',
         ],
         tom: 'parceira de time, direta, PT-BR',
+        reply_chat: (brief as { reply_chat?: string | null }).reply_chat ?? null,
       });
       // encerra quando a chamada cair (poll do estado) — o owner também pode desligar na janela
+      // v1.14 (owner 21/10): "luna desliga" pelo chat -> sinal externo encerra a chamada;
+      // o cascade abaixo fecha o lado ChatGPT junto (decreto 26/09).
+      let externalEnd = false;
+      let ctrlClient: import('pg').PoolClient | null = null;
+      try {
+        ctrlClient = await pool.connect();
+        await ctrlClient.query('LISTEN voice_call_control');
+        ctrlClient.on('notification', () => { externalEnd = true; log.info('voice.call: pedido externo de desligar (chat)'); });
+      } catch { ctrlClient = null; }
       for (;;) {
         await new Promise((r) => setTimeout(r, 5_000));
+        if (externalEnd) break; // v1.14: owner pediu pra desligar pelo chat
         const st = await (transport as never as { observePanel: () => Promise<{ state: string }> }).observePanel();
         if (st.state !== 'chamada') break;
       }
       handle.stop();
+      try { if (ctrlClient) (ctrlClient as { release: () => void }).release(); } catch { /* noop */ }
       // CALL DIGEST (decreto owner 27/09): captura a transcrição DESTA
       // chamada (início→fim), grava em .brain/luna/calls/ e enfileira o job
       // de classificação — ANTES de resetar a aba (reset apaga o thread).

@@ -192,3 +192,60 @@ Owner (Abner, time) fez varios pedidos operacionais e a Luna nao respondeu nenhu
 }
 ```
 
+## 2026-10-20 — Luna
+
+Abner pediu para a Luna responder o Noke no privado (boa noite), executar tool de leitura da pasta luna-kernel e fazer uma ligação de brincadeira para Ana Paula. A Luna respondeu o Noke com boa noite e bênção, leu a pasta luna-kernel (647 itens, 14 pastas principais) e reportou os dados. Houve alguns turnos de 'Sem resposta' por falha de execução, mas no geral a tarefa foi cumprida.
+
+```json
+{
+  "outcome": "resuelto",
+  "sentiment": "positivo",
+  "topic": "suporte_tecnico",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 4,
+  "summary": "Abner pediu para a Luna responder o Noke no privado (boa noite), executar tool de leitura da pasta luna-kernel e fazer uma ligação de brincadeira para Ana Paula. A Luna respondeu o Noke com boa noite e bênção, leu a pasta luna-kernel (647 itens, 14 pastas principais) e reportou os dados. Houve alguns turnos de 'Sem resposta' por falha de execução, mas no geral a tarefa foi cumprida.",
+  "client_signal": "pedido"
+}
+```
+
+## 2026-10-20 — Luna
+
+Owner (Abner) fez 4 pedidos consecutivos e a Luna nao respondeu nenhum: responder msg privada do Enoque, executar tool pra ler pasta luna-kernel, ligar pra Ana Paula com pegadinha leve, e dica de usar listTools. Silencio total da Luna em todos os turnos.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "Luna kernel",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna nao respondeu nenhuma das 4 mensagens do owner (Abner). Pedidos: responder Enoque no privado, ler pasta luna-kernel via tool, ligar pra Ana Paula (brincadeira), e orientacao de usar listTools. Nenhuma acao executada — investigar por que a Luna ficou em silencio (possivel falha de runtime/tools).",
+  "quality_score": 1,
+  "summary": "Owner (Abner) fez 4 pedidos consecutivos e a Luna nao respondeu nenhum: responder msg privada do Enoque, executar tool pra ler pasta luna-kernel, ligar pra Ana Paula com pegadinha leve, e dica de usar listTools. Silencio total da Luna em todos os turnos.",
+  "client_signal": "reclamacao_recorrente"
+}
+```
+
+## 2026-10-20 — Luna
+
+Owner (Abner) pediu a Luna para executar tools (ler pasta, listar tools, ligar para Ana Paula com pegadinha leve, responder Enoque) e a Luna nao respondeu nenhuma das mensagens — falha tecnica de execucao.
+
+```json
+{
+  "outcome": "reclamacao",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "Luna",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Owner pediu varias acoes (responder Enoque, ler pasta luna-kernel, ligar pra Ana Paula, usar listTools) e Luna nao executou nenhuma — 'Sem resposta' em todas. Investigar por que as tools nao foram chamadas.",
+  "quality_score": 1,
+  "summary": "Owner (Abner) pediu a Luna para executar tools (ler pasta, listar tools, ligar para Ana Paula com pegadinha leve, responder Enoque) e a Luna nao respondeu nenhuma das mensagens — falha tecnica de execucao.",
+  "client_signal": "reclamacao_recorrente"
+}
+```
+

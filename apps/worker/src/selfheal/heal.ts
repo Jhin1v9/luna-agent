@@ -68,6 +68,13 @@ export function assertOwnComponent(service: string, paths: string[]): void {
 
 export async function runHeal(deps: HealDeps, input: HealInput): Promise<{ healed: boolean; attempts: number; commit?: string }> {
   const { pool, log, exec } = deps;
+  // 2026-10-21 (decreto owner): self-heal DESLIGADO por padrao. O rollback
+  // git reset --hard destruia trabalho nao commitado do owner (incidentes
+  // ao vivo 20-21/10). So roda com HEAL_ENABLED=1 explicito no ambiente.
+  if (process.env.HEAL_ENABLED !== '1') {
+    log.warn({ service: input.service }, 'selfheal DESLIGADO (decreto owner 21/10 — rollback destrutivo. HEAL_ENABLED=1 pra reativar)');
+    return { healed: false, attempts: 0 };
+  }
   const root = deps.repoRoot ?? 'C:/Users/Abner/Documents/Luna cto/luna-agent';
   assertOwnComponent(input.service, [input.component]);
 
@@ -128,6 +135,10 @@ export async function runHeal(deps: HealDeps, input: HealInput): Promise<{ heale
       // ROLLBACK pro LKG antes de tentar de novo (rede de segurança).
       await exec('git', ['-C', root, 'checkout', 'main']).catch(() => {});
       await exec('git', ['-C', root, 'reset', '--hard', lkg]).catch(() => {});
+      // 2026-10-21 (decreto owner): rollback destrutivo DESATIVADO — nunca
+      // mais git reset --hard automatico. So alerta; worktree fica como
+      // esta pra revisao humana.
+      log.error({ service: input.service, lkg }, 'selfheal: rollback pro LKG NAO executado (decreto owner — revisao humana necessaria)');
       await exec('git', ['-C', root, 'branch', '-D', lastBranch]).catch(() => {});
       if (attempt < MAX_REPAIR_ATTEMPTS) continue;
 

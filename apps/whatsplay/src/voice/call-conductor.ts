@@ -148,6 +148,7 @@ export class CallConductor {
   private voiceSeen = new Set<string>();
   /** Resultado de investigação pendente — entra como contexto no próximo relay. */
   private pendingInvestigation: string | null = null;
+  private convId: string | null = null;
 
   constructor(private readonly deps: ConductorDeps) {}
 
@@ -221,6 +222,24 @@ export class CallConductor {
     return fresh;
   }
 
+  /** v1.13 (owner 21/10): espelha cada fala da chamada como msg no chat que pediu a ligacao. */
+  private async mirrorTurno(turno: ConductorTurn): Promise<void> {
+    if (!this.convId || !this.deps.pool) return;
+    const body = '[📞 chamada] ' + turno.speaker + ': "' + turno.text.slice(0, 280) + '"'; // 
+    try {
+      const r = await this.deps.pool.query(
+        "INSERT INTO messages (conversation_id, direction, channel, sender, body, author_name, metadata, send_state) " +
+        "VALUES ($1, 'outbound', 'whatsapp', 'luna', $2, 'Luna', $3::jsonb, 'queued') RETURNING id",
+        [this.convId, body, JSON.stringify({ source: 'voice_call' })]);
+      const id = r.rows[0] && r.rows[0].id;
+      if (id) {
+        try { await this.deps.pool.query('SELECT pg_notify($1, $2)', ['luna_outbound', id]); } catch { /* noop */ }
+      }
+    } catch (e) {
+      this.say('mirrorTurno falhou (best-effort)', { erro: String(e).slice(0, 80) });
+    }
+  }
+
   /** Liga o loop da conductora. Retorna handle com stop(). */
   start(tab: Page, brief: CallBriefConductor): { stop: () => void } {
     this.running = true;
@@ -234,6 +253,20 @@ export class CallConductor {
       })
       .catch(() => {});
     const pollMs = this.deps.pollMs ?? 3_000;
+    // v1.13 (owner 21/10): reply_chat -> conversation_id (chat que pediu a ligacao)
+    const replyChat = (brief as { reply_chat?: string | null }).reply_chat ?? null;
+    if (replyChat && this.deps.pool) {
+      this.deps.pool
+        .query(
+          `SELECT cv.id FROM conversations cv LEFT JOIN contacts ct ON ct.id = cv.contact_id
+           WHERE ct.name = $1 OR ct.name ILIKE $2 ORDER BY cv.created_at DESC LIMIT 1`,
+          [replyChat, '%' + replyChat + '%'])
+        .then((r) => {
+          this.convId = r.rows[0]?.id ?? null;
+          if (this.convId) this.say('transcricao da chamada espelhada no chat: ' + replyChat, { replyChat, conversation_id: this.convId });
+          else this.say('reply_chat sem conversa correspondente — transcricao NAO espelhada', { replyChat });
+        })
+        .catch(() => {});
     const loop = async (): Promise<void> => {
       await startReady;
       while (this.running) {
@@ -242,6 +275,7 @@ export class CallConductor {
           if (fresh.length > 0) {
             for (const turno of fresh) {
               this.history.push(`- ${turno.speaker}: ${turno.text}`.slice(0, 200));
+              this.mirrorTurno(turno).catch(() => {});
               if (this.history.length > 12) this.history.shift();
             }
             // RELAY DIRETO (decreto owner 2026-09-25): TODA a transcript vai
