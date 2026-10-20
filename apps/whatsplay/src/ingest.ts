@@ -107,6 +107,21 @@ export function createIngest(deps: IngestDeps) {
       authorOrg = dir.rows[0]!.org;
     }
 
+    // v16.6-fix (owner 20/10): safety net anti-duplicata — external_id é
+    // base64(author|text) e os caminhos (preview diff vs reconcile) montam
+    // formatos diferentes; corpo igual na mesma conversa em 15min = mesma
+    // mensagem. Skip independente de external_id.
+    const dupBodyNet = await pool.query<{ id: string }>(
+      `SELECT id FROM messages
+       WHERE conversation_id = $1 AND direction = 'inbound'
+         AND body = $2 AND created_at > now() - interval '15 minutes'
+       LIMIT 1`,
+      [identity.conversation_id, effectiveText],
+    );
+    if (dupBodyNet.rowCount) {
+      log.info({ external_id: msg.external_id }, 'mensagem duplicada por conteúdo — ignorada (v16.6)');
+      return 'skipped';
+    }
     const messageId = await insertInboundMessage(pool, {
       conversation_id: identity.conversation_id,
       channel: 'whatsapp',

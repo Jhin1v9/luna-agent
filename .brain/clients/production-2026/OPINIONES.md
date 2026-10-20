@@ -1085,3 +1085,22 @@ Conversa interna do time sobre bugs da Luna; cliente (grupo Production) não tev
 }
 ```
 
+## 2026-10-20 — Luna
+
+Luna apresentou falhas técnicas graves durante o atendimento (Chrome desconectado, respostas vazias, 'Sem resposta'). Cliente perguntou se precisa ir pessoalmente ou há outra opção pra subir o site; Enoque mencionou novo pedido de vestuário personalizado.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "negativo",
+  "topic": "suporte_tecnico",
+  "product": "",
+  "urgency": "alta",
+  "follow_up_required": true,
+  "follow_up_note": "Luna falhou na conversa (respostas 'plain Copy', 'Sem resposta', Chrome desconectou). Cliente do grupo 🏆Production pediu opções pra subir o site; Enoque sinalizou pedido de camisetas/sudaderas com logo (Juninho). Time precisa retomar o atendimento manualmente.",
+  "quality_score": 1,
+  "summary": "Luna apresentou falhas técnicas graves durante o atendimento (Chrome desconectado, respostas vazias, 'Sem resposta'). Cliente perguntou se precisa ir pessoalmente ou há outra opção pra subir o site; Enoque mencionou novo pedido de vestuário personalizado.",
+  "client_signal": "pedido"
+}
+```
+
