@@ -817,7 +817,14 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
             }`,
             null,
           ).catch(() => '');
-          earlyOk = typeof hdr === 'string' && hdr.includes(want);
+          // v16.30-fix (owner 21/10): pra NOME de grupo (nao-jid), o header do WA
+          // renderiza 'NOME_DO_GRUPO quem-falou' (preview). includes() casava o nome
+          // do grupo com o preview do privado ('...Abner') e entregava errado.
+          // Agora: so reutiliza o painel se o header EXATO for o nome pedido.
+          const _norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
+          // v16.36-fix (owner 21/10): _norm nao remove emoji — adicionar.
+          const _normEmoji = (s) => String(s || '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}]/gu, '').replace(/\s+/g, ' ').trim();
+          earlyOk = typeof hdr === 'string' && _normEmoji(hdr) === _normEmoji(want);
         }
       }
       if (earlyOk) {

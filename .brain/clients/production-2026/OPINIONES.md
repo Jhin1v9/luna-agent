@@ -1123,3 +1123,41 @@ Conversa interna do time sobre bugs da Luna (Chrome desconectou, respostas vazia
 }
 ```
 
+## 2026-10-21 — Luna
+
+Conversa interna do time (Abner e Enoque) em tom descontraído: bom dia, piadas e Abner comentando que está ficando por dentro da Luna após 2 dias de trabalho. Luna respondeu uma vez de forma adequada, mas depois deixou de responder duas chamadas seguidas ('ta acordada?', 'oi luna').
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "positivo",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 3,
+  "summary": "Conversa interna do time (Abner e Enoque) em tom descontraído: bom dia, piadas e Abner comentando que está ficando por dentro da Luna após 2 dias de trabalho. Luna respondeu uma vez de forma adequada, mas depois deixou de responder duas chamadas seguidas ('ta acordada?', 'oi luna').",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-21 — Luna
+
+Abner (time) testando se a Luna estava acordada e pedindo para o Noke (Enoque) retornar a ligação. A Luna respondeu múltiplas vezes de forma repetitiva/duplicada sem confirmar o retorno da ligação ao time.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "outro",
+  "product": "",
+  "urgency": "baixa",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 2,
+  "summary": "Abner (time) testando se a Luna estava acordada e pedindo para o Noke (Enoque) retornar a ligação. A Luna respondeu múltiplas vezes de forma repetitiva/duplicada sem confirmar o retorno da ligação ao time.",
+  "client_signal": "nenhum"
+}
+```
+

@@ -249,3 +249,41 @@ Owner (Abner) pediu a Luna para executar tools (ler pasta, listar tools, ligar p
 }
 ```
 
+## 2026-10-20 — Luna
+
+Owner (Abner, time) pediu para a Luna ligar para ele e para Ana Paula via nova tool de voz. Luna não respondeu nenhuma das mensagens — provável índice de tools desatualizado na thread, impossibilitando o uso de voiceCallPlace/callRespond/voiceCallEnd.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "suporte_tecnico",
+  "product": "luna-kernel",
+  "urgency": "normal",
+  "follow_up_required": true,
+  "follow_up_note": "Owner pediu teste de ligação (voiceCallPlace) e a Luna não respondeu — verificar índice de tools da thread (161 tools pré-commit, tool nova não aparece). Atualizar índice com listTools busca 'call'.",
+  "quality_score": 1,
+  "summary": "Owner (Abner, time) pediu para a Luna ligar para ele e para Ana Paula via nova tool de voz. Luna não respondeu nenhuma das mensagens — provável índice de tools desatualizado na thread, impossibilitando o uso de voiceCallPlace/callRespond/voiceCallEnd.",
+  "client_signal": "nenhum"
+}
+```
+
+## 2026-10-21 — Luna
+
+Abner (time) orientou a Luna sobre envio de mensagem no chat correto; houve confusão de roteamento e a Luna enviou mensagens duplicadas no grupo, mas depois confirmou funcionamento e envio do bom dia pedido.
+
+```json
+{
+  "outcome": "outro",
+  "sentiment": "neutro",
+  "topic": "suporte_tecnico",
+  "product": "Luna (agente interno)",
+  "urgency": "normal",
+  "follow_up_required": false,
+  "follow_up_note": "",
+  "quality_score": 3,
+  "summary": "Abner (time) orientou a Luna sobre envio de mensagem no chat correto; houve confusão de roteamento e a Luna enviou mensagens duplicadas no grupo, mas depois confirmou funcionamento e envio do bom dia pedido.",
+  "client_signal": "nenhum"
+}
+```
+

@@ -82,7 +82,9 @@ const BADGES_PREVIEW_SCRIPT = `(sel) => {
   const out = [];
   for (const item of document.querySelectorAll(sel.chatItem)) {
     const titleEl = item.querySelector('[title]');
-    const name = titleEl ? titleEl.getAttribute('title') : '';
+    // v16.34-fix (owner 21/10): getAttribute('title') sem emoji. Usar textContent do span[title] (visivel, com emoji).
+    const spanEl = item.querySelector('span[title]');
+    const name = (spanEl && spanEl.textContent ? spanEl.textContent.trim() : '') || (titleEl ? titleEl.getAttribute('title') : '');
     if (!name) continue;
     const chatId = item.getAttribute('data-id') || name;
     if (seen.has(chatId)) continue;

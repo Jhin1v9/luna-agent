@@ -267,6 +267,7 @@ export class CallConductor {
           else this.say('reply_chat sem conversa correspondente — transcricao NAO espelhada', { replyChat });
         })
         .catch(() => {});
+    }
     const loop = async (): Promise<void> => {
       await startReady;
       while (this.running) {
