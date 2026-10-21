@@ -6,6 +6,29 @@ import { sendTeamMessage, type TelegramConfig } from '@luna/channels';
 import { recordAudit } from '@luna/database';
 import type { WhatsAppTransport } from './transport.js';
 import { matchesAllowlist, parseAllowlist } from './allowlist.js';
+
+// v16.17-fix (owner 21/10): chat_registry é a fonte canônica da allowlist
+// (decreto ADR-020 ciculado: whatsappAllowContact -> registry -> guardrail).
+// Destino com role='allowed' no registry libera; env vira só override de emergência.
+async function registryAllows(pool: any, target: any, allowTarget: any): Promise<boolean> {
+  try {
+    const digits = String(target ?? '').replace(/\D/g, '');
+    const { rows } = await pool.query(
+      `SELECT 1 FROM chat_registry WHERE role = 'allowed' AND (
+         (kind = 'individual' AND (
+            replace(chat_key, '@c.us', '') = $1
+            OR replace(coalesce(phone_e164, ''), '@c.us', '') = $1
+            OR lower(canonical_name) = lower($2)))
+         OR (kind = 'group' AND (
+            lower(canonical_name) = lower($2)
+            OR replace(chat_key, '@g.us', '') = $1))
+       ) LIMIT 1`,
+      [digits, String(allowTarget ?? '')]
+    );
+    return rows.length > 0;
+  } catch { return false; }
+}
+
 import { withAutoRepair, type RepairableTransport } from './auto-repair.js';
 import { sanitizeOutboundText } from './outbound-text.js';
 
@@ -292,9 +315,15 @@ export function createOutboundListener(deps: OutboundDeps) {
     // e o jid @g.us nunca casa com entrada de nome. Individual: inalterado
     // (sendTarget === target).
     const allowTarget = isGroupJid ? sendTarget : target;
-    const refusal = (await refusedByAllowlist(allowTarget)) && !(await notifySendExempt(messageId, target))
+    let refusal = (await refusedByAllowlist(allowTarget)) && !(await notifySendExempt(messageId, target))
       ? refusedByAllowlist(allowTarget)
       : null;
+    // v16.17-fix: registry canônico — role=allowed libera; recusa ganha hint do decreto.
+    if (refusal) {
+      const registryHit = await registryAllows(pool, target, allowTarget);
+      if (registryHit) refusal = null;
+      else refusal = String(refusal) + ' — sem role=allowed no chat_registry (libere com whatsappAllowContact)';
+    }
     if (refusal) {
       // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.
       await mark(messageId, 'failed', refusal);

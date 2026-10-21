@@ -744,7 +744,12 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
       // classificava o historico inteiro (sujo) a cada msg, abria aba
       // nova por execucao e spammava. Reativar so quando o job classificar
       // a ultima troca (nao o historico): LUNA_CLASSIFY_ENABLED=1 no .env.
-      if (process.env.LUNA_CLASSIFY_ENABLED === '1') {
+      // v16.19-fix (owner 21/10): classifier SO no done:true + cliente real + conversa nao-meta.
+      // Antes disparava a cada evento de msg -> spam de abas + regress do classifier.
+      const v1619Done = /done\s*:\s*true/i.test(decision.answerText ?? '');
+      const v1619Client = ((pack as { client_name?: string }).client_name ?? 'admin') !== 'admin';
+      const v1619Meta = /^whatsapp/i.test(String(packName ?? ''));
+      if (process.env.LUNA_CLASSIFY_ENABLED === '1' && v1619Done && v1619Client && !v1619Meta) {
         await enqueueJob(db, {
           job_type: 'conversation.classify',
           payload: {

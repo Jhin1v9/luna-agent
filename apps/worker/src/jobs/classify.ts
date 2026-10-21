@@ -38,6 +38,7 @@ const CLASSIFY_PROMPT = (clientName: string, transcript: string) =>
     'Você é a Luna classificando uma conversa de atendimento ENCERRADA da Nexo Digital.',
     `Cliente: ${clientName}.`,
     'Responda APENAS o JSON da classificação, sem texto fora.',
+    'REGRAS DURAS (v16.16): PROIBIDO usar whatsappSendMessage ou qualquer envio — a classificação NUNCA vai pro WhatsApp (read-only). Leia ao vivo com dashboardGetWhatsAppHistory — a tool DEVE ser seguida das linhas isgen:false e done:false. Quando TODAS as leituras terminarem e o JSON da classificação estiver pronto: output = APENAS o JSON + linha done:true. done:true NUNCA antes do JSON final.',
     '',
     'Taxonomia: outcome = resuelto|cliente_feliz|queria_mejora|sugestao|reclamacao|outro;',
     'sentiment = positivo|neutro|negativo; topic = site|design|conteudo|dominio_hospedagem|',
@@ -95,7 +96,7 @@ export function createClassifyHandler(deps: ClassifyDeps) {
     const transcript = 'INSTRUCAO: antes de classificar, LEIA as mensagens recentes deste chat ao vivo usando a tool dashboardGetWhatsAppHistory (parametro chat = o nome desta conversa). Classifique com base no que voce LEU. Amostra minima das ultimas 8 mensagens (use so se a tool falhar):\n' + recentSample;
 
     const turn = await adapter.sendTurn({
-      session_key: `classify:${conversationId}`,
+      session_key: 'classify:main', // v16.19-fix: 1 aba so pro classifier (reutilizada)
       prompt: CLASSIFY_PROMPT(client_name ?? 'desconhecido', transcript),
     });
 
