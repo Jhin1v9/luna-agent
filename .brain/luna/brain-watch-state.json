@@ -1,5 +1,5 @@
 {
-  "last_hash": "afe334c2af0b2eb32760de8b7bef66206d442983",
+  "last_hash": "fb77b8954ef5a83dfae1a8f69fccbce49097bb0f",
   "seen": [
     "4f7c7e225a2957cf406f2cbf8b062439d6a8eaf8",
     "17d8f29624d1ba1989f65e3966f8accda01da707",
@@ -58,7 +58,10 @@
     "f989d24b7768a3f1ee79b79cffa2faa26b833869",
     "7fe0483356517052d98d0795a8c447bdf105d41f",
     "f3f48638aeafc0ae7da0e0d34d19923e2c55f168",
-    "afe334c2af0b2eb32760de8b7bef66206d442983"
+    "afe334c2af0b2eb32760de8b7bef66206d442983",
+    "1db12e625feb7225f7613362c28ee91bbb09a76b",
+    "6faf1ce99df3b664e7239f59add293b26915c2a2",
+    "fb77b8954ef5a83dfae1a8f69fccbce49097bb0f"
   ],
   "armed_at": "2026-10-02T14:13:35.041Z"
 }

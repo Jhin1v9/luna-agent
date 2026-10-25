@@ -21,11 +21,12 @@ async function registryAllows(pool: any, target: any, allowTarget: any): Promise
             OR lower(canonical_name) = lower($2)))
          OR (kind = 'group' AND (
             lower(canonical_name) = lower($2)
-            OR replace(chat_key, '@g.us', '') = $1))
+            OR replace(chat_key, '@g.us', '') = $1
+            OR chat_key = $3 OR chat_key LIKE '%' || $3)) // v16.41c-fix: group por target BRUTO (slug)
        ) LIMIT 1`,
-      [digits, String(allowTarget ?? '')]
+      [digits, String(allowTarget ?? ''), String(target ?? '')]
     );
-    return rows.length > 0;
+    console.log("[REGISTRY-DEBUG] target=" + JSON.stringify(target) + " allowTarget=" + JSON.stringify(allowTarget) + " rows=" + rows.length); return rows.length > 0;
   } catch { return false; }
 }
 
@@ -327,6 +328,7 @@ export function createOutboundListener(deps: OutboundDeps) {
     if (refusal) {
       // Falha EXPLÍCITA: marca failed, audita a recusa, nunca silencioso.
       await mark(messageId, 'failed', refusal);
+      throw new Error('GUARDRAIL_RECUSOU: ' + refusal); // v16.41c-fix: erro real pro kernel
       await recordAudit(pool, {
         actor: 'whatsplay',
         action: 'whatsapp.message.send_refused',
