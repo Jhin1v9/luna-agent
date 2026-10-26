@@ -11,8 +11,11 @@ import { matchesAllowlist, parseAllowlist } from './allowlist.js';
 // (decreto ADR-020 ciculado: whatsappAllowContact -> registry -> guardrail).
 // Destino com role='allowed' no registry libera; env vira só override de emergência.
 async function registryAllows(pool: any, target: any, allowTarget: any): Promise<boolean> {
+  // v16.46-clean-registry: reescrita limpa (patches antigas quebraram a SQL;
+  // catch silencioso virava recusa eterna). Erro agora e logado, nao engolido.
   try {
     const digits = String(target ?? '').replace(/\D/g, '');
+    const t3 = String(target ?? '');
     const { rows } = await pool.query(
       `SELECT 1 FROM chat_registry WHERE role = 'allowed' AND (
          (kind = 'individual' AND (
@@ -21,13 +24,18 @@ async function registryAllows(pool: any, target: any, allowTarget: any): Promise
             OR lower(canonical_name) = lower($2)))
          OR (kind = 'group' AND (
             lower(canonical_name) = lower($2)
-            OR replace(chat_key, '@g.us', '') = $1
-            OR chat_key = $3 OR chat_key LIKE '%' || $3)) // v16.41c-fix: group por target BRUTO (slug)
+            OR chat_key = $3
+            OR ($3 <> '' AND chat_key LIKE '%' || $3)
+            OR lower(regexp_replace(coalesce(canonical_name, ''), '[^a-zA-Z0-9]+', '', 'g')) = lower(regexp_replace(coalesce($2::text, ''), '[^a-zA-Z0-9]+', '', 'g'))))
        ) LIMIT 1`,
-      [digits, String(allowTarget ?? ''), String(target ?? '')]
+      [digits, String(allowTarget ?? ''), t3]
     );
-    console.log("[REGISTRY-DEBUG] target=" + JSON.stringify(target) + " allowTarget=" + JSON.stringify(allowTarget) + " rows=" + rows.length); return rows.length > 0;
-  } catch { return false; }
+    console.log('[REGISTRY] target=' + JSON.stringify(target) + ' allowTarget=' + JSON.stringify(allowTarget) + ' rows=' + rows.length);
+    return rows.length > 0;
+  } catch (err: any) {
+    console.log('[REGISTRY-ERR] ' + (err && err.message ? err.message : String(err)));
+    return false;
+  }
 }
 
 import { withAutoRepair, type RepairableTransport } from './auto-repair.js';
@@ -270,14 +278,30 @@ export function createOutboundListener(deps: OutboundDeps) {
     // por NOME (busca do WA não indexa JID): contact_name → chat_registry →
     // conversations.metadata.chat_name. Sem nome resolvido = failed EXPLÍCITO sem
     // retry (re-tentar só polui a busca com número lixo, screenshot owner 19:48).
+    // v16.52-slug: grupos no formato 'group:<slug>' (padrao atual do kernel)
+    // tambem sao grupo — antes o check so via JID e o slug ia cru pro openChat.
+    const slugMatch = /^group:/.test(row.conversation_chat_id ?? '') ? String(row.conversation_chat_id) : null;
     const isGroupJid =
       /@g\.us$/.test(row.address ?? '') ||
       /@g\.us$/.test(row.conversation_chat_id ?? '') ||
-      /^120363\d{9,}$/.test(row.conversation_chat_id ?? '');
+      /^120363\d{9,}$/.test(row.conversation_chat_id ?? '') ||
+      !!slugMatch;
     let sendTarget = target;
     if (isGroupJid) {
       const jidDigits = (row.conversation_chat_id ?? row.address ?? '').replace(/\D/g, '');
-      let groupName: string | null = row.contact_name ?? null;
+      // v16.52: slug resolve pelo registry PRIMEIRO (canonical_name = nome oficial
+      // intacto no banco, sem emoji mangled do extrator); contact_name pode ser stale.
+      let groupName: string | null = null;
+      if (slugMatch) {
+        try {
+          const reg = await pool.query<{ canonical_name: string }>(
+            `SELECT canonical_name FROM chat_registry WHERE kind = 'group' AND chat_key = $1 LIMIT 1`,
+            [slugMatch],
+          );
+          groupName = reg.rows[0]?.canonical_name ?? null;
+        } catch { groupName = null; }
+      }
+      if (!groupName) groupName = row.contact_name ?? null;
       if (!groupName && jidDigits) {
         try {
           const reg = await pool.query<{ canonical_name: string }>(

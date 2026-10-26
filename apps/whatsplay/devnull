@@ -1,0 +1,69 @@
+// v5.6-fix (2026-10-19): GUARDA DE INSTANCIA UNICA — fim dos zumbis.
+// Grava o proprio PID ao subir. Se a porta estiver ocupada, a nova instancia
+// MATA a anterior (pelo PID registrado) e sai — pm2 respawna e acha porta livre.
+const LUNA_PID_FILE = path.join(require('os').tmpdir(), 'luna-server-3458.pid');
+server.on('listening', () => {
+  try { fs.writeFileSync(LUNA_PID_FILE, String(process.pid)); } catch {}
+});
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    let matou = false;
+    try {
+      const oldPid = parseInt(fs.readFileSync(LUNA_PID_FILE, 'utf8').trim(), 10);
+      if (oldPid && oldPid !== process.pid) {
+        try { process.kill(oldPid); matou = true; } catch {}
+      }
+    } catch {}
+    if (!matou) {
+      // v5.7-fix: FALLBACK — sem PID file (instancia anterior pre-guarda): mata
+      // qualquer node luna-server.js (menos esta instancia) via guard-kill.ps1.
+      try {
+        const { execSync: _ex } = require('child_process');
+        const _ps1 = require('path').join(__dirname, 'guard-kill.ps1');
+        const _out = _ex('powershell -NoProfile -ExecutionPolicy Bypass -File ' + _ps1 + ' -Me ' + process.pid, { encoding: 'utf8', timeout: 15000 });
+        if (_out && _out.trim()) console.log('[LUNA] guarda-fallback: ' + _out.trim());
+        matou = true;
+      } catch (e2) {
+        console.error('[LUNA-FATAL] guarda-fallback falhou: ' + (e2.message || e2));
+      }
+    }
+    if (matou) {
+      console.log('[LUNA] porta ' + PORT + ' sera liberada — retry do listen em 3s (sem exit)');
+    } else {
+      console.error('[LUNA-FATAL] porta ' + PORT + ' ocupada e guarda nao conseguiu liberar — retry em 5s');
+    }
+    // v-fix-listen-loop (24/10): era process.exit(1) incondicional — loop infinito:
+    // cada morte gerava TIME_WAIT (EADDRINUSE no proximo boot) e o ciclo se
+    // auto-alimentava. Agora: retry do listen com backoff; exit so apos 12 falhas.
+    // v-fix-listen-loop-v2: retry ETERNO com backoff exponencial (TIME_WAIT 60-120s no
+    // Windows; exit causava crash loop via pm2 respawn). Nunca morre por porta.
+    global.__lunaListenRetries = (global.__lunaListenRetries || 0) + 1;
+    const _tries = global.__lunaListenRetries;
+    const _delay = Math.min(3000 * Math.pow(1.7, _tries), 60000);
+    console.log('[LUNA] retry ' + _tries + ' do listen em ' + Math.round(_delay/1000) + 's');
+    setTimeout(() => { try { server.listen(PORT); } catch (e) { console.error('[LUNA] retry listen: ' + e.message); } }, _delay);
+    return;
+  }
+  console.error('[LUNA-FATAL] Erro no server:', err.message);
+  process.exit(1);
+});
+
+server.listen(PORT, () => {
+  console.log(`🌙 Luna Web rodando em http://localhost:${PORT}`);
+  console.log(`   luna-dir: ${LUNA_DIR}`);
+  console.log(`   runtime:  ${RUNTIME_PATH}`);
+  console.log('');
+  console.log('   Endpoints:');
+  console.log('   - Chat:    POST /api/chat | GET /api/chat/stream (SSE)');
+  console.log('   - Sessions: GET /api/chat/sessions | POST /api/chat/session');
+  console.log('   - Config:  GET/POST /api/config');
+  console.log('   - Tests:   GET /api/test/* | POST /api/system/*');
+  console.log('   - Legacy:  GET /config.html');
+  console.log('   - Ext WS:  ws://localhost:' + PORT + '/ext/ws');
+  console.log('');
+  console.log('   Frontend:');
+  console.log('   - Serves luna-web/dist/ (SPA fallback)');
+  console.log('');
+});
+
+module.exports = { app };

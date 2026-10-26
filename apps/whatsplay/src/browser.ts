@@ -1027,12 +1027,21 @@ export class WhatsAppWebTransport implements WhatsAppTransport {
       const searchEmpty = await evalWithArg(
         page,
         `(_) => {
-          const pane = document.querySelector('#pane-side') || document.querySelector('#side');
-          const t = ((pane && pane.textContent) || '').toLowerCase();
+          // v16.51-search-fix: o WA renderiza resultados FORA do #pane-side
+          // (mudanca 2026-09 ja documentada no caminho do Enter abaixo). A deteccao
+          // antiga ficou escopada no #pane-side => hasResult sempre falso =>
+          // todo envio abortava como "busca SEM resultado". Agora procura titulos
+          // de resultado VISIVEIS na METADE ESQUERDA da tela, independente do DOM.
+          const titles = Array.from(document.querySelectorAll('[data-testid="cell-frame-title"]'));
+          const hasResult = titles.some((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.left < window.innerWidth / 2;
+          });
+          if (hasResult) return false;
+          const t = (document.body.textContent || '').toLowerCase();
           const saidNone = t.includes('ningún chat') || t.includes('no se encontró') ||
-            t.includes('nenhum chat') || t.includes('no results found');
-          const hasResult = !!document.querySelector(
-            '#pane-side [data-testid="cell-frame-title"], #side [data-testid="cell-frame-title"]');
+            t.includes('nenhum chat') || t.includes('nenhum resultado') ||
+            t.includes('no results found') || t.includes('no chats found');
           return saidNone || !hasResult;
         }`,
         null,
