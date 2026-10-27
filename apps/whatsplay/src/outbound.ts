@@ -439,20 +439,12 @@ export function createOutboundListener(deps: OutboundDeps) {
       // instável) virava 'failed' PERMANENTE e o usuário nunca sabia. Agora
       // reenfileira com backoff (máx 4 retries). Bloqueios de segurança
       // (send-safety/allowlist) continuam falha imediata — nunca retentam.
-      const seguranca = /send_safety|allowlist|blocklist|recusa/i.test(errorMsg);
-      const attempts = Number((row as unknown as { metadata?: { delivery_attempts?: number } }).metadata?.delivery_attempts ?? 0) + 1;
-      if (!seguranca && attempts < 5) {
-        const backoffSec = Math.min(60 * attempts, 300);
-        await pool.query(
-          `UPDATE messages SET metadata = COALESCE(metadata,'{}'::jsonb) || $2::jsonb WHERE id = $1`,
-          [messageId, JSON.stringify({ delivery_attempts: attempts, next_retry_at: new Date(Date.now() + backoffSec * 1000).toISOString() })],
-        );
-        log.warn({ message_id: messageId, attempts, backoffSec }, 'entrega falhou — reenfileirada com backoff');
-        setTimeout(() => {
-          deliverQueued(messageId);
-        }, backoffSec * 1000);
-        return;
-      }
+      // v16.59-fire-and-forget (decreto owner 26/10): retry automatico DESATIVADO.
+      // Falhou = falha permanente: marca, loga e acabou. Reenfileirar com backoff
+      // gerava flood de msgs velhas (duplicadas, atrasadas). Reenvio = manual.
+      await mark(messageId, 'failed', errorMsg.slice(0, 300));
+      log.error({ message_id: messageId, target, err: errorMsg.slice(0, 200) }, 'entrega falhou — fire-and-forget, sem retry (reenvie manual se precisar)');
+      return;
       await mark(messageId, 'failed', errorMsg);
       await recordAudit(pool, {
         actor: 'whatsplay',
